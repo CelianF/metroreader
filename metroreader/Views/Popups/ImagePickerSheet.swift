@@ -15,11 +15,11 @@ struct ImagePickerSheet: View {
     
     // Liste des images disponibles dans vos Assets
     let availableImages: [String: [String]] = [
-        "Pass Originaux": ["Navigo", "Navigo Découverte", "Navigo Easy Carte", "Navigo Easy SOCS", "Navigo eSE Apple", "Carte ScolR"],
+        "Pass Originaux": ["Navigo", "Navigo Découverte", "Navigo Easy Carte", "Navigo Easy SOCS", "Navigo eSE Apple", "Carte ScolR", "Navigo Easy PassLocal"],
         "Pass Événementiels": ["Navigo Easy Carte JO", "Navigo JO Vert", "Navigo JO Jaune", "Navigo JO Rouge", "Navigo JO Bleu", "Navigo JO Noir", "Navigo JO", "Navigo JP"],
-        "Pass Historiques": ["Navigo STIF", "NavigOrange"],
-        "Pass Réseaux Externes": ["NavigOpus", "NavigOyster", "NavigoPassPass", "NavigAura"],
-        "Pass Spéciaux": ["Navigo Anti-Pollution", "Ticket T+"],
+        "Pass Historiques": ["Navigo STIF", "NaviGold", "NavigOrange"],
+        "Pass Réseaux Externes": ["NavigOpus", "NavigOyster", "NavigoPassPass", "NavigAura", "Navigente"],
+        "Pass Spéciaux": ["Navigo Anti-Pollution", "Ticket T+", "Navigo Pride"],
         "Pass Entreprise": ["Pass Carmillion", "Pass Optile"],
         "Pass Ligne": ["C1", "M15", "RER B", "Grand Paris Express"]
     ]

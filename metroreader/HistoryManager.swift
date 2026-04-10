@@ -3,7 +3,7 @@
 //  metroreader
 //
 //  Created by Antoine Souben-Fink on 30/12/2025.
-//
+//  Edited by Célian Faucille on 10/01/2026.
 
 import Foundation
 
@@ -30,6 +30,7 @@ class HistoryManager: ObservableObject {
             existingRecord.date = Date()
             existingRecord.iccData = icc
             existingRecord.envData = try? JSONSerialization.data(withJSONObject: env)
+            existingRecord.contractsData = try? JSONSerialization.data(withJSONObject: contracts)
             
             // Fusion des événements (éviter les doublons)
             let oldEvents = existingRecord.events
@@ -52,7 +53,7 @@ class HistoryManager: ObservableObject {
             }
             existingRecord.specialEventsData = try? JSONSerialization.data(withJSONObject: newUniqueSpecialEvents + oldSpecialEvents)
             
-            let oldContracts = existingRecord.contracts
+            /* let oldContracts = existingRecord.contracts
             let newUniqueContracts = contracts.filter { newC in
                 !oldContracts.contains(where: {
                     getKey($0, "ContractSerialNumber") == getKey(newC, "ContractSerialNumber") &&
@@ -61,7 +62,7 @@ class HistoryManager: ObservableObject {
                     getKey($0, "ContractProvider") == getKey(newC, "ContractProvider")
                 })
             }
-            existingRecord.contractsData = try? JSONSerialization.data(withJSONObject: newUniqueContracts + oldContracts)
+            existingRecord.contractsData = try? JSONSerialization.data(withJSONObject: newUniqueContracts + oldContracts) */
             
             // Remplacer l'ancien record et le remonter en haut de liste
             history.remove(at: index)
@@ -131,5 +132,28 @@ class HistoryManager: ObservableObject {
         } catch {
             print("Error deleting history file: \(error.localizedDescription)")
         }
+    }
+    func togglePin(for record: ScanRecord) {
+        if let index = history.firstIndex(where: { $0.id == record.id }) {
+            history[index].isPinned.toggle()
+            persistToDisk()
+        }
+    }
+
+    var sortedHistory: [ScanRecord] {
+        history.sorted { record1, record2 in
+            if record1.isPinned == record2.isPinned {
+                return record1.date > record2.date
+            }
+            return record1.isPinned && !record2.isPinned
+        }
+    }
+
+    var pinnedRecords: [ScanRecord] {
+        history.filter { $0.isPinned }.sorted { $0.date > $1.date }
+    }
+
+    var unpinnedRecords: [ScanRecord] {
+        history.filter { !$0.isPinned }.sorted { $0.date > $1.date }
     }
 }

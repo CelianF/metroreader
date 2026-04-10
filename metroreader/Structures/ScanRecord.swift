@@ -3,7 +3,8 @@
 //  metroreader
 //
 //  Created by Antoine Souben-Fink on 30/12/2025.
-//
+//  Edited by Célian Faucille on 10/01/2026.
+
 
 import Foundation
 import SwiftUI
@@ -14,6 +15,7 @@ struct ScanRecord: Identifiable, Codable {
     var date: Date // Date du dernier scan
     var nickname: String? // Nom personnalisé
     var imageName: String? // Image de pass personnalisée
+    var isPinned: Bool = false
     let cardID: UInt64
     var iccData: String?
     var envData: Data?

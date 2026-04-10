@@ -2,8 +2,8 @@
 //  HistoryPageView.swift
 //  metroreader
 //
-//  Created by Antoine Souben-Fink on 30/12/2025.
-//
+//  Created by Antoine Souben-Fink on 30/12/2026.
+//  Edited by Célian Faucille on 10/01/2026
 
 import SwiftUI
 
@@ -14,42 +14,32 @@ struct HistoryPageView: View {
     
     var body: some View {
         List {
-            ForEach(historyManager.history) { record in
-                Button {
-                    selectedRecord = record
-                } label: {
-                    HStack(spacing: 8) {
-                        NavigoImage(imageName: record.image)
-                            .shadow(radius: 2)
-                            .frame(height: 50)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("\(record.displayTitle)")
-                                .font(.headline)
-                            
-                            HStack {
-                                if record.cardID != 0 {
-                                    Text("\(record.cardID)")
-                                        .font(.caption)
-                                        .padding(4)
-                                        .background(Color.blue.opacity(0.1))
-                                        .cornerRadius(4)
-                                        .foregroundStyle(.secondary)
-                                }
-                             
-                                Spacer()
-                                
-                                Text(record.date.formatted(date: .abbreviated, time: .shortened))
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 4)
+            // Section des épinglés
+            if !historyManager.pinnedRecords.isEmpty {
+                Section(header: HStack {
+                    Image(systemName: "pin.fill")
+                    Text("Épinglés")
+                }.foregroundColor(.yellow)) {
+                    ForEach(historyManager.pinnedRecords) { record in
+                        HistoryRowButton(record: record, selectedRecord: $selectedRecord, historyManager: historyManager)
                     }
                 }
-                .buttonStyle(.plain)
             }
-            .onDelete { indexSet in
-                historyManager.deleteItems(at: indexSet)
+            
+            // Section des récents
+            Section(header: Text(historyManager.pinnedRecords.isEmpty ? "Historique" : "Récents")) {
+                ForEach(historyManager.unpinnedRecords) { record in
+                    HistoryRowButton(record: record, selectedRecord: $selectedRecord, historyManager: historyManager)
+                }
+                .onDelete { indexSet in
+                    // Adapter la suppression pour les unpinnedRecords
+                    let recordsToDelete = indexSet.map { historyManager.unpinnedRecords[$0] }
+                    for record in recordsToDelete {
+                        if let index = historyManager.history.firstIndex(where: { $0.id == record.id }) {
+                            historyManager.deleteItems(at: IndexSet(integer: index))
+                        }
+                    }
+                }
             }
         }
         .navigationTitle("Historique")

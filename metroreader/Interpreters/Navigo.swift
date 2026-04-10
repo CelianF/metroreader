@@ -14,7 +14,7 @@ func interpretNavigoCommercialId(_ bitstring: String) -> String {
     case 0:
         return "Unknown"
     case 1:
-        return "Navigo"
+        return "Navigo" // Ou Navigo Découverte
     case 2:
         return "Navigo Annuel"
     case 5:
@@ -52,6 +52,8 @@ func interpretNavigoImage(_ personalizationStatusBitstring: String, _ issuerIdBi
                         return "Navigo JO"
                     }
                 }
+            } else if tariff == 0x8010 {
+                return "Navigo Easy PassLocal"
             }
         }
     }
