@@ -105,10 +105,11 @@ public class NavigoStations {
         if let station = allStations.first(where: { $0.provider_id == provider_id && $0.line_id == line_id && $0.location_id == location_id && $0.mode == modeToUse }) {
             return station
         }
-        else if let station = allStations.first(where: { $0.provider_id == provider_id && $0.location_id == location_id && $0.mode == modeToUse }) {
-            return station
-        }
-        // If no provider matches this location, we try without checking the provider
-        return allStations.first(where: { $0.location_id == location_id && $0.mode == modeToUse })
+        // Pas de repli sans l'exploitant. Les identifiants d'arrêt sont locaux à
+        // chaque réseau et massivement recyclés — le 161 est déclaré par vingt
+        // exploitants — donc chercher sans lui renvoie le premier venu dans
+        // l'ordre du fichier, soit un arrêt à l'autre bout de la région annoncé
+        // comme une certitude. Mieux vaut rendre l'identifiant brut.
+        return allStations.first(where: { $0.provider_id == provider_id && $0.location_id == location_id && $0.mode == modeToUse })
     }
 }
