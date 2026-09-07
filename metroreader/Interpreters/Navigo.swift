@@ -45,45 +45,47 @@ func interpretNavigoImage(_ personalizationStatusBitstring: String, _ issuerIdBi
                     let endDate = interpretDate(endDateBitstring)
                     switch endDate {
                     case "14/08/2024":
-                        return "Navigo JO"
+                        return "PhrygeJO"
                     case "11/09/2024":
-                        return "Navigo JP"
+                        return "PhrygeJOP"
                     default:
-                        return "Navigo JO"
+                        return "PhrygeJO"
                     }
                 }
             } else if tariff == 0x8010 {
-                return "Navigo Easy PassLocal"
+                return "Pass Local"
             }
         }
     }
     
     switch commercialName {
     case "Navigo", "Navigo Annuel", "Navigo Imagine R":
-        return "Navigo"
+        return "Nominatif"
     case "eSE Apple":
-        return "Navigo eSE Apple"
+        return "Pass iOS"
     case "Carte Interne":
         switch issuer {
         case "SNCF":
-            return "Pass Carmillion"
+            return "Carmillon"
         case "Optile":
-            return "Pass Optile"
+            return "Optile"
         default:
-            return "Navigo"
+            return "Nominatif"
         }
-    case "Navigo Easy Carte", "Navigo Easy SOCS":
-        return commercialName
+    case "Navigo Easy Carte":
+        return "Easy"
+    case "Navigo Easy SOCS": // Support Occasionnel Carton Sans Contact
+        return "EasyCarton"
     default:
         switch perso {
         case "Anonymous":
-            return "Navigo Easy"
+            return "Easy"
         case "Declarative":
-            return "Navigo Découverte"
+            return "Découverte"
         case "Nominative":
-            return "Navigo"
+            return "Nominatif"
         default:
-            return "Navigo"
+            return "Nominatif"
         }
     }
 }

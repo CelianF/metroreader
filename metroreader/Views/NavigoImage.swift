@@ -18,5 +18,5 @@ struct NavigoImage: View {
 }
 
 #Preview {
-    NavigoImage(imageName: "Navigo JO")
+    NavigoImage(imageName: "PhrygeJO")
 }

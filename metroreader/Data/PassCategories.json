@@ -1,0 +1,99 @@
+{
+  "categories": [
+    {
+      "folder": "Originaux",
+      "name": "Originaux",
+      "images": [
+        "Découverte",
+        "Easy",
+        "EasyCarton",
+        "Local Carton",
+        "Nominatif",
+        "Pass iOS",
+        "Pass Local"
+      ]
+    },
+    {
+      "folder": "JO",
+      "name": "JO",
+      "images": [
+        "EasyJO",
+        "PassJObleu",
+        "PassJOjaune",
+        "PassJOnoir",
+        "PassJOrouge",
+        "PassJOvert",
+        "PhrygeJO",
+        "PhrygeJOP"
+      ]
+    },
+    {
+      "folder": "Spéciaux",
+      "name": "Spéciaux",
+      "images": [
+        "Anti-Polution",
+        "Catacombes",
+        "Pride",
+        "Ticket T+"
+      ]
+    },
+    {
+      "folder": "Lignes",
+      "name": "Lignes",
+      "images": [
+        "Cable C1",
+        "Métro 15",
+        "Métro 4",
+        "RER A",
+        "RER B",
+        "SGP 15-16-17"
+      ]
+    },
+    {
+      "folder": "Schol'R",
+      "name": "Schol'R",
+      "images": [
+        "2018-2019",
+        "2019-2020",
+        "2020-2021",
+        "2021-2022",
+        "2022-2023",
+        "2023-2024",
+        "2024-2025",
+        "2025-2026"
+      ]
+    },
+    {
+      "folder": "Entreprises",
+      "name": "Entreprises",
+      "images": [
+        "Carmillon",
+        "Optile",
+        "Optile Bleu",
+        "Optile Gold"
+      ]
+    },
+    {
+      "folder": "Exterieurs",
+      "name": "Exterieurs",
+      "images": [
+        "Aura Auvergne Rhone Alpes",
+        "Navegante Lisbone",
+        "New York Metro Card",
+        "Opus Montréal",
+        "Oyester Londres",
+        "PassPass Lille",
+        "TCL Lyon"
+      ]
+    },
+    {
+      "folder": "Olds",
+      "name": "Olds",
+      "images": [
+        "CarteOrange",
+        "NaviGoSTIF1",
+        "NavigoSTIF2"
+      ]
+    }
+  ]
+}

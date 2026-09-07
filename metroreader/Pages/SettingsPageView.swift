@@ -77,7 +77,7 @@ struct SettingsPageView: View {
                         }
                     }
                     
-                    Text("Designs des cartes")
+                    Text("Interface de l'application, design des cartes")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

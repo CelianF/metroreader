@@ -13,19 +13,9 @@ struct ImagePickerSheet: View {
     let cardID: UInt64
     @ObservedObject var historyManager: HistoryManager
     
-    // Liste des images disponibles dans vos Assets
-    let availableImages: [String: [String]] = [
-        "Pass Originaux": ["Navigo", "Navigo Découverte", "Navigo Easy Carte", "Navigo Easy SOCS", "Navigo eSE Apple", "Carte ScolR", "Navigo Easy PassLocal"],
-        "Pass Événementiels": ["Navigo Easy Carte JO", "Navigo JO Vert", "Navigo JO Jaune", "Navigo JO Rouge", "Navigo JO Bleu", "Navigo JO Noir", "Navigo JO", "Navigo JP"],
-        "Pass Historiques": ["Navigo STIF", "NaviGold", "NavigOrange"],
-        "Pass Réseaux Externes": ["NavigOpus", "NavigOyster", "NavigoPassPass", "NavigAura", "Navigente"],
-        "Pass Spéciaux": ["Navigo Anti-Pollution", "Ticket T+", "Navigo Pride"],
-        "Pass Entreprise": ["Pass Carmillion", "Pass Optile"],
-        "Pass Ligne": ["C1", "M15", "RER B", "Grand Paris Express"]
-    ]
-    
-    let categories: [String] = ["Pass Originaux", "Pass Événementiels", "Pass Historiques", "Pass Réseaux Externes", "Pass Spéciaux", "Pass Entreprise", "Pass Ligne"]
-    
+    // Catégories et ordre d'affichage : Data/PassCategories.json
+    let categories: [PassCategory] = PassCatalog.categories
+
     let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
     var body: some View {
@@ -57,15 +47,15 @@ struct ImagePickerSheet: View {
                     
                     // --- PARCOURS DES CATÉGORIES ---
                     
-                    ForEach(categories, id: \.self) { category in
+                    ForEach(categories) { category in
                         VStack(alignment: .leading, spacing: 10) {
-                            Text(category)
+                            Text(category.displayName)
                                 .font(.title3)
                                 .bold()
                                 .padding(.bottom, 5)
-                            
+
                             LazyVGrid(columns: columns, spacing: 20) {
-                                ForEach(availableImages[category] ?? [], id: \.self) { imgName in
+                                ForEach(category.images, id: \.self) { imgName in
                                     Button {
                                         historyManager.setImageName(for: cardID, to: imgName)
                                         dismiss()
