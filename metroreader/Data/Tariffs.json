@@ -18,6 +18,7 @@
         { "endDate": "11/09/2024", "name": "Navigo Jeux Paralympiques" }
       ]
     },
+    { "code": "0x000F", "name": "Forfait Antipollution", "icon": "ic_ticketing_antipollution" },
     { "code": "0x0015", "name": "Paris - Visite", "icon": "ic_ticketing_paris" },
     { "code": "0x1000", "name": "Navigo Liberté +", "icon": "ic_ticketing_liberte_plus" },
     { "code": "0x1001", "name": "Navigo Liberté +", "icon": "ic_ticketing_liberte_plus" },

@@ -14,12 +14,14 @@
     { "id": 116, "name": "R'Bus (VEOLIA)" },
     { "id": 156, "name": "Phebus" },
     { "id": 175, "name": "RATP (Veolia Transport Nanterre)" },
+    { "id": 201, "name": "Transdev Vexin" },
     { "id": 205, "name": "Transdev Valmy" },
     { "id": 221, "name": "Transdev Coteaux de la Marne" },
     { "id": 222, "name": "Keolis Ouest Val-de-Marne" },
     { "id": 226, "name": "RC Saclay" },
     { "id": 228, "name": "Transdev Versailles" },
-    { "id": 230, "name": "Transdev Sud Yvelines" }
+    { "id": 230, "name": "Transdev Sud Yvelines" },
+    { "id": 235, "name": "RATP Cap Mantois" }
   ],
   "networks": [
     { "name": "Montréal", "countryId": "124", "networkId": "001" },

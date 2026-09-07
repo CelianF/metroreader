@@ -18,8 +18,8 @@ struct PassTimers {
     }
 
     struct SaleBlock {
-        let countdown: Countdown
         let blocked: [String] // Titres dont l'achat est impossible
+        let countdown: Countdown? // nil : blocage permanent, un titre bloquant est encore sur le pass
     }
 
     /// Validité opposable à un contrôle, telle que la calcule le timer « Contrôle ».
@@ -81,8 +81,12 @@ struct PassTimers {
         var isTransit: Bool { isRail || isSurface }
     }
 
-    // Titres soumis à la règle de vente, et ce que leur consommation bloque.
-    // Le Bus-Tram est compatible avec tout, le T+ n'est plus vendu donc jamais bloqué.
+    // Ordre d'affichage canonique des titres bloqués
+    private static let saleOrder = ["Métro-Train-RER", "Paris <> Aéroports"]
+
+    // Titres soumis à la règle de vente, et ce que leur présence ou leur
+    // consommation bloque. Le Bus-Tram est compatible avec tout, et le T+ n'est
+    // plus vendu donc il n'apparaît jamais parmi les titres bloqués.
     private static let saleRules: [Int: [String]] = [
         0x5000: ["Métro-Train-RER", "Paris <> Aéroports"], // Ticket T+
         0x5010: ["Métro-Train-RER", "Paris <> Aéroports"], // Ticket T+ (Réduit)
@@ -114,7 +118,7 @@ struct PassTimers {
 
         hasUsableEvent = parsed.contains { $0.isTransit }
         alreadyValidated = Self.alreadyValidatedTimer(parsed)
-        sale = Self.saleTimer(parsed)
+        sale = Self.saleTimer(contracts: contracts, events: parsed)
         control = Self.controlTimer(parsed)
     }
 
@@ -129,17 +133,41 @@ struct PassTimers {
         }
     }
 
-    /// 4 h après la consommation du dernier titre soumis à la règle de vente.
-    private static func saleTimer(_ events: [TimedEvent]) -> SaleBlock? {
-        for event in events {
-            guard let contract = event.contract,
-                  let tariffBits = getKey(contract, "ContractTariff"),
-                  let tariff = Int(tariffBits, radix: 2),
-                  let blocked = saleRules[tariff] else { continue }
-            return SaleBlock(countdown: Countdown(start: event.date, duration: 4 * 3600),
-                             blocked: blocked)
+    /// Un titre soumis à la règle de vente bloque tant qu'il reste sur le pass,
+    /// puis encore 4 h après la consommation du dernier d'entre eux.
+    private static func saleTimer(contracts: [[String: Any]], events: [TimedEvent]) -> SaleBlock? {
+        var permanent: Set<String> = []
+        var timed: Set<String> = []
+        var countdown: Countdown?
+
+        // Titres bloquants encore chargés : le blocage n'a pas de fin connue.
+        for contract in contracts {
+            guard let tariff = tariffCode(contract),
+                  let blocks = saleRules[tariff],
+                  let countBits = getKey(contract, "CounterContractCount"),
+                  interpretInt(countBits) > 0 else { continue }
+            permanent.formUnion(blocks)
         }
-        return nil
+
+        // Sinon, les 4 h qui suivent la consommation du dernier titre bloquant.
+        if let event = events.first(where: { $0.contract.flatMap(tariffCode).map { saleRules[$0] != nil } ?? false }),
+           let tariff = event.contract.flatMap(tariffCode),
+           let blocks = saleRules[tariff] {
+            let elapsed = Countdown(start: event.date, duration: 4 * 3600)
+            if elapsed.isRunning {
+                timed.formUnion(blocks)
+                countdown = elapsed
+            }
+        }
+
+        let blocked = saleOrder.filter { permanent.contains($0) || timed.contains($0) }
+        guard !blocked.isEmpty else { return nil }
+        return SaleBlock(blocked: blocked, countdown: permanent.isEmpty ? countdown : nil)
+    }
+
+    private static func tariffCode(_ contract: [String: Any]) -> Int? {
+        guard let bits = getKey(contract, "ContractTariff") else { return nil }
+        return Int(bits, radix: 2)
     }
 
     /// Temps de validité. La famille est choisie par le mode du dernier événement.

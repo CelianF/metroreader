@@ -143,12 +143,6 @@ struct ScanView: View {
                 TimersView(timers: timers)
             }
             
-            if !tagEnvHolder.isEmpty {
-                Section(header: Text("Environnement")) {
-                    EnvHolderView(envHolderInfo: tagEnvHolder)
-                }
-            }
-            
             if tagContracts.count > 0 {
                 Section(header: Text("Contrats")) {
                     ForEach(displayedContractsIndices, id: \.self) { i in
@@ -222,6 +216,12 @@ struct ScanView: View {
                             EventPreview(eventInfo: tagSpecialEvents[i])
                         }
                     }
+                }
+            }
+
+            if !tagEnvHolder.isEmpty {
+                Section(header: Text("Environnement")) {
+                    EnvHolderView(envHolderInfo: tagEnvHolder)
                 }
             }
         }

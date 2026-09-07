@@ -28,13 +28,19 @@ struct TimersView: View {
                 }
             }
 
-            if saleEnabled, let sale = timers.sale, sale.countdown.isRunning {
+            if saleEnabled, let sale = timers.sale {
                 box(color: .red) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Achat impossible pour \(TimersView.list(sale.blocked))")
                             .fontWeight(.semibold)
-                        TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-                            Text("Disponible dans \(TimersView.hoursMinutes(sale.countdown.remaining))")
+                        if let countdown = sale.countdown {
+                            TimelineView(.periodic(from: .now, by: 1.0)) { _ in
+                                Text("Disponible dans \(TimersView.hoursMinutes(countdown.remaining))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else {
+                            Text("Tant qu'un titre bloquant reste sur le pass")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
