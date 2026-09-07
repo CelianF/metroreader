@@ -14,6 +14,10 @@ struct SettingsPageView: View {
     @AppStorage("autoLaunchScan") private var autoLaunchScan = false
     #endif
     @AppStorage("isHistoryEnabled") private var isHistoryEnabled = false
+
+    @AppStorage(TimerSettings.alreadyValidated) private var alreadyValidatedTimer = true
+    @AppStorage(TimerSettings.sale) private var saleTimer = true
+    @AppStorage(TimerSettings.control) private var controlTimer = true
     
     @State private var showingDeleteAlert = false
     
@@ -39,6 +43,20 @@ struct SettingsPageView: View {
                 }
             }
             
+            Section(header: Text("Timers"), footer: Text("Affichés sous le visuel de la carte. Le timer Contrôle pilote aussi le contour du pass.")) {
+                Toggle(isOn: $alreadyValidatedTimer) {
+                    Label("Pass déjà validé", systemImage: "arrow.uturn.backward.circle")
+                }
+
+                Toggle(isOn: $saleTimer) {
+                    Label("Vente", systemImage: "cart")
+                }
+
+                Toggle(isOn: $controlTimer) {
+                    Label("Contrôle", systemImage: "checkmark.seal")
+                }
+            }
+
             Section(header: Text("Confidentialité")) {
                 Button(role: .destructive) {
                     showingDeleteAlert = true

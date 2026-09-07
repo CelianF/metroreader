@@ -23,6 +23,23 @@ struct ScanView: View {
     @State private var showingRenameAlert = false
     @State private var newNickname = ""
     @State private var showingImagePicker = false
+    @AppStorage(TimerSettings.control) private var controlTimerEnabled = true
+
+    private var timers: PassTimers {
+        PassTimers(contracts: tagContracts, events: tagEvents)
+    }
+
+    // Contour du visuel : vert tant que le titre est valable, orange pendant la
+    // demi-heure qui suit son expiration, rouge ensuite.
+    private var validityOutline: (color: Color, glow: CGFloat)? {
+        guard controlTimerEnabled else { return nil }
+        switch timers.validity {
+        case .valid:           return (.green, 6)
+        case .recentlyExpired: return (.orange, 16)
+        case .expired:         return (.red, 6)
+        case .unknown:         return nil
+        }
+    }
     
     private var displayedContractsIndices: [Int] {
         let allIndices = Array(0..<tagContracts.count)
@@ -78,6 +95,15 @@ struct ScanView: View {
                     if let holderCardStatus = getKey(tagEnvHolder, "HolderDataCardStatus"), let holderCommercialId = getKey(tagEnvHolder, "HolderDataCommercialID") {
                         NavigoImage(imageName: historyManager.history.first(where: { $0.cardID == cardID })?.image ?? interpretNavigoImage(holderCardStatus, getKey(tagEnvHolder, "EnvApplicationIssuerId") ?? "", holderCommercialId, tagContracts))
                             .shadow(radius: 2)
+                            .overlay {
+                                if let outline = validityOutline {
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .strokeBorder(outline.color, lineWidth: 3)
+                                        .shadow(color: outline.color, radius: outline.glow)
+                                        .shadow(color: outline.color.opacity(0.6), radius: outline.glow)
+                                        .allowsHitTesting(false)
+                                }
+                            }
                             .onTapGesture(count: 2) {
                                 showingImagePicker = true
                             }
@@ -114,7 +140,7 @@ struct ScanView: View {
             
             
             if tagContracts.count > 0 && tagEvents.count > 0 {
-                StatusView(contracts: tagContracts, events: tagEvents)
+                TimersView(timers: timers)
             }
             
             if !tagEnvHolder.isEmpty {
