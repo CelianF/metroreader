@@ -185,9 +185,9 @@ func interpretZonesShort(_ bitstring: String) -> String {
 func interpretRouteNumber(_ routeNumberBitstring: String, _ eventCodeBitstring: String, _ eventServiceProviderBitstring: String) -> String {
     let routeNumber = Int(routeNumberBitstring, radix: 2)!
     
-    let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: true, routeNumber: routeNumber).0
-    
     let serviceProviderCode = Int(eventServiceProviderBitstring, radix: 2)!
+
+    let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: true, routeNumber: routeNumber, serviceProvider: serviceProviderCode).0
     
     if (eventTransport == "RER") {
         if (routeNumber == 16) || (routeNumber == 17) || (routeNumber == 26) {
@@ -263,9 +263,9 @@ func interpretRoute(_ routeNumberBitstring: String, _ eventCodeBitstring: String
         return nil
     }
     
-    let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: true, routeNumber: routeNumber).0
-    
     let serviceProviderCode = Int(eventServiceProviderBitstring, radix: 2)!
+
+    let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: true, routeNumber: routeNumber, serviceProvider: serviceProviderCode).0
     
     if (eventTransport == "RER") {
         if (routeNumber == 16) || (routeNumber == 17) || (routeNumber == 26) {
@@ -300,7 +300,7 @@ func interpretLocationId(_ locationIdBitString: String, _ eventCodeBitstring: St
     
     let eventRouteNumberPresent = (routeNumberBitstring != nil)
     
-    let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: eventRouteNumberPresent, routeNumber: eventRouteNumberPresent ? Int(routeNumberBitstring ?? "0", radix: 2) : nil).0
+    let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: eventRouteNumberPresent, routeNumber: eventRouteNumberPresent ? Int(routeNumberBitstring ?? "0", radix: 2) : nil, serviceProvider: Int(eventServiceProviderBitstring, radix: 2)).0
     
     let eventServiceProviderId = Int(eventServiceProviderBitstring, radix: 2) ?? 0
 

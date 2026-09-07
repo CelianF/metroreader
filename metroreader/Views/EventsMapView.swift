@@ -34,7 +34,7 @@ struct EventsMapView: View {
                 return nil;
             }
             
-            let eventCode = interpretEventCode(getKey(eventInfo, "EventCode") ?? "", isRouteNumberPresent: getKey(eventInfo, "EventRouteNumber") != nil, routeNumber: Int(getKey(eventInfo, "EventRouteNumber") ?? "0", radix: 2))
+            let eventCode = interpretEventCode(getKey(eventInfo, "EventCode") ?? "", isRouteNumberPresent: getKey(eventInfo, "EventRouteNumber") != nil, routeNumber: Int(getKey(eventInfo, "EventRouteNumber") ?? "0", radix: 2), serviceProvider: Int(getKey(eventInfo, "EventServiceProvider") ?? "", radix: 2))
             var finalMode = eventCode.0
             let eventTransition = eventCode.1
             if (eventLocation.found && finalMode == "Train") {

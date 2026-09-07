@@ -77,7 +77,7 @@ func interpretPersonalizationStatusCode(_ bitstring: String) -> (String, Bool, B
     }
 }
 
-func interpretEventCode(_ bitstring: String, isRouteNumberPresent: Bool = false, routeNumber: Int? = nil) -> (String, String) {
+func interpretEventCode(_ bitstring: String, isRouteNumberPresent: Bool = false, routeNumber: Int? = nil, serviceProvider: Int? = nil) -> (String, String) {
     /**
      Interprets the event code from a binary string
      - Parameter bitstring: The binary string of the event code to interpret
@@ -127,7 +127,11 @@ func interpretEventCode(_ bitstring: String, isRouteNumberPresent: Bool = false,
     
     var transportModeStr = transportModes[transportMode]
     if isRouteNumberPresent && transportModeStr == "Métro" {
-        if routeNumber == 16 {
+        // La RATP encode le RER A en mode métro sur la course 16. Chez un autre
+        // exploitant, la course 16 est bien un métro : c'est la ligne du Grand
+        // Paris Express qui dessert Saint-Denis Pleyel. À exploitant inconnu on
+        // garde l'ancien comportement.
+        if routeNumber == 16 && (serviceProvider ?? 3) == 3 {
             transportModeStr = "RER"
         }
     }
@@ -179,7 +183,9 @@ func interpretEventResult(_ bitstring: String) -> String {
         // son ancien libellé « Double validation (Sortie) ».
         return "Titre non valable"
     default:
-        return "Unknown (\(Int(bitstring, radix: 2) ?? 0))"
+        // Tout code non répertorié, dont 0x34 et 0x35, rencontrés sur des passes
+        // réelles sans qu'on sache encore ce qu'ils signifient.
+        return "Événement inconnu (\(String(format: "0x%02X", Int(bitstring, radix: 2) ?? 0))) — à signaler"
     }
 }
 

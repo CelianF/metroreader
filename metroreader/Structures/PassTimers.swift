@@ -106,9 +106,11 @@ struct PassTimers {
             date.addTimeInterval(interpretTimeAsTimeInterval(getKey(event, "EventTimeStamp") ?? ""))
 
             let routeNumber = getKey(event, "EventRouteNumber").flatMap { Int($0, radix: 2) }
+            let provider = getKey(event, "EventServiceProvider").flatMap { Int($0, radix: 2) }
             let (mode, transition) = interpretEventCode(getKey(event, "EventCode") ?? "",
                                                         isRouteNumberPresent: routeNumber != nil,
-                                                        routeNumber: routeNumber)
+                                                        routeNumber: routeNumber,
+                                                        serviceProvider: provider)
 
             let pointer = interpretInt(getKey(event, "EventContractPointer") ?? "")
             let contract = (pointer > 0 && pointer <= contracts.count) ? contracts[pointer - 1] : nil
