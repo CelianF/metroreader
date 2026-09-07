@@ -98,6 +98,7 @@ private func interpretCardID(_ iccBitstring: String) -> UInt64 {
 #if os(iOS)
 class NFCReader: NSObject, ObservableObject, NFCTagReaderSessionDelegate {
     @Published var tagID: String = "Tap 'Scan' to read NFC"
+    @Published var isScanning: Bool = false
     @Published var cardID: UInt64 = 0
     @Published var tagIcc: String = ""
     @Published var tagEnvHolder: [String: Any] = [:]
@@ -175,11 +176,15 @@ class NFCReader: NSObject, ObservableObject, NFCTagReaderSessionDelegate {
         session = NFCTagReaderSession(pollingOption: .iso14443, delegate: self, queue: DispatchQueue.main)
         session?.alertMessage = "Placez votre passe sur le haut de votre iPhone pendant quelques secondes."
         session?.begin()
+        isScanning = true
         
         clearData()
     }
     
     func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {
+        DispatchQueue.main.async {
+            self.isScanning = false
+        }
         /* DispatchQueue.main.async {
             self.tagID = "NFC Session Invalidated: \(error.localizedDescription)"
         } */
@@ -370,6 +375,7 @@ class NFCReader: NSObject, ObservableObject, NFCTagReaderSessionDelegate {
 #else
 class NFCReader: NSObject, ObservableObject {
     @Published var tagID: String = "Tap 'Scan' to read NFC"
+    @Published var isScanning: Bool = false
     @Published var cardID: UInt64 = 0
     @Published var tagIcc: String = ""
     @Published var tagEnvHolder: [String: Any] = [:]

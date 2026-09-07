@@ -16,9 +16,23 @@ struct ScanPageView: View {
     @State private var hasAutoLaunched = false
     #endif
     @State private var isImporting = false
-    
+
+    // Tant qu'aucune carte n'est chargée, on n'affiche que l'état vide :
+    // les boutons de scan, de menu et de partage restent masqués.
+    private var hasCard: Bool { !nfcReader.tagEnvHolder.isEmpty }
+
     var body: some View {
-        ScanView(cardID: nfcReader.cardID, tagIcc: nfcReader.tagIcc, tagEnvHolder: nfcReader.tagEnvHolder, tagContracts: nfcReader.tagContracts, tagEvents: nfcReader.tagEvents, tagSpecialEvents: nfcReader.tagSpecialEvents, exportDataAsJSON: nfcReader.exportDataAsJSON, historyManager: historyManager)
+        Group {
+            if hasCard {
+                ScanView(cardID: nfcReader.cardID, tagIcc: nfcReader.tagIcc, tagEnvHolder: nfcReader.tagEnvHolder, tagContracts: nfcReader.tagContracts, tagEvents: nfcReader.tagEvents, tagSpecialEvents: nfcReader.tagSpecialEvents, exportDataAsJSON: nfcReader.exportDataAsJSON, historyManager: historyManager)
+            } else {
+                EmptyScanView(
+                    isScanning: nfcReader.isScanning,
+                    onScan: { nfcReader.beginScanning(historyManager: historyManager) },
+                    onImport: { isImporting = true }
+                )
+            }
+        }
         .navigationTitle("")
         .toolbar {
             #if os(iOS)
@@ -26,11 +40,13 @@ struct ScanPageView: View {
                 Button(action: { isImporting = true }) {
                     Image(systemName: "square.and.arrow.down")
                 }
-                
-                Button(action: {
-                    nfcReader.beginScanning(historyManager: historyManager)
-                }) {
-                    Image(systemName: "wave.3.forward")
+
+                if hasCard {
+                    Button(action: {
+                        nfcReader.beginScanning(historyManager: historyManager)
+                    }) {
+                        Image(systemName: "wave.3.forward")
+                    }
                 }
             }
             #else
