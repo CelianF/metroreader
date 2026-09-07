@@ -134,9 +134,13 @@ class HistoryManager: ObservableObject {
         }
     }
     func togglePin(for record: ScanRecord) {
-        if let index = history.firstIndex(where: { $0.id == record.id }) {
-            history[index].isPinned.toggle()
-            persistToDisk()
+        guard let index = history.firstIndex(where: { $0.id == record.id }) else { return }
+        history[index].isPinned.toggle()
+        // L'écriture disque encode tout l'historique, blobs de contrats et
+        // d'événements compris. La faire ici saccade l'animation de la liste
+        // dès qu'il y a plusieurs passes : on la sort de la transaction.
+        DispatchQueue.main.async { [weak self] in
+            self?.persistToDisk()
         }
     }
 

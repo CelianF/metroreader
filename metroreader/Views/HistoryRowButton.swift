@@ -12,7 +12,8 @@ import SwiftUI
 struct HistoryRowButton: View {
     let record: ScanRecord
     @Binding var selectedRecord: ScanRecord?
-    @ObservedObject var historyManager: HistoryManager
+    // Le déplacement entre sections est séquencé par HistoryPageView
+    let onTogglePin: () -> Void
     
     var body: some View {
         Button {
@@ -57,11 +58,7 @@ struct HistoryRowButton: View {
         }
         .buttonStyle(.plain)
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
-            Button {
-                withAnimation {
-                    historyManager.togglePin(for: record)
-                }
-            } label: {
+            Button(action: onTogglePin) {
                 Label(record.isPinned ? "Désépingler" : "Épingler",
                       systemImage: record.isPinned ? "pin.slash" : "pin.fill")
             }

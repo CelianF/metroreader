@@ -4,9 +4,35 @@ struct ContentView: View {
     @StateObject private var nfcReader = NFCReader()
     @StateObject private var historyManager = HistoryManager()
     @State private var selectedTab = 0
-    
+    @State private var lastScanTabTap: Date?
+
+    // Deux touches rapprochées sur l'onglet Scan lancent une lecture. La
+    // sélection est passée par un Binding maison parce que SwiftUI rappelle
+    // le setter même quand l'onglet touché est déjà celui qui est actif.
+    private var tabSelection: Binding<Int> {
+        Binding(
+            get: { selectedTab },
+            set: { newValue in
+                #if os(iOS)
+                if newValue == 0 {
+                    let now = Date()
+                    if let last = lastScanTabTap, now.timeIntervalSince(last) < 0.4 {
+                        lastScanTabTap = nil
+                        if !nfcReader.isScanning {
+                            nfcReader.beginScanning(historyManager: historyManager)
+                        }
+                    } else {
+                        lastScanTabTap = now
+                    }
+                }
+                #endif
+                selectedTab = newValue
+            }
+        )
+    }
+
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: tabSelection) {
             // Page 1: Scan
             NavigationStack {
                 ScanPageView(nfcReader: nfcReader, historyManager: historyManager)
