@@ -112,80 +112,16 @@ func interpretNavigoPersonalizationStatusCode(_ bitstring: String) -> String {
 }
 
 func interpretTariff(_ bitstring: String, _ contractEndDateBitstring: String) -> String {
-    switch Int(bitstring, radix: 2) ?? 0 {
-    case 0x0000:
-        return "Navigo Mois"
-    case 0x0001:
-        return "Navigo Semaine"
-    case 0x0002:
-        return "Navigo Annuel"
-    case 0x0003:
-        return "Navigo Jour"
-    case 0x0004:
-        return "Imagine R Scolaire"
-    case 0x0005:
-        return "Imagine R Étudiant"
-    case 0x000D:
-        return "Navigo Jeunes Week-end"
-    case 0x000E: do {
-        let endDate = interpretDate(contractEndDateBitstring)
-        switch endDate {
-        case "14/08/2024":
-            return "Navigo Jeux Olympiques"
-        case "11/09/2024":
-            return "Navigo Jeux Paralympiques"
-        default:
-            return "Navigo JOP"
-        }
+    let code = Int(bitstring, radix: 2) ?? 0
+    guard let tariff = TariffCatalog.find(code) else {
+        return "Unknown (\(code))"
     }
-    case 0x0015:
-        return "Paris - Visite"
-    case 0x1000, 0x1001:
-        return "Navigo Liberté +"
-    case 0x4000:
-        return "Navigo Mois 75%"
-    case 0x4001:
-        return "Navigo Semaine 75%"
-    case 0x4015:
-        return "Paris - Visite (Enfant)"
-    case 0x5000:
-        return "Ticket T+"
-    case 0x5004:
-        return "Ticket OrlyBus"
-    case 0x5005:
-        return "Ticket RoissyBus"
-    case 0x5006:
-        return "Bus-Tram"
-    case 0x5008:
-        return "Métro-Train-RER"
-    case 0x500b:
-        return "Paris <> Aéroports"
-    case 0x5010:
-        return "Ticket T+ (Réduit)"
-    case 0x5016:
-        return "Bus-Tram (Réduit)"
-    case 0x5018:
-        return "Métro-Train-RER (Réduit)"
-    case 0x501b:
-        return "Paris <> Aéroports (Réduit)"
-    case 0x8001:
-        return "Pass Interne"
-    case 0x8003:
-        return "Navigo Solidarité Gratuit"
-    case 0x8010:
-        return "Pass'Local Versailles"
-    default:
-        return "Unknown (\(Int(bitstring, radix: 2) ?? 0))"
-    }
+    return tariff.name(endDate: interpretDate(contractEndDateBitstring))
 }
 
 func interpretTariffDuration(_ bitstring: String) -> TimeInterval {
-    switch Int(bitstring, radix: 2) ?? 0 {
-    case 0x5000, 0x5006, 0x5010, 0x5016: // Ticket T+ / Bus-Tram
-        return TimeInterval(5400)
-    default:
-        return TimeInterval(7200)
-    }
+    let code = Int(bitstring, radix: 2) ?? 0
+    return TariffCatalog.find(code)?.duration ?? TariffCatalog.defaultDuration
 }
 
 func interpretZones(_ bitstring: String) -> String {
@@ -262,6 +198,14 @@ func interpretRouteNumber(_ routeNumberBitstring: String, _ eventCodeBitstring: 
         }
     }
     if (eventTransport == "Métro") {
+        // Chez la RATP le numéro de course vaut le numéro de ligne, ce que les
+        // cas ci-dessous supposent. Ce n'est pas vrai des autres exploitants :
+        // la desserte de l'aéroport d'Orly porte la course 12, qui entrerait en
+        // collision avec la ligne 12. On interroge donc la table pour eux.
+        if serviceProviderCode != 3,
+           let route = NavigoLines.find(serviceProviderCode, routeNumber, eventTransport) {
+            return route.name
+        }
         switch routeNumber {
         case 29:
             return "Orlyval"
@@ -345,50 +289,8 @@ func interpretRoute(_ routeNumberBitstring: String, _ eventCodeBitstring: String
 }
 
 func interpretServiceProvider(_ bitstring: String) -> String {
-    switch Int(bitstring, radix: 2) ?? 0 {
-    case 2:
-        return "SNCF";
-    case 3:
-        return "RATP";
-    case 4:
-        return "Optile";
-    case 10:
-        return "IDF Mobilites";
-    case 7:
-        return "RATP Cap Bièvre";
-    case 8:
-        return "ORA";
-    case 12:
-        return "Keolis";
-    case 14:
-        return "LUG - Paris";
-    case 17:
-        return "Stretto";
-    case 109:
-        return "Keolis Ouest Val-de-Marne T9";
-    case 115:
-        return "CSO (VEOLIA)";
-    case 116:
-        return "R'Bus (VEOLIA)";
-    case 156:
-        return "Phebus";
-    case 175:
-        return "RATP (Veolia Transport Nanterre)";
-    case 205:
-        return "Transdev Valmy";
-    case 221:
-        return "Transdev Coteaux de la Marne";
-    case 222:
-        return "Keolis Ouest Val-de-Marne";
-    case 226:
-        return "RC Saclay";
-    case 228:
-        return "Transdev Versailles";
-    case 230:
-        return "Transdev Sud Yvelines";
-    default:
-        return "Unknown (\(Int(bitstring, radix: 2) ?? 0))";
-    }
+    let id = Int(bitstring, radix: 2) ?? 0
+    return ProviderCatalog.findProvider(id)?.name ?? "Unknown (\(id))"
 }
 
 func interpretLocationId(_ locationIdBitString: String, _ eventCodeBitstring: String, _ eventServiceProviderBitstring: String, _ routeNumberBitstring: String?) -> NavigoStationInfo {

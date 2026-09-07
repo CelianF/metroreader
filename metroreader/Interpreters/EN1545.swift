@@ -162,6 +162,10 @@ func interpretEventResult(_ bitstring: String) -> String {
         return "Invalidation - fraude monétique transport"
     case 0xA:
         return "Invalidation impossible"
+    case 0x14:
+        // Refus d'entrée : le titre ne couvre pas le service (OrlyVal exige
+        // un titre aéroport, un Imagine R n'y donne pas accès)
+        return "Titre non valable"
     case 0x30:
         return "Double validation (Entrée)"
     case 0x31:
@@ -169,7 +173,11 @@ func interpretEventResult(_ bitstring: String) -> String {
     case 0x32:
         return "Contrat invalide / expiré"
     case 0x33:
-        return "Double validation (Sortie)"
+        // Refus d'entrée : le titre ne couvre pas le service (l'aéroport d'Orly
+        // exige un titre aéroport). Ce code n'apparaît que sur des événements
+        // d'entrée, jamais de sortie, contrairement à ce que laissait croire
+        // son ancien libellé « Double validation (Sortie) ».
+        return "Titre non valable"
     default:
         return "Unknown (\(Int(bitstring, radix: 2) ?? 0))"
     }

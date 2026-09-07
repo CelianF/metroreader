@@ -1,0 +1,41 @@
+{
+  "defaultIcon": "ic_ticketing_default",
+  "defaultDuration": 7200,
+  "tariffs": [
+    { "code": "0x0000", "name": "Navigo Mois", "icon": "ic_ticketing_month" },
+    { "code": "0x0001", "name": "Navigo Semaine", "icon": "ic_ticketing_week" },
+    { "code": "0x0002", "name": "Navigo Annuel", "icon": "ic_ticketing_year_pass" },
+    { "code": "0x0003", "name": "Navigo Jour", "icon": "ic_ticketing_day" },
+    { "code": "0x0004", "name": "Imagine R Scolaire", "icon": "ic_ticketing_imaginer_pass" },
+    { "code": "0x0005", "name": "Imagine R Étudiant", "icon": "ic_ticketing_imaginer_pass" },
+    { "code": "0x000D", "name": "Navigo Jeunes Week-end", "icon": "ic_ticketing_youthwe_pass" },
+    {
+      "code": "0x000E",
+      "name": "Navigo JOP",
+      "icon": "ic_ticketing_month",
+      "variants": [
+        { "endDate": "14/08/2024", "name": "Navigo Jeux Olympiques" },
+        { "endDate": "11/09/2024", "name": "Navigo Jeux Paralympiques" }
+      ]
+    },
+    { "code": "0x0015", "name": "Paris - Visite", "icon": "ic_ticketing_paris" },
+    { "code": "0x1000", "name": "Navigo Liberté +", "icon": "ic_ticketing_liberte_plus" },
+    { "code": "0x1001", "name": "Navigo Liberté +", "icon": "ic_ticketing_liberte_plus" },
+    { "code": "0x4000", "name": "Navigo Mois 75%", "icon": "ic_ticketing_month" },
+    { "code": "0x4001", "name": "Navigo Semaine 75%", "icon": "ic_ticketing_week" },
+    { "code": "0x4015", "name": "Paris - Visite (Enfant)", "icon": "ic_ticketing_paris" },
+    { "code": "0x5000", "name": "Ticket T+", "icon": "ic_ticketing_ticket", "duration": 5400 },
+    { "code": "0x5004", "name": "Ticket OrlyBus", "icon": "ic_ticketing_orly_roissy" },
+    { "code": "0x5005", "name": "Ticket RoissyBus", "icon": "ic_ticketing_orly_roissy" },
+    { "code": "0x5006", "name": "Bus-Tram", "icon": "ic_ticketing_ticket", "duration": 5400 },
+    { "code": "0x5008", "name": "Métro-Train-RER", "icon": "ic_ticketing_ticket" },
+    { "code": "0x500B", "name": "Paris <> Aéroports", "icon": "ic_ticketing_orly_roissy" },
+    { "code": "0x5010", "name": "Ticket T+ (Réduit)", "icon": "ic_ticketing_ticket", "duration": 5400 },
+    { "code": "0x5016", "name": "Bus-Tram (Réduit)", "icon": "ic_ticketing_ticket", "duration": 5400 },
+    { "code": "0x5018", "name": "Métro-Train-RER (Réduit)", "icon": "ic_ticketing_ticket" },
+    { "code": "0x501B", "name": "Paris <> Aéroports (Réduit)", "icon": "ic_ticketing_orly_roissy" },
+    { "code": "0x8001", "name": "Pass Interne" },
+    { "code": "0x8003", "name": "Navigo Solidarité Gratuit", "icon": "ic_ticketing_default" },
+    { "code": "0x8010", "name": "Pass'Local Versailles" }
+  ]
+}
