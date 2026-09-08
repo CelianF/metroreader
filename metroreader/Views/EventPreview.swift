@@ -44,7 +44,7 @@ struct EventPreview: View {
                                 .foregroundColor(Color.gray)
                         }
                         else {
-                            Text(" - \(event.transition)")
+                            Text(" - \(interpretTransitionLabel(event.transition))")
                                 .font(.caption)
                                 .foregroundColor(Color.gray)
                         }
@@ -65,7 +65,7 @@ struct EventPreview: View {
                             .foregroundColor(Color.gray)
                     }
                     else {
-                        Text("\(event.transition)")
+                        Text(interpretTransitionLabel(event.transition))
                             .font(.caption)
                             .foregroundColor(Color.gray)
                     }

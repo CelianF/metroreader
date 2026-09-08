@@ -72,48 +72,16 @@ struct IdentifyStopSheet: View {
         }
     }
 
-    /// Au-delà de ce délai, la position ne renseigne plus sur l'endroit de la
-    /// validation : un bus a déjà quitté l'arrêt.
-    private static let fraicheurMax: TimeInterval = 90
-
     private var ecoule: TimeInterval? {
         eventDate.map { Date().timeIntervalSince($0) }
     }
 
-    /// Le relevé n'est exploitable que s'il a été pris près de la validation.
-    /// On compare l'instant du scan à celui de l'événement, pas à maintenant :
-    /// la feuille peut être ouverte longtemps après.
-    private var ecartReleve: TimeInterval? {
-        guard let eventDate, let capturedAt = gps.capturedAt else { return nil }
-        return abs(capturedAt.timeIntervalSince(eventDate))
-    }
-
-    private var releveExploitable: Bool {
-        guard let ecartReleve else { return false }
-        return ecartReleve < Self.fraicheurMax
-    }
-
-    /// Les arrêts les plus proches, tous exploitants confondus. Dix des treize
-    /// réseaux concernés n'ont aucun arrêt en base, mais leurs arrêts physiques
-    /// sont souvent desservis aussi par un réseau qu'on connaît : c'est de là
-    /// que vient la suggestion.
-    private func proches(de position: CLLocationCoordinate2D) -> [(NearbyStop, CLLocationDistance)] {
-        var vus = Set<String>()
-        return NearbyStops.all
-            .filter { $0.mode == mode }
-            .map { ($0, position.distance(toLatitude: $0.lat, longitude: $0.lon)) }
-            .filter { $0.1 < 400 }
-            .sorted { $0.1 < $1.1 }
-            .filter { vus.insert($0.0.name).inserted }
-            .prefix(8)
-            .map { $0 }
+    /// Le relevé du scan, s'il éclaire encore cette validation.
+    private var releve: (position: CLLocationCoordinate2D, accuracy: CLLocationDistance)? {
+        gps.fix(for: eventDate)
     }
 
     private func precisionOuZero(_ m: CLLocationDistance) -> CLLocationDistance { max(0, m) }
-
-    private func distanceCourte(_ m: CLLocationDistance) -> String {
-        m < 1000 ? "\(Int(m.rounded())) m" : String(format: "%.1f km", m / 1000)
-    }
 
     var body: some View {
         NavigationStack {
@@ -130,21 +98,26 @@ struct IdentifyStopSheet: View {
                     Text("Cet arrêt n'est pas dans le jeu de données. En l'identifiant, tu l'ajoutes au journal, consultable depuis Réglages › Données.")
                 }
 
-                if case .located(let position, let precision) = gps.state, releveExploitable {
+                if let releve {
                     Section {
-                        let voisins = proches(de: position)
+                        // Les arrêts les plus proches, tous exploitants
+                        // confondus. Dix des treize réseaux concernés n'ont
+                        // aucun arrêt en base, mais leurs arrêts physiques sont
+                        // souvent desservis aussi par un réseau qu'on connaît :
+                        // c'est de là que vient la suggestion.
+                        let voisins = NearbyStops.around(releve.position, mode: mode)
                         if voisins.isEmpty {
                             Text("Aucun arrêt connu à moins de 400 m")
                                 .foregroundStyle(.secondary)
                         } else {
-                            ForEach(voisins, id: \.0.name) { station, distance in
+                            ForEach(voisins, id: \.stop.name) { station, distance in
                                 Button {
                                     enregistrer(nom: station.name, lat: station.lat, lon: station.lon)
                                 } label: {
                                     HStack {
                                         Text(station.name).foregroundStyle(.primary)
                                         Spacer()
-                                        Text(distanceCourte(distance))
+                                        Text(distance.courte)
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
@@ -154,9 +127,9 @@ struct IdentifyStopSheet: View {
                     } header: {
                         Text("Là où tu étais au scan")
                     } footer: {
-                        Text("Position relevée au moment du scan, à \(Int(ecartReleve ?? 0)) s de la validation, précise à \(distanceCourte(precisionOuZero(precision))) près. Les arrêts proposés viennent de tous les réseaux — c'est souvent le même arrêt physique.")
+                        Text("Position relevée au moment du scan, à \(Int(gps.gap(from: eventDate) ?? 0)) s de la validation, précise à \(precisionOuZero(releve.accuracy).courte) près. Les arrêts proposés viennent de tous les réseaux — c'est souvent le même arrêt physique.")
                     }
-                } else if let ecoule, ecoule < Self.fraicheurMax {
+                } else if let ecoule, ecoule < LocationProvider.freshnessWindow {
                     Section {
                         switch gps.state {
                         case .denied:

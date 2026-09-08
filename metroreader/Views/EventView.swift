@@ -15,6 +15,7 @@ struct EventView: View {
     // La résolution est refaite à chaque rendu et le journal est observé : ce
     // qu'on vient d'identifier s'affiche sans quitter l'écran.
     @ObservedObject private var entries = ManualEntries.shared
+    @ObservedObject private var gps = LocationProvider.shared
 
     @State private var cityName: String = "Loading..."
     @State private var identifying: Identification?
@@ -32,15 +33,6 @@ struct EventView: View {
     private var event: ResolvedEvent { ResolvedEvent(eventInfo) }
 
     private var eventInstant: Date? { ResolvedEvent.instant(eventInfo) }
-
-    private func colorForTransition(_ transition: String) -> Color {
-        if transition.starts(with: "Entrée") {
-            return Color.blue
-        } else if transition.starts(with: "Sortie") {
-            return Color.red
-        }
-        return Color.purple
-    }
 
     var body: some View {
         let event = self.event
@@ -64,7 +56,7 @@ struct EventView: View {
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(.gray)
                             }
-                            Text(" - \(event.transition)")
+                            Text(" - \(interpretTransitionLabel(event.transition))")
                                 .font(.system(size: 18, weight: .medium))
                                 .foregroundColor(.gray)
                         }
@@ -79,7 +71,7 @@ struct EventView: View {
                             }
                         }
 
-                        Text("\(event.transition)")
+                        Text(interpretTransitionLabel(event.transition))
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.gray)
                     }
@@ -90,8 +82,38 @@ struct EventView: View {
                     if event.hasSomethingToIdentify {
                         VStack(spacing: 6) {
                             if event.isStopUnidentified, let locationId = event.locationId {
-                                identifyButton("Arrêt inconnu (\(locationId))", icon: "mappin.slash") {
-                                    identifying = .stop
+                                // Quand la position a été relevée au bon moment,
+                                // l'arrêt le plus proche est presque toujours le
+                                // bon : on le propose d'un bouton, et la liste
+                                // reste à côté pour les cas où il ne l'est pas.
+                                if let voisin = suggestion(pour: event) {
+                                    VStack(spacing: 6) {
+                                        Text("Arrêt \(locationId) inconnu · « \(voisin.stop.name) » à \(voisin.distance.courte)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .multilineTextAlignment(.center)
+                                        HStack(spacing: 8) {
+                                            Button {
+                                                ajouter(voisin.stop, pour: event)
+                                            } label: {
+                                                Label("Ajouter", systemImage: "plus")
+                                                    .font(.system(size: 15, weight: .medium))
+                                            }
+                                            .buttonStyle(.borderedProminent)
+
+                                            Button {
+                                                identifying = .stop
+                                            } label: {
+                                                Label("Autre arrêt", systemImage: "list.bullet")
+                                                    .font(.system(size: 15, weight: .medium))
+                                            }
+                                            .buttonStyle(.bordered)
+                                        }
+                                    }
+                                } else {
+                                    identifyButton("Arrêt inconnu (\(locationId))", icon: "mappin.slash") {
+                                        identifying = .stop
+                                    }
                                 }
                             }
                             if event.isLineUnidentified, let routeNumber = event.routeNumber {
@@ -203,7 +225,7 @@ struct EventView: View {
                         span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
                     ))) {
                         Marker(event.location.name, systemImage: getTransitIcon(event.mode, event.transition), coordinate: center)
-                            .tint(colorForTransition(event.transition))
+                            .tint(TransitionKind(event.transition).color)
                     }
                     .frame(height: 200)
                     // La carte ne relit sa position initiale qu'à sa création :
@@ -248,6 +270,30 @@ struct EventView: View {
                 IdentifyProviderSheet(providerId: event.providerId)
             }
         }
+    }
+
+    /// L'arrêt connu le plus proche du relevé fait pendant le scan, quand ce
+    /// relevé est assez proche de la validation pour vouloir dire quelque chose.
+    private func suggestion(pour event: ResolvedEvent) -> (stop: NearbyStop, distance: CLLocationDistance)? {
+        guard let releve = gps.fix(for: eventInstant) else { return nil }
+        return NearbyStops.nearest(releve.position, mode: event.lookupMode)
+    }
+
+    private func ajouter(_ stop: NearbyStop, pour event: ResolvedEvent) {
+        guard let locationId = event.locationId else { return }
+        entries.save(StopReport(
+            id: UUID(),
+            date: Date(),
+            providerId: event.providerId,
+            locationId: locationId,
+            mode: event.lookupMode,
+            routeNumber: event.routeNumber,
+            lineName: event.routeName,
+            stationName: stop.name,
+            referenceId: nil,
+            lat: stop.lat,
+            lon: stop.lon
+        ))
     }
 
     private func identifyButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {

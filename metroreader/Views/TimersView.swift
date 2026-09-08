@@ -77,7 +77,11 @@ struct TimersView: View {
             if controlEnabled {
                 switch timers.validity {
                 case .valid(let countdown):
-                    box(color: .green) { row("Titre valable", countdown: countdown) }
+                    box(color: .green) {
+                        row(TimersView.titreValable(timers.coverage),
+                            countdown: countdown,
+                            coverage: timers.coverage)
+                    }
                 case .recentlyExpired(let countdown):
                     box(color: .orange) {
                         VStack(alignment: .leading, spacing: 6) {
@@ -106,14 +110,59 @@ struct TimersView: View {
         .listRowBackground(color.opacity(0.2))
     }
 
-    private func row(_ title: String, countdown: PassTimers.Countdown) -> some View {
+    private func row(_ title: String,
+                     countdown: PassTimers.Countdown,
+                     coverage: PassTimers.Coverage? = nil) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .fontWeight(.semibold)
+            HStack(spacing: 8) {
+                if let coverage { ModeBadges(coverage: coverage) }
+                Text(title)
+                    .fontWeight(.semibold)
+            }
             Text("Restant : \(TimersView.clock(countdown.remaining))")
                 .font(.system(.caption2, design: .monospaced))
                 .fontWeight(.bold)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Ce que le titre couvre
+
+    /// « Titre valable », suivi de ce sur quoi il l'est. Sans cette précision
+    /// la phrase se lit comme un droit général, alors qu'une validation en bus
+    /// ne couvre pas le métro.
+    static func titreValable(_ coverage: PassTimers.Coverage?) -> String {
+        guard let coverage, let portee = portee(coverage) else { return "Titre valable" }
+        return "Titre valable \(portee)"
+    }
+
+    private static func portee(_ coverage: PassTimers.Coverage) -> String? {
+        guard let mode = modeLabel(coverage.mode) else { return nil }
+        return coverage.airport ? "\(mode), aéroports compris" : mode
+    }
+
+    private static func modeLabel(_ mode: String) -> String? {
+        switch mode {
+        case "Bus urbain", "Bus interurbain": return "en bus"
+        case "Noctilien":                     return "en Noctilien"
+        case "Métro":                         return "en métro"
+        case "RER", "Train", "Transilien":    return "en RER et train"
+        case "Tramway":                       return "en tramway"
+        case "Câble":                         return "en câble"
+        default:                              return nil
+        }
+    }
+
+    /// Le pictogramme du mode, celui-là même qui est affiché sur les quais.
+    static func modeIcon(_ mode: String) -> String? {
+        switch mode {
+        case "Bus urbain", "Bus interurbain": return "mode_bus"
+        case "Noctilien":                     return "mode_noctilien"
+        case "Métro":                         return "mode_metro"
+        case "RER", "Train", "Transilien":    return "mode_train_rer"
+        case "Tramway":                       return "mode_tram"
+        case "Câble":                         return "mode_cable"
+        default:                              return nil
         }
     }
 
@@ -136,5 +185,32 @@ struct TimersView: View {
         guard let last = items.last else { return "" }
         if items.count == 1 { return last }
         return items.dropLast().joined(separator: ", ") + " et " + last
+    }
+}
+
+
+/// Les pictogrammes de ce que la validation en cours couvre. Ce sont ceux des
+/// quais : c'est à eux qu'on reconnaît ce qu'on a le droit de prendre.
+private struct ModeBadges: View {
+    let coverage: PassTimers.Coverage
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if let mode = TimersView.modeIcon(coverage.mode) {
+                badge(mode)
+            }
+            if coverage.airport {
+                badge("ic_ticketing_orly_roissy")
+            }
+        }
+    }
+
+    private func badge(_ name: String) -> some View {
+        Image(name)
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: 24, height: 24)
+            .foregroundStyle(.primary)
     }
 }

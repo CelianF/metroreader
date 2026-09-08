@@ -23,6 +23,15 @@ struct ScanView: View {
     @State private var showingRenameAlert = false
     @State private var newNickname = ""
     @State private var showingImagePicker = false
+
+    /// Le contour dit la validité à l'instant où la carte s'affiche — c'est là
+    /// qu'on la regarde. Passé quelques secondes il n'apprend plus rien et ne
+    /// fait que masquer le visuel, alors il s'efface.
+    @State private var outlineShown = true
+
+    private static let outlineLifetime: Duration = .seconds(10)
+    private static let outlineFade: Double = 1.5
+
     @AppStorage(TimerSettings.control) private var controlTimerEnabled = true
 
     // La carte des événements et les libellés d'arrêt suivent le journal des
@@ -105,17 +114,14 @@ struct ScanView: View {
                         NavigoImage(imageName: historyManager.history.first(where: { $0.cardID == cardID })?.image ?? interpretNavigoImage(holderCardStatus, getKey(tagEnvHolder, "EnvApplicationIssuerId") ?? "", holderCommercialId, tagContracts))
                             .shadow(radius: 2)
                             .overlay {
-                                // Le titre expire sans que rien ne bouge dans
-                                // les données : le contour se relit à l'heure.
-                                TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-                                    if let outline = validityOutline {
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .strokeBorder(outline.color, lineWidth: 3)
-                                            .shadow(color: outline.color, radius: outline.glow)
-                                            .shadow(color: outline.color.opacity(0.6), radius: outline.glow)
-                                    }
+                                if let outline = validityOutline {
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .strokeBorder(outline.color, lineWidth: 3)
+                                        .shadow(color: outline.color, radius: outline.glow)
+                                        .shadow(color: outline.color.opacity(0.6), radius: outline.glow)
+                                        .opacity(outlineShown ? 1 : 0)
+                                        .allowsHitTesting(false)
                                 }
-                                .allowsHitTesting(false)
                             }
                             .onTapGesture(count: 2) {
                                 if canPersonalize { showingImagePicker = true }
@@ -238,6 +244,10 @@ struct ScanView: View {
                 }
             }
         }
+        .task {
+            try? await Task.sleep(for: Self.outlineLifetime)
+            withAnimation(.easeOut(duration: Self.outlineFade)) { outlineShown = false }
+        }
         .toolbar {
             ToolbarItem(placement: .principal) {
                 if cardID != 0 {
@@ -275,7 +285,7 @@ struct ScanView: View {
                             Label("Changer l'image", systemImage: "photo.on.rectangle")
                         }
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Label("Modifier le pass", systemImage: "square.and.pencil")
                     }
                 }
                 
@@ -308,7 +318,7 @@ struct ScanView: View {
                             Label("Changer l'image", systemImage: "photo.on.rectangle")
                         }
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Label("Modifier le pass", systemImage: "square.and.pencil")
                     }
                 }
                 

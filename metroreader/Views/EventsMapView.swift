@@ -51,7 +51,7 @@ struct EventsMapView: View {
                     // Affiche le numéro de l'événement (1 étant le plus récent)
                     Label(annotation.name, systemImage: annotation.systemImage)
                 }
-                .tint(colorForTransition(annotation.eventTransition))
+                .tint(TransitionKind(annotation.eventTransition).color)
             }
             
             MapPolyline(coordinates: annotations.map { $0.coordinate })
@@ -62,17 +62,5 @@ struct EventsMapView: View {
         // Le cadrage automatique est choisi à la création : un arrêt identifié
         // en cours de route agrandit la carte, il faut la refaire naître.
         .id(annotations.map { "\($0.coordinate.latitude),\($0.coordinate.longitude)" }.joined(separator: "|"))
-    }
-
-    // Optionnel : change la couleur des marqueurs selon l'ancienneté
-    private func colorForTransition(_ transition: String) -> Color {
-        switch transition {
-        case "Entrée", "Entrée (correspondance)", "Entrée (voie publique)":
-            return .blue
-        case "Sortie", "Sortie (correspondance)", "Sortie (voie publique)":
-            return .red
-        default:
-            return .purple
-        }
     }
 }

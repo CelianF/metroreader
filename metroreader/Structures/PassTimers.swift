@@ -34,11 +34,26 @@ struct PassTimers {
         case expired
     }
 
+    /// Ce sur quoi la validation en cours donne un droit.
+    ///
+    /// Le décompte de contrôle peut courir depuis une validation antérieure —
+    /// un bus puis un tram le fait partir du bus — mais c'est le dernier mode
+    /// emprunté qui dit ce qui est légal maintenant. Un titre valable en bus ne
+    /// l'est pas dans le métro : afficher « Titre valable » sans le préciser
+    /// laissait croire le contraire.
+    struct Coverage {
+        /// Le mode de la dernière validation, tel que la carte l'encode.
+        let mode: String
+        /// Le titre ouvre en plus les liaisons aéroport.
+        let airport: Bool
+    }
+
     static let recentlyExpiredWindow: TimeInterval = 1800 // 30 min
 
     let alreadyValidated: Countdown? // 7 min après une entrée ou une correspondance
     let sale: SaleBlock? // 4 h après la consommation d'un T+, TMTR ou Aéroport
     let control: Countdown? // Temps de validité : 2 h en rail, 1 h 30 en surface
+    let coverage: Coverage? // Le mode que ce temps de validité couvre
 
     var validity: Validity {
         guard let control else { return .expired }
@@ -122,6 +137,30 @@ struct PassTimers {
         alreadyValidated = Self.alreadyValidatedTimer(parsed)
         sale = Self.saleTimer(contracts: contracts, events: parsed)
         control = Self.controlTimer(parsed)
+        coverage = Self.coverage(parsed)
+    }
+
+    /// Le dernier mode emprunté, et si le titre qui l'a payé ouvre aussi les
+    /// aéroports.
+    private static func coverage(_ events: [TimedEvent]) -> Coverage? {
+        guard let last = events.first, last.isTransit else { return nil }
+        return Coverage(mode: last.mode, airport: airportAllowed(last))
+    }
+
+    // Titres qui couvrent les liaisons aéroport quelles que soient les zones.
+    private static let airportTariffs: Set<Int> = [
+        0x500B, 0x501B, // Paris <> Aéroports
+        0x1000, 0x1001, // Navigo Liberté +
+    ]
+
+    /// Les aéroports ne s'ajoutent qu'au rail, et qu'avec un titre qui les
+    /// couvre : le ticket dédié, Liberté+ qui facture le trajet réellement
+    /// effectué, ou un abonnement dont les zones vont jusqu'à la quatrième.
+    private static func airportAllowed(_ event: TimedEvent) -> Bool {
+        guard event.isRail, let contract = event.contract else { return false }
+        if let tariff = tariffCode(contract), airportTariffs.contains(tariff) { return true }
+        guard let zoneBits = getKey(contract, "ContractValidityZones") else { return false }
+        return interpretZoneSet(zoneBits).contains(4)
     }
 
     /// 7 min après une entrée ou une correspondance, annulé par une sortie.

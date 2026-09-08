@@ -65,7 +65,7 @@ struct EventIcon: View {
         }
             .foregroundColor(Color.white)
             .frame(width: 40.0, height: 40.0)
-            .background(eventTransition.contains("Entrée") ? Color.blue : eventTransition.contains("Sortie") ? Color.red : Color.purple)
+            .background(TransitionKind(eventTransition).color)
             .clipShape(RoundedRectangle(cornerRadius: 5.0))
     }
 }

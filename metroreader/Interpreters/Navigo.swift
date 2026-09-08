@@ -124,6 +124,16 @@ func interpretTariffDuration(_ bitstring: String) -> TimeInterval {
     return TariffCatalog.find(code)?.duration ?? TariffCatalog.defaultDuration
 }
 
+/// Les zones couvertes par un titre, telles que le bitstring les porte : un bit
+/// par zone, la première à droite.
+func interpretZoneSet(_ bitstring: String) -> Set<Int> {
+    var zones: Set<Int> = []
+    for (i, char) in bitstring.reversed().enumerated() where char == "1" {
+        zones.insert(i + 1)
+    }
+    return zones
+}
+
 func interpretZones(_ bitstring: String) -> String {
     /**
      Interprets the zone information from a binary string.
@@ -131,14 +141,7 @@ func interpretZones(_ bitstring: String) -> String {
      - Returns: A string describing the interpreted zones.
      */
     
-    var zones: [Int] = []
-    
-    // Iterate through the binary string from right to left
-    for (i, char) in bitstring.reversed().enumerated() {
-        if char == "1" {
-            zones.append(i + 1)
-        }
-    }
+    let zones = interpretZoneSet(bitstring)
     
     guard let minZone = zones.min(), let maxZone = zones.max() else {
         return "No zones"
@@ -162,14 +165,7 @@ func interpretZonesShort(_ bitstring: String) -> String {
      - Returns: A string describing the interpreted zones.
      */
     
-    var zones: [Int] = []
-    
-    // Iterate through the binary string from right to left
-    for (i, char) in bitstring.reversed().enumerated() {
-        if char == "1" {
-            zones.append(i + 1)
-        }
-    }
+    let zones = interpretZoneSet(bitstring)
     
     guard let minZone = zones.min(), let maxZone = zones.max() else {
         return "-"
@@ -385,7 +381,12 @@ func getTransitIcon(_ eventTransportMode: String, _ eventTransition: String) -> 
     case "Bus interurbain":
         return "bus.doubledecker.fill"
     case "Train", "RER", "Train / RER":
-        if eventTransition.contains("Entrée") {
+        // Une correspondance porte « Sortie » sans que le voyage s'arrête :
+        // c'est la voiture du milieu, ni la montée ni la descente.
+        if eventTransition.localizedCaseInsensitiveContains("correspondance") {
+            return "train.side.middle.car"
+        }
+        else if eventTransition.contains("Entrée") {
             return "train.side.front.car"
         }
         else if eventTransition.contains("Sortie") {

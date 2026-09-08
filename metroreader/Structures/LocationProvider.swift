@@ -40,6 +40,10 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     /// Clé du réglage qui autorise le relevé au scan
     static let settingKey = "locateOnScan"
 
+    /// Au-delà de ce délai, la position ne renseigne plus sur l'endroit de la
+    /// validation : un bus a déjà quitté l'arrêt.
+    static let freshnessWindow: TimeInterval = 90
+
     @Published private(set) var state: State = .idle
 
     /// Instant du relevé, à comparer à celui de la validation
@@ -100,6 +104,22 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         }
     }
 
+    /// L'écart entre le relevé et la validation. On compare l'instant du scan à
+    /// celui de l'événement, et non à maintenant : l'écran peut être ouvert
+    /// longtemps après.
+    func gap(from eventDate: Date?) -> TimeInterval? {
+        guard let eventDate, let capturedAt else { return nil }
+        return abs(capturedAt.timeIntervalSince(eventDate))
+    }
+
+    /// La position relevée pendant le scan, quand elle éclaire encore cette
+    /// validation. Nil dès que le relevé est trop loin de l'événement.
+    func fix(for eventDate: Date?) -> (position: CLLocationCoordinate2D, accuracy: CLLocationDistance)? {
+        guard case .located(let position, let accuracy) = state,
+              let gap = gap(from: eventDate), gap < Self.freshnessWindow else { return nil }
+        return (position, accuracy)
+    }
+
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         authorization = manager.authorizationStatus
         switch manager.authorizationStatus {
@@ -129,5 +149,13 @@ extension CLLocationCoordinate2D {
     func distance(toLatitude lat: Double, longitude lon: Double) -> CLLocationDistance {
         CLLocation(latitude: latitude, longitude: longitude)
             .distance(from: CLLocation(latitude: lat, longitude: lon))
+    }
+}
+
+
+extension CLLocationDistance {
+    /// Dite en mètres tant que ça reste marchable.
+    var courte: String {
+        self < 1000 ? "\(Int(rounded())) m" : String(format: "%.1f km", self / 1000)
     }
 }
