@@ -14,6 +14,25 @@
       ]
     },
     {
+      "folder": "Anciens",
+      "name": "Anciens",
+      "images": [
+        "Carte Orange",
+        "Navigo STIF",
+        "Navigo STIF 2"
+      ]
+    },
+    {
+      "folder": "Spéciaux",
+      "name": "Spéciaux",
+      "images": [
+        "Anti-Polution",
+        "Catacombes",
+        "Pride",
+        "Ticket T+"
+      ]
+    },
+    {
       "folder": "JO",
       "name": "JO",
       "images": [
@@ -25,16 +44,6 @@
         "PassJOvert",
         "PhrygeJO",
         "PhrygeJOP"
-      ]
-    },
-    {
-      "folder": "Spéciaux",
-      "name": "Spéciaux",
-      "images": [
-        "Anti-Polution",
-        "Catacombes",
-        "Pride",
-        "Ticket T+"
       ]
     },
     {
@@ -77,22 +86,14 @@
       "folder": "Exterieurs",
       "name": "Exterieurs",
       "images": [
-        "Aura Auvergne Rhone Alpes",
+        "AURA",
         "Navegante Lisbone",
         "New York Metro Card",
         "Opus Montréal",
         "Oyester Londres",
         "PassPass Lille",
+        "RTM Marseille",
         "TCL Lyon"
-      ]
-    },
-    {
-      "folder": "Olds",
-      "name": "Olds",
-      "images": [
-        "CarteOrange",
-        "NaviGoSTIF1",
-        "NavigoSTIF2"
       ]
     }
   ]

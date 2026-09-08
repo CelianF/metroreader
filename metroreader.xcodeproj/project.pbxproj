@@ -282,7 +282,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = metroreader/metroreader.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 47;
+				CURRENT_PROJECT_VERSION = 48;
 				DEVELOPMENT_ASSET_PATHS = "\"metroreader/Preview Content\"";
 				DEVELOPMENT_TEAM = 3H92LK9UXU;
 				ENABLE_APP_SANDBOX = YES;
@@ -302,7 +302,9 @@
 				INFOPLIST_FILE = metroreader/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PassReader;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NFCReaderUsageDescription = "This app needs NFC access to communicate with NFC tags.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Votre position sert à proposer les arrêts proches quand la carte annonce un arrêt que l'application ne connaît pas. Elle n'est lue qu'à votre demande et n'est jamais enregistrée ni transmise.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -335,7 +337,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = metroreader/metroreader.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 47;
+				CURRENT_PROJECT_VERSION = 48;
 				DEVELOPMENT_ASSET_PATHS = "\"metroreader/Preview Content\"";
 				DEVELOPMENT_TEAM = 3H92LK9UXU;
 				ENABLE_APP_SANDBOX = YES;
@@ -355,7 +357,9 @@
 				INFOPLIST_FILE = metroreader/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PassReader;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NFCReaderUsageDescription = "This app needs NFC access to communicate with NFC tags.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Votre position sert à proposer les arrêts proches quand la carte annonce un arrêt que l'application ne connaît pas. Elle n'est lue qu'à votre demande et n'est jamais enregistrée ni transmise.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
