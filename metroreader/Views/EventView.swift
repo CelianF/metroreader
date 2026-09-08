@@ -22,6 +22,8 @@ struct EventView: View {
     @State private var region: MKCoordinateRegion
     @State private var cityName: String = "Loading..."
     @State private var location: NavigoStationInfo = NavigoStationInfo(name: "Loading", provider_id: 0, line_id: nil, location_id: 0, mode: "", lat: 0.0, lon: 0.0, found: false)
+    @State private var showingStopReport = false
+    @ObservedObject private var stopJournal = StopReports.shared
         
     init(eventInfo: [String: Any] = [:], contractsInfos: [[String: Any]] = []) {
         self.eventInfo = eventInfo
@@ -74,6 +76,13 @@ struct EventView: View {
         ))
     }
     
+    /// Jour et heure de la validation, pour juger la fraîcheur d'une position
+    private var eventInstant: Date? {
+        guard let jour = getKey(eventInfo, "EventDateStamp") else { return nil }
+        return interpretDateAsDate(jour)
+            .addingTimeInterval(interpretTimeAsTimeInterval(getKey(eventInfo, "EventTimeStamp") ?? ""))
+    }
+
     private var colorForTransition: Color {
         if self.eventTransition.starts(with: "Entrée") {
             return Color.blue
@@ -122,6 +131,18 @@ struct EventView: View {
                         Text("\(self.eventTransition)")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.gray)
+
+                        // L'arrêt manque au référentiel : proposer de l'identifier
+                        if let locationId = getKey(eventInfo, "EventLocationId").flatMap({ Int($0, radix: 2) }) {
+                            Button {
+                                showingStopReport = true
+                            } label: {
+                                Label("Arrêt inconnu (\(locationId))", systemImage: "mappin.slash")
+                                    .font(.system(size: 15, weight: .medium))
+                            }
+                            .buttonStyle(.bordered)
+                            .padding(.top, 4)
+                        }
                     }
                     
                     
@@ -212,7 +233,7 @@ struct EventView: View {
                 }
             }
             
-            if location.found {
+            if location.isLocatable {
                 Section {
                     Map(initialPosition: .region(region)) {
                         Marker(self.eventLocation.name, systemImage: getTransitIcon(self.eventTransportMode, self.eventTransition), coordinate: region.center)
@@ -239,6 +260,18 @@ struct EventView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showingStopReport) {
+            StopReportSheet(providerId: Int(getKey(eventInfo, "EventServiceProvider") ?? "", radix: 2) ?? 0,
+                            locationId: Int(getKey(eventInfo, "EventLocationId") ?? "", radix: 2) ?? 0,
+                            mode: self.eventTransportMode,
+                            routeNumber: self.eventRouteNumber,
+                            lineName: self.eventRouteName,
+                            linePublicId: self.eventRouteData?.public_id,
+                            eventDate: eventInstant)
+        }
+        .onChange(of: stopJournal.reports) {
+            location = interpretLocationId(getKey(eventInfo, "EventLocationId") ?? "", getKey(eventInfo, "EventCode") ?? "", getKey(eventInfo, "EventServiceProvider") ?? "", getKey(eventInfo, "EventRouteNumber"))
         }
     }
     

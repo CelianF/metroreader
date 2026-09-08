@@ -177,6 +177,10 @@ class NFCReader: NSObject, ObservableObject, NFCTagReaderSessionDelegate {
         session?.alertMessage = "Placez votre passe sur le haut de votre iPhone pendant quelques secondes."
         session?.begin()
         isScanning = true
+
+        // La position n'a de sens que prise maintenant : c'est l'instant le plus
+        // proche de la validation qu'on puisse atteindre.
+        LocationProvider.shared.captureForScan()
         
         clearData()
     }

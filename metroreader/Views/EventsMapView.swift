@@ -30,7 +30,7 @@ struct EventsMapView: View {
             
             let eventLocation = interpretLocationId(getKey(eventInfo, "EventLocationId") ?? "", getKey(eventInfo, "EventCode") ?? "", getKey(eventInfo, "EventServiceProvider") ?? "", getKey(eventInfo, "EventRouteNumber"))
             
-            if !eventLocation.found {
+            if !eventLocation.isLocatable {
                 return nil;
             }
             

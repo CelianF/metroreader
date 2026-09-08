@@ -14,12 +14,18 @@ struct SettingsPageView: View {
     @AppStorage("autoLaunchScan") private var autoLaunchScan = false
     #endif
     @AppStorage("isHistoryEnabled") private var isHistoryEnabled = false
+    #if os(iOS)
+    @AppStorage(LocationProvider.settingKey) private var locateOnScan = true
+    #endif
 
     @AppStorage(TimerSettings.alreadyValidated) private var alreadyValidatedTimer = true
     @AppStorage(TimerSettings.sale) private var saleTimer = true
     @AppStorage(TimerSettings.control) private var controlTimer = true
     
+    @ObservedObject private var stopJournal = StopReports.shared
+
     @State private var showingDeleteAlert = false
+    @State private var showingJournalAlert = false
     
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -41,6 +47,12 @@ struct SettingsPageView: View {
                 Toggle(isOn: $isHistoryEnabled) {
                     Label("Conserver l'historique", systemImage: "clock.arrow.circlepath")
                 }
+
+                #if os(iOS)
+                Toggle(isOn: $locateOnScan) {
+                    Label("Relever la position au scan", systemImage: "location")
+                }
+                #endif
             }
             
             Section(header: Text("Timers"), footer: Text("Affichés sous le visuel de la carte. Le timer Contrôle pilote aussi le contour du pass.")) {
@@ -55,6 +67,41 @@ struct SettingsPageView: View {
                 Toggle(isOn: $controlTimer) {
                     Label("Contrôle", systemImage: "checkmark.seal")
                 }
+            }
+
+            Section {
+                if stopJournal.reports.isEmpty {
+                    Text("Aucun arrêt signalé")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(stopJournal.reports) { report in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(report.stationName)
+                                .fontWeight(.semibold)
+                            Text("\(interpretServiceProviderName(report.providerId)) · \(report.locationId)\(report.lineName.map { " · ligne " + $0 } ?? "")")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .onDelete { stopJournal.delete(at: $0) }
+
+                    if let data = stopJournal.exportData {
+                        ShareLink(item: StopJournalFile(data: data),
+                                  preview: SharePreview("Arrêts à identifier")) {
+                            Label("Exporter le journal", systemImage: "square.and.arrow.up")
+                        }
+                    }
+
+                    Button(role: .destructive) {
+                        showingJournalAlert = true
+                    } label: {
+                        Label("Vider le journal", systemImage: "trash")
+                    }
+                }
+            } header: {
+                Text("Arrêts signalés")
+            } footer: {
+                Text("Treize réseaux n'ont pas déclaré leurs codes d'arrêt au référentiel régional. Les arrêts que tu identifies s'affichent aussitôt et sont conservés ici, pour être exportés et versés au jeu de données.")
             }
 
             Section(header: Text("Confidentialité")) {
@@ -129,6 +176,12 @@ struct SettingsPageView: View {
             }
         } message: {
             Text("Cette action est irréversible. Tous vos scans enregistrés seront supprimés.")
+        }
+        .alert("Vider le journal ?", isPresented: $showingJournalAlert) {
+            Button("Annuler", role: .cancel) { }
+            Button("Tout effacer", role: .destructive) { stopJournal.clearAll() }
+        } message: {
+            Text("Les arrêts que tu as identifiés seront oubliés et réafficheront leur identifiant brut.")
         }
     }
 }

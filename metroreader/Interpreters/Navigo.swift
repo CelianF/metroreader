@@ -305,6 +305,10 @@ func interpretLocationId(_ locationIdBitString: String, _ eventCodeBitstring: St
     let eventServiceProviderId = Int(eventServiceProviderBitstring, radix: 2) ?? 0
 
     guard let station = NavigoStations.find(eventServiceProviderId, eventRouteNumberPresent ? Int(routeNumberBitstring ?? "", radix: 2) : nil, value, eventTransport) else {
+        // Faute de référentiel, l'arrêt a pu être identifié à la main
+        if let signale = StopReports.shared.station(provider: eventServiceProviderId, location: value, mode: eventTransport) {
+            return signale
+        }
         return NavigoStationInfo.init(name: "\(value)", provider_id: eventServiceProviderId, line_id: nil, location_id: value, mode: eventTransport, lat: 0, lon: 0, found: false)
     }
     return station

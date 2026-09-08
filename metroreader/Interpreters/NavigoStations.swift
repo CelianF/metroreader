@@ -51,6 +51,22 @@ public struct NavigoStationInfo: Codable {
         self.found = true
     }
     
+    init(name: String, provider_id: Int, line_id: Int?, location_id: Int, mode: String, lat: Double, lon: Double, lines: [NavigoLineInfo], found: Bool) {
+        self.name = name
+        self.provider_id = provider_id
+        self.line_id = line_id
+        self.location_id = location_id
+        self.mode = mode
+        self.lat = lat
+        self.lon = lon
+        self.lines = lines
+        self.found = found
+    }
+
+    /// Un arrêt identifié à la main peut n'avoir aucune coordonnée : on connaît
+    /// son nom mais rien à placer sur une carte.
+    var isLocatable: Bool { found && (lat != 0 || lon != 0) }
+
     init(name: String, provider_id: Int, line_id: Int?, location_id: Int, mode: String, lat: Double, lon: Double, found: Bool) {
         self.name = name
         self.provider_id = provider_id

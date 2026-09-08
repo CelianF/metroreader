@@ -84,7 +84,7 @@ struct ScanView: View {
             let route = getKey(event, "EventRouteNumber")
             
             let location = interpretLocationId(locId, code, provider, route)
-            return location.found ? location : nil
+            return location.isLocatable ? location : nil
         }
     }
     
