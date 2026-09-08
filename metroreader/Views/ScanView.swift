@@ -41,26 +41,25 @@ struct ScanView: View {
         }
     }
     
+    private var preferredContractIndex: Int? {
+        Array(0..<tagContracts.count).first { isContractBest(tagContracts[$0], tagContracts) }
+    }
+
     private var displayedContractsIndices: [Int] {
         let allIndices = Array(0..<tagContracts.count)
-        
-        // Si l'utilisateur a cliqué sur "Voir tout", on donne tout
-        if showAllContracts {
-            return allIndices
-        }
-        
-        // On cherche l'index du contrat préféré
-        let preferredIndex = allIndices.first { i in
-            isContractBest(tagContracts[i], tagContracts)
-        }
-        
-        // Si on trouve un préféré, on ne renvoie que celui-là
-        if let bestIndex = preferredIndex {
-            return [bestIndex]
-        }
-        
-        // Sinon (pas de préféré détecté), on affiche tout par défaut
-        return allIndices
+
+        // Sans contrat préféré, on affiche tout d'emblée
+        guard let bestIndex = preferredContractIndex else { return allIndices }
+
+        // Le contrat retenu garde sa place en tête : déplier ajoute les autres
+        // en dessous de lui, au lieu de le faire glisser dans la liste.
+        guard showAllContracts else { return [bestIndex] }
+        return [bestIndex] + allIndices.filter { $0 != bestIndex }
+    }
+
+    /// Ce que le dépliage ferait apparaître, et non le nombre total de contrats
+    private var hiddenContractsCount: Int {
+        preferredContractIndex == nil ? 0 : tagContracts.count - 1
     }
     
     private var displayedEventsIndices: [Int] {
@@ -157,14 +156,14 @@ struct ScanView: View {
                         }
                     }
                     
-                    if tagContracts.count > 1 && !showAllContracts && displayedContractsIndices.count < tagContracts.count {
+                    if !showAllContracts && hiddenContractsCount > 0 {
                         Button(action: {
                             withAnimation { showAllContracts = true }
                         }) {
                             HStack {
                                 Text("Voir tout...")
                                 Spacer()
-                                Text("\(tagContracts.count)")
+                                Text("\(hiddenContractsCount)")
                                     .foregroundColor(.gray)
                                     .font(.caption)
                             }
@@ -183,14 +182,14 @@ struct ScanView: View {
                         }
                     }
                     
-                    if tagEvents.count > 3 && !showAllEvents {
+                    if !showAllEvents && tagEvents.count > displayedEventsIndices.count {
                         Button(action: {
                             withAnimation { showAllEvents = true }
                         }) {
                             HStack {
                                 Text("Voir tout...")
                                 Spacer()
-                                Text("\(tagEvents.count)")
+                                Text("\(tagEvents.count - displayedEventsIndices.count)")
                                     .foregroundColor(.gray)
                                     .font(.caption)
                             }
