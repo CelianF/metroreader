@@ -37,11 +37,12 @@ struct ScanPageView: View {
         .toolbar {
             #if os(iOS)
             ToolbarItemGroup(placement: .topBarLeading) {
-                Button(action: { isImporting = true }) {
-                    Image(systemName: "square.and.arrow.down")
-                }
-
+                // Sans carte, l'écran vide porte déjà son propre bouton d'import
                 if hasCard {
+                    Button(action: { isImporting = true }) {
+                        Image(systemName: "square.and.arrow.down")
+                    }
+
                     Button(action: {
                         nfcReader.beginScanning(historyManager: historyManager)
                     }) {
