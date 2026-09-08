@@ -23,54 +23,28 @@ struct EventsMapView: View {
     // Liste dynamique des stations trouvées
     let events: [[String: Any]]
 
+    // Un arrêt identifié à la main entre dans la carte : le journal est observé
+    // pour que la vue s'en aperçoive.
+    @ObservedObject private var entries = ManualEntries.shared
+
     // Transformation des stations en annotations identifiables
     private var annotations: [EventAnnotation] {
         events.enumerated().compactMap { index, eventInfo in
-            let eventRouteNumber = Int(getKey(eventInfo, "EventRouteNumber") ?? "", radix: 2)
-            
-            let eventLocation = interpretLocationId(getKey(eventInfo, "EventLocationId") ?? "", getKey(eventInfo, "EventCode") ?? "", getKey(eventInfo, "EventServiceProvider") ?? "", getKey(eventInfo, "EventRouteNumber"))
-            
-            if !eventLocation.isLocatable {
-                return nil;
-            }
-            
-            let eventCode = interpretEventCode(getKey(eventInfo, "EventCode") ?? "", isRouteNumberPresent: getKey(eventInfo, "EventRouteNumber") != nil, routeNumber: Int(getKey(eventInfo, "EventRouteNumber") ?? "0", radix: 2), serviceProvider: Int(getKey(eventInfo, "EventServiceProvider") ?? "", radix: 2))
-            var finalMode = eventCode.0
-            let eventTransition = eventCode.1
-            if (eventLocation.found && finalMode == "Train") {
-                let stationModes = Set(eventLocation.lines.map { $0.mode })
-                
-                let hasRER = stationModes.contains("RER")
-                let hasTrain = stationModes.contains("Transilien") || stationModes.contains("TER")
-                
-                if hasRER && hasTrain {
-                    finalMode = "Train / RER"
-                } else if hasRER {
-                    finalMode = "RER"
-                } else if hasTrain {
-                    finalMode = "Train"
-                }
-            }
-            
-            let eventRouteData = NavigoLines.find(Int(getKey(eventInfo, "EventServiceProvider") ?? "", radix: 2) ?? 0, eventRouteNumber ?? 0, finalMode)
-            
-            if eventRouteData?.is_noctilien == true {
-                finalMode = "Noctilien"
-            }
-            
-            let eventTransportMode = finalMode
-            
+            let event = ResolvedEvent(eventInfo)
+            guard event.location.isLocatable else { return nil }
+
             return EventAnnotation(
-                name: eventLocation.name,
-                coordinate: CLLocationCoordinate2D(latitude: eventLocation.lat, longitude: eventLocation.lon),
+                name: event.location.name,
+                coordinate: CLLocationCoordinate2D(latitude: event.location.lat, longitude: event.location.lon),
                 eventNumber: index + 1,
-                systemImage: getTransitIcon(eventTransportMode, eventTransition),
-                eventTransition: eventTransition
+                systemImage: getTransitIcon(event.mode, event.transition),
+                eventTransition: event.transition
             )
         }
     }
 
     var body: some View {
+        let annotations = self.annotations
         Map {
             ForEach(annotations) { annotation in
                 Marker(coordinate: annotation.coordinate) {
@@ -85,6 +59,9 @@ struct EventsMapView: View {
         }
         .mapStyle(.standard(emphasis: .muted))
         .frame(height: 300)
+        // Le cadrage automatique est choisi à la création : un arrêt identifié
+        // en cours de route agrandit la carte, il faut la refaire naître.
+        .id(annotations.map { "\($0.coordinate.latitude),\($0.coordinate.longitude)" }.joined(separator: "|"))
     }
 
     // Optionnel : change la couleur des marqueurs selon l'ancienneté

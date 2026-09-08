@@ -45,12 +45,40 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     /// Instant du relevé, à comparer à celui de la validation
     @Published private(set) var capturedAt: Date?
 
+    /// Ce qu'iOS a accordé, pour que le réglage puisse le dire.
+    @Published private(set) var authorization: CLAuthorizationStatus = .notDetermined
+
     private let manager = CLLocationManager()
 
     override init() {
         super.init()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        authorization = manager.authorizationStatus
+    }
+
+    /// Appelé quand l'utilisateur allume le réglage.
+    ///
+    /// Le réglage de l'app et l'autorisation d'iOS sont deux choses : cocher
+    /// l'un sans demander l'autre laissait le relevé armé côté app et muet côté
+    /// système, et le scan suivant ne rapportait rien. La demande se fait donc
+    /// au moment où on coche, pas au premier scan — l'invite d'iOS a besoin
+    /// d'un écran, et le scan NFC en occupe un.
+    func requestPermission() {
+        switch manager.authorizationStatus {
+        case .notDetermined:
+            manager.requestWhenInUseAuthorization()
+        case .denied, .restricted:
+            state = .denied
+        default:
+            break
+        }
+    }
+
+    /// Vrai quand iOS refuse, et que l'app n'y peut plus rien : il faut passer
+    /// par ses réglages.
+    var isDeniedBySystem: Bool {
+        authorization == .denied || authorization == .restricted
     }
 
     /// Appelé au début d'un scan, si le réglage l'autorise.
@@ -73,6 +101,7 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        authorization = manager.authorizationStatus
         switch manager.authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways:
             if state == .requesting { manager.requestLocation() }

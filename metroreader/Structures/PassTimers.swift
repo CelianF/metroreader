@@ -23,11 +23,15 @@ struct PassTimers {
     }
 
     /// Validité opposable à un contrôle, telle que la calcule le timer « Contrôle ».
+    ///
+    /// Il n'y a pas de troisième terme : un pass sur lequel aucune validation
+    /// n'ouvre de droit ne vaut rien face à un contrôle, qu'il n'ait plus de
+    /// validation ou qu'il n'en ait jamais eu. Un pass neuf est donc non
+    /// valable, et se lit comme tel.
     enum Validity {
         case valid(Countdown)
         case recentlyExpired(Countdown) // Expiré depuis moins de recentlyExpiredWindow
         case expired
-        case unknown // Aucun événement exploitable
     }
 
     static let recentlyExpiredWindow: TimeInterval = 1800 // 30 min
@@ -37,13 +41,11 @@ struct PassTimers {
     let control: Countdown? // Temps de validité : 2 h en rail, 1 h 30 en surface
 
     var validity: Validity {
-        guard let control else { return hasUsableEvent ? .expired : .unknown }
+        guard let control else { return .expired }
         if control.isRunning { return .valid(control) }
         if -control.remaining < Self.recentlyExpiredWindow { return .recentlyExpired(control) }
         return .expired
     }
-
-    private let hasUsableEvent: Bool
 
     // MARK: - Classification
 
@@ -117,7 +119,6 @@ struct PassTimers {
             return TimedEvent(date: date, mode: mode, kind: Kind(transition: transition), contract: contract)
         }
 
-        hasUsableEvent = parsed.contains { $0.isTransit }
         alreadyValidated = Self.alreadyValidatedTimer(parsed)
         sale = Self.saleTimer(contracts: contracts, events: parsed)
         control = Self.controlTimer(parsed)

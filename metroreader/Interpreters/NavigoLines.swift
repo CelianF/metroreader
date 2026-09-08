@@ -17,6 +17,9 @@ public struct NavigoLineInfo: Codable {
     let background_color: String
     let text_color: String
     let is_noctilien: Bool
+    /// Faux quand la ligne n'a pas été trouvée et qu'on affiche le numéro de
+    /// course brut. Absent du JSON : ce qui vient du référentiel est trouvé.
+    let found: Bool
     
     enum CodingKeys: String, CodingKey {
         case name, mode, direction, public_id, provider_id, line_id, background_color, text_color, is_noctilien
@@ -34,9 +37,10 @@ public struct NavigoLineInfo: Codable {
         self.background_color = try container.decode(String.self, forKey: .background_color)
         self.text_color = try container.decode(String.self, forKey: .text_color)
         self.is_noctilien = try container.decodeIfPresent(Bool.self, forKey: .is_noctilien) ?? false
+        self.found = true
     }
     
-    init(name: String, mode: String, direction: String? = nil, public_id: String, provider_id: Int?, line_id: Int?, background_color: String, text_color: String, is_noctilien: Bool = false) {
+    init(name: String, mode: String, direction: String? = nil, public_id: String, provider_id: Int?, line_id: Int?, background_color: String, text_color: String, is_noctilien: Bool = false, found: Bool = true) {
         self.name = name
         self.mode = mode
         self.direction = direction
@@ -46,6 +50,7 @@ public struct NavigoLineInfo: Codable {
         self.background_color = background_color
         self.text_color = text_color
         self.is_noctilien = is_noctilien
+        self.found = found
     }
 }
 

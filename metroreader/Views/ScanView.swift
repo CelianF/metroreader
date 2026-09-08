@@ -25,6 +25,10 @@ struct ScanView: View {
     @State private var showingImagePicker = false
     @AppStorage(TimerSettings.control) private var controlTimerEnabled = true
 
+    // La carte des événements et les libellés d'arrêt suivent le journal des
+    // saisies : ce qui vient d'être identifié apparaît sans changer d'écran.
+    @ObservedObject private var entries = ManualEntries.shared
+
     private var timers: PassTimers {
         PassTimers(contracts: tagContracts, events: tagEvents)
     }
@@ -37,8 +41,14 @@ struct ScanView: View {
         case .valid:           return (.green, 6)
         case .recentlyExpired: return (.orange, 16)
         case .expired:         return (.red, 6)
-        case .unknown:         return nil
         }
+    }
+
+    /// Renommer le pass et changer son image n'existent que dans l'historique :
+    /// sans fiche enregistrée, la saisie n'aurait nulle part où être écrite et
+    /// serait perdue à la fermeture. Historique éteint, il n'y a pas de fiche.
+    private var canPersonalize: Bool {
+        cardID != 0 && historyManager.history.contains { $0.cardID == cardID }
     }
     
     private var preferredContractIndex: Int? {
@@ -95,16 +105,20 @@ struct ScanView: View {
                         NavigoImage(imageName: historyManager.history.first(where: { $0.cardID == cardID })?.image ?? interpretNavigoImage(holderCardStatus, getKey(tagEnvHolder, "EnvApplicationIssuerId") ?? "", holderCommercialId, tagContracts))
                             .shadow(radius: 2)
                             .overlay {
-                                if let outline = validityOutline {
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .strokeBorder(outline.color, lineWidth: 3)
-                                        .shadow(color: outline.color, radius: outline.glow)
-                                        .shadow(color: outline.color.opacity(0.6), radius: outline.glow)
-                                        .allowsHitTesting(false)
+                                // Le titre expire sans que rien ne bouge dans
+                                // les données : le contour se relit à l'heure.
+                                TimelineView(.periodic(from: .now, by: 1.0)) { _ in
+                                    if let outline = validityOutline {
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .strokeBorder(outline.color, lineWidth: 3)
+                                            .shadow(color: outline.color, radius: outline.glow)
+                                            .shadow(color: outline.color.opacity(0.6), radius: outline.glow)
+                                    }
                                 }
+                                .allowsHitTesting(false)
                             }
                             .onTapGesture(count: 2) {
-                                showingImagePicker = true
+                                if canPersonalize { showingImagePicker = true }
                             }
                         VStack(alignment: .leading) {
                             switch interpretNavigoPersonalizationStatusCode(holderCardStatus) {
@@ -138,9 +152,9 @@ struct ScanView: View {
             .listRowInsets(EdgeInsets())
             
             
-            if tagContracts.count > 0 && tagEvents.count > 0 {
-                TimersView(timers: timers)
-            }
+            // Sans contrat ni événement non plus : un pass neuf n'ouvre aucun
+            // droit, et le dire est le seul renseignement qu'on ait à donner.
+            TimersView(timers: timers)
             
             if tagContracts.count > 0 {
                 Section(header: Text("Contrats")) {
@@ -233,6 +247,7 @@ struct ScanView: View {
                         .font(.headline)
                         // Détection du double-clic sur le titre
                         .onTapGesture(count: 2) {
+                            guard canPersonalize else { return }
                             #if os(iOS)
                             let impactMed = UIImpactFeedbackGenerator(style: .medium)
                             impactMed.impactOccurred()
@@ -241,25 +256,27 @@ struct ScanView: View {
                             newNickname = record?.nickname ?? ""
                             showingRenameAlert = true
                         }
-                        .help("Double-cliquez pour renommer") // Optionnel : bulle d'aide sur iPad/Mac
+                        .help(canPersonalize ? "Double-cliquez pour renommer" : "")
                 }
             }
             
             #if os(iOS)
             ToolbarItemGroup(placement: .topBarTrailing) {
-                Menu {
-                    Button(action: {
-                        newNickname = historyManager.history.first(where: { $0.cardID == cardID })?.nickname ?? ""
-                        showingRenameAlert = true
-                    }) {
-                        Label("Renommer le pass", systemImage: "pencil")
+                if canPersonalize {
+                    Menu {
+                        Button(action: {
+                            newNickname = historyManager.history.first(where: { $0.cardID == cardID })?.nickname ?? ""
+                            showingRenameAlert = true
+                        }) {
+                            Label("Renommer le pass", systemImage: "pencil")
+                        }
+
+                        Button(action: { showingImagePicker = true }) {
+                            Label("Changer l'image", systemImage: "photo.on.rectangle")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
-                    
-                    Button(action: { showingImagePicker = true }) {
-                        Label("Changer l'image", systemImage: "photo.on.rectangle")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
                 }
                 
                 if !tagEnvHolder.isEmpty, let jsonData = exportDataAsJSON {
@@ -278,19 +295,21 @@ struct ScanView: View {
             }
             #else
             ToolbarItemGroup {
-                Menu {
-                    Button(action: {
-                        newNickname = historyManager.history.first(where: { $0.cardID == cardID })?.nickname ?? ""
-                        showingRenameAlert = true
-                    }) {
-                        Label("Renommer le pass", systemImage: "pencil")
+                if canPersonalize {
+                    Menu {
+                        Button(action: {
+                            newNickname = historyManager.history.first(where: { $0.cardID == cardID })?.nickname ?? ""
+                            showingRenameAlert = true
+                        }) {
+                            Label("Renommer le pass", systemImage: "pencil")
+                        }
+
+                        Button(action: { showingImagePicker = true }) {
+                            Label("Changer l'image", systemImage: "photo.on.rectangle")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
-                    
-                    Button(action: { showingImagePicker = true }) {
-                        Label("Changer l'image", systemImage: "photo.on.rectangle")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
                 }
                 
                 if !tagEnvHolder.isEmpty, let jsonData = exportDataAsJSON {

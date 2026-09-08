@@ -15,14 +15,18 @@ struct SettingsPageView: View {
     #endif
     @AppStorage("isHistoryEnabled") private var isHistoryEnabled = false
     #if os(iOS)
-    @AppStorage(LocationProvider.settingKey) private var locateOnScan = true
+    // Éteint par défaut : la valeur par défaut d'un @AppStorage n'écrit rien
+    // dans UserDefaults, si bien qu'un interrupteur allumé d'origine se lisait
+    // éteint côté lecture — et iOS, lui, n'avait jamais été sollicité.
+    @AppStorage(LocationProvider.settingKey) private var locateOnScan = false
+    @ObservedObject private var gps = LocationProvider.shared
     #endif
 
     @AppStorage(TimerSettings.alreadyValidated) private var alreadyValidatedTimer = true
     @AppStorage(TimerSettings.sale) private var saleTimer = true
     @AppStorage(TimerSettings.control) private var controlTimer = true
     
-    @ObservedObject private var stopJournal = StopReports.shared
+    @ObservedObject private var journal = ManualEntries.shared
 
     @State private var showingDeleteAlert = false
     @State private var showingJournalAlert = false
@@ -37,23 +41,45 @@ struct SettingsPageView: View {
 
     var body: some View {
         List {
-            Section(header: Text("Comportement")) {
+            Section {
                 #if os(iOS)
                 Toggle(isOn: $autoLaunchScan) {
                     Label("Scan au démarrage", systemImage: "bolt.fill")
                 }
                 #endif
+
                 
                 Toggle(isOn: $isHistoryEnabled) {
                     Label("Conserver l'historique", systemImage: "clock.arrow.circlepath")
                 }
+            } header: {
+                Text("Comportement")
+            } footer: {
+                Text("Sans historique, un pass ne peut être ni renommé ni recoloré : il n'y a pas de fiche où l'écrire.")
+            }
 
-                #if os(iOS)
+            #if os(iOS)
+            Section {
                 Toggle(isOn: $locateOnScan) {
                     Label("Relever la position au scan", systemImage: "location")
                 }
-                #endif
+                .onChange(of: locateOnScan) { _, active in
+                    if active { gps.requestPermission() }
+                }
+
+                if locateOnScan, gps.isDeniedBySystem,
+                   let reglages = URL(string: UIApplication.openSettingsURLString) {
+                    Link(destination: reglages) {
+                        Label("Autoriser dans les réglages de l'iPhone", systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.orange)
+                    }
+                }
+            } header: {
+                Text("Position")
+            } footer: {
+                Text("Relevée au moment du scan seulement, pour proposer les arrêts proches quand la carte annonce un arrêt inconnu. Elle n'est ni enregistrée ni transmise.")
             }
+            #endif
             
             Section(header: Text("Timers"), footer: Text("Affichés sous le visuel de la carte. Le timer Contrôle pilote aussi le contour du pass.")) {
                 Toggle(isOn: $alreadyValidatedTimer) {
@@ -70,47 +96,41 @@ struct SettingsPageView: View {
             }
 
             Section {
-                if stopJournal.reports.isEmpty {
-                    Text("Aucun arrêt signalé")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(stopJournal.reports) { report in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(report.stationName)
-                                .fontWeight(.semibold)
-                            Text("\(interpretServiceProviderName(report.providerId)) · \(report.locationId)\(report.lineName.map { " · ligne " + $0 } ?? "")")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .onDelete { stopJournal.delete(at: $0) }
-
-                    if let data = stopJournal.exportData {
-                        ShareLink(item: StopJournalFile(data: data),
-                                  preview: SharePreview("Arrêts à identifier")) {
-                            Label("Exporter le journal", systemImage: "square.and.arrow.up")
-                        }
-                    }
-
-                    Button(role: .destructive) {
-                        showingJournalAlert = true
-                    } label: {
-                        Label("Vider le journal", systemImage: "trash")
-                    }
+                NavigationLink {
+                    ManualDataView()
+                } label: {
+                    Label("Données saisies", systemImage: "tablecells")
                 }
+
+                if let data = journal.export {
+                    ShareLink(item: ManualEntriesFile(data: data, fileName: "donnees-saisies.json"),
+                              preview: SharePreview("Données saisies")) {
+                        Label("Partager", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(journal.isEmpty)
+                }
+
+                Button(role: .destructive) {
+                    showingJournalAlert = true
+                } label: {
+                    Label("Supprimer", systemImage: "trash")
+                }
+                .disabled(journal.isEmpty)
             } header: {
-                Text("Arrêts signalés")
+                Text("Données")
             } footer: {
-                Text("Treize réseaux n'ont pas déclaré leurs codes d'arrêt au référentiel régional. Les arrêts que tu identifies s'affichent aussitôt et sont conservés ici, pour être exportés et versés au jeu de données.")
+                Text("Les réseaux, lignes et arrêts que tu as identifiés faute de référentiel. Ils se parcourent par réseau, puis par ligne, et s'exportent pour être versés au jeu de données.")
             }
 
-            Section(header: Text("Confidentialité")) {
+            Section {
                 Button(role: .destructive) {
                     showingDeleteAlert = true
                 } label: {
                     Label("Effacer tout l'historique", systemImage: "trash")
                 }
                 .disabled(historyManager.history.isEmpty)
+            } header: {
+                Text("Confidentialité")
             }
             
             Section(header: Text("Crédits")) {
@@ -177,11 +197,11 @@ struct SettingsPageView: View {
         } message: {
             Text("Cette action est irréversible. Tous vos scans enregistrés seront supprimés.")
         }
-        .alert("Vider le journal ?", isPresented: $showingJournalAlert) {
+        .alert("Supprimer les données saisies ?", isPresented: $showingJournalAlert) {
             Button("Annuler", role: .cancel) { }
-            Button("Tout effacer", role: .destructive) { stopJournal.clearAll() }
+            Button("Tout effacer", role: .destructive) { journal.clearAll() }
         } message: {
-            Text("Les arrêts que tu as identifiés seront oubliés et réafficheront leur identifiant brut.")
+            Text("Les réseaux, lignes et arrêts que tu as identifiés seront oubliés, et réafficheront leur identifiant brut.")
         }
     }
 }

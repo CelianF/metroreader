@@ -1,5 +1,5 @@
 //
-//  StopReportSheet.swift
+//  IdentifyStopSheet.swift
 //  metroreader
 //
 
@@ -10,7 +10,7 @@ import CoreLocation
 /// Sélection de l'arrêt correspondant à un identifiant que l'app n'a pas su
 /// résoudre. Les arrêts du réseau sont connus — seule la clé manque — donc on
 /// propose d'abord ceux de la ligne empruntée.
-struct StopReportSheet: View {
+struct IdentifyStopSheet: View {
     let providerId: Int
     let locationId: Int
     let mode: String
@@ -23,12 +23,25 @@ struct StopReportSheet: View {
     var eventDate: Date?
 
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var journal = StopReports.shared
+    @ObservedObject private var journal = ManualEntries.shared
 
     @ObservedObject private var gps = LocationProvider.shared
     @State private var recherche = ""
     @State private var toutLeReseau = false
     @State private var saisieLibre = ""
+
+    /// Arrêts déjà nommés à la main sur ce réseau. Un même arrêt physique porte
+    /// plusieurs codes — un par quai, par sens, par exploitant qui le dessert —
+    /// et c'est le cas courant : le deuxième code se rattache en un geste.
+    private var dejaNommes: [StopReport] {
+        var vus = Set<String>()
+        return journal.stops
+            .filter { $0.mode == mode && $0.locationId != locationId }
+            .filter { recherche.isEmpty || $0.stationName.localizedCaseInsensitiveContains(recherche) }
+            .filter { vus.insert($0.stationName).inserted }
+            .prefix(6)
+            .map { $0 }
+    }
 
     /// Arrêts du réseau, dédoublonnés par nom : les quais d'un même arrêt
     /// portent des identifiants différents mais le même libellé.
@@ -114,7 +127,7 @@ struct StopReportSheet: View {
                 } header: {
                     Text("Ce que la carte annonce")
                 } footer: {
-                    Text("Cet arrêt n'est pas dans le jeu de données. En l'identifiant, tu l'ajoutes au journal, exportable depuis les Réglages.")
+                    Text("Cet arrêt n'est pas dans le jeu de données. En l'identifiant, tu l'ajoutes au journal, consultable depuis Réglages › Données.")
                 }
 
                 if case .located(let position, let precision) = gps.state, releveExploitable {
@@ -155,6 +168,29 @@ struct StopReportSheet: View {
                         }
                     } header: {
                         Text("Là où tu étais au scan")
+                    }
+                }
+
+                if !dejaNommes.isEmpty {
+                    Section {
+                        ForEach(dejaNommes) { report in
+                            Button {
+                                enregistrer(nom: report.stationName, reference: report.referenceId,
+                                            lat: report.lat, lon: report.lon)
+                            } label: {
+                                HStack {
+                                    Text(report.stationName).foregroundStyle(.primary)
+                                    Spacer()
+                                    Text("\(report.locationId)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("Arrêts que tu as déjà nommés")
+                    } footer: {
+                        Text("Un même arrêt porte plusieurs codes : un par quai, par sens, ou par exploitant qui le dessert. Le rattacher ici réunit ses codes sous un seul nom.")
                     }
                 }
 
@@ -249,9 +285,4 @@ struct StopReportSheet: View {
         ))
         dismiss()
     }
-}
-
-/// Le libellé d'exploitant, sans passer par le bitstring.
-func interpretServiceProviderName(_ id: Int) -> String {
-    ProviderCatalog.findProvider(id)?.displayName ?? "Unknown (\(id))"
 }

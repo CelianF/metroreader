@@ -11,140 +11,103 @@ import MapKit
 struct EventView: View {
     var eventInfo: [String: Any] = [:]
     var contractsInfos: [[String: Any]] = []
-    
-    let eventLocation: NavigoStationInfo
-    let eventRouteNumber: Int?
-    let eventRouteName: String?
-    let eventTransportMode: String
-    let eventTransition: String
-    let eventRouteData: NavigoLineInfo?
-    
-    @State private var region: MKCoordinateRegion
+
+    // La résolution est refaite à chaque rendu et le journal est observé : ce
+    // qu'on vient d'identifier s'affiche sans quitter l'écran.
+    @ObservedObject private var entries = ManualEntries.shared
+
     @State private var cityName: String = "Loading..."
-    @State private var location: NavigoStationInfo = NavigoStationInfo(name: "Loading", provider_id: 0, line_id: nil, location_id: 0, mode: "", lat: 0.0, lon: 0.0, found: false)
-    @State private var showingStopReport = false
-    @ObservedObject private var stopJournal = StopReports.shared
-        
+    @State private var identifying: Identification?
+
+    private enum Identification: Int, Identifiable {
+        case stop, line, provider
+        var id: Int { rawValue }
+    }
+
     init(eventInfo: [String: Any] = [:], contractsInfos: [[String: Any]] = []) {
         self.eventInfo = eventInfo
         self.contractsInfos = contractsInfos
-        
-        self.eventRouteNumber = Int(getKey(eventInfo, "EventRouteNumber") ?? "", radix: 2)
-        var finalRouteName: String? = nil
-        if self.eventRouteNumber != nil {
-            finalRouteName = interpretRouteNumber(getKey(eventInfo, "EventRouteNumber") ?? "", getKey(eventInfo, "EventCode") ?? "", getKey(eventInfo, "EventServiceProvider") ?? "")
-        }
-        
-        self.eventLocation = interpretLocationId(getKey(eventInfo, "EventLocationId") ?? "", getKey(eventInfo, "EventCode") ?? "", getKey(eventInfo, "EventServiceProvider") ?? "", getKey(eventInfo, "EventRouteNumber"))
-        
-        let eventCode = interpretEventCode(getKey(eventInfo, "EventCode") ?? "", isRouteNumberPresent: getKey(eventInfo, "EventRouteNumber") != nil, routeNumber: Int(getKey(eventInfo, "EventRouteNumber") ?? "0", radix: 2), serviceProvider: Int(getKey(eventInfo, "EventServiceProvider") ?? "", radix: 2))
-        var finalMode = eventCode.0
-        self.eventTransition = eventCode.1
-        if (self.eventLocation.found && finalMode == "Train") {
-            let stationModes = Set(self.eventLocation.lines.map { $0.mode })
-            
-            let hasRER = stationModes.contains("RER")
-            let hasTrain = stationModes.contains("Transilien") || stationModes.contains("TER")
-            
-            if hasRER && hasTrain {
-                finalMode = "Train / RER"
-            } else if hasRER {
-                finalMode = "RER"
-            } else if hasTrain {
-                finalMode = "Train"
-            }
-            
-            if self.eventLocation.lines.count == 1 {
-                finalRouteName = self.eventLocation.lines.first!.name
-            }
-        }
-        
-        self.eventRouteData = NavigoLines.find(Int(getKey(eventInfo, "EventServiceProvider") ?? "", radix: 2) ?? 0, self.eventRouteNumber ?? 0, finalMode)
-        
-        if self.eventRouteData?.is_noctilien == true {
-            finalMode = "Noctilien"
-        }
-        
-        self.eventTransportMode = finalMode
-        self.eventRouteName = finalRouteName
-        
-        _location = State(initialValue: self.eventLocation)
-        
-        _region = State(initialValue: MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: self.eventLocation.lat, longitude: self.eventLocation.lon),
-            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-        ))
-    }
-    
-    /// Jour et heure de la validation, pour juger la fraîcheur d'une position
-    private var eventInstant: Date? {
-        guard let jour = getKey(eventInfo, "EventDateStamp") else { return nil }
-        return interpretEventInstant(jour, getKey(eventInfo, "EventTimeStamp") ?? "")
     }
 
-    private var colorForTransition: Color {
-        if self.eventTransition.starts(with: "Entrée") {
+    private var event: ResolvedEvent { ResolvedEvent(eventInfo) }
+
+    private var eventInstant: Date? { ResolvedEvent.instant(eventInfo) }
+
+    private func colorForTransition(_ transition: String) -> Color {
+        if transition.starts(with: "Entrée") {
             return Color.blue
-        } else if self.eventTransition.starts(with: "Sortie") {
+        } else if transition.starts(with: "Sortie") {
             return Color.red
         }
         return Color.purple
     }
-    
+
     var body: some View {
+        let event = self.event
         List {
             Section {
                 VStack(alignment: .center, spacing: 8) {
-                    if location.found {
-                        Text("\(self.eventLocation.name)")
+                    if event.location.found {
+                        Text("\(event.location.name)")
                             .font(.largeTitle)
                             .fontWeight(.bold)
                             .multilineTextAlignment(.center)
                             .frame(maxWidth: .infinity, alignment: .center)
-                        
-                        LineIcons(lines: self.eventLocation.lines)
-                        
+
+                        LineIcons(lines: event.location.lines)
+
                         HStack(spacing: 0) {
-                            if let route = interpretRoute(getKey(eventInfo, "EventRouteNumber") ?? "", getKey(eventInfo, "EventCode") ?? "", getKey(eventInfo, "EventServiceProvider") ?? "") {
+                            if let route = event.route {
                                 LineIcons(lines: [route])
                             } else {
-                                Text("\(self.eventTransportMode)")
+                                Text("\(event.mode)")
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(.gray)
                             }
-                            Text(" - \(self.eventTransition)")
+                            Text(" - \(event.transition)")
                                 .font(.system(size: 18, weight: .medium))
                                 .foregroundColor(.gray)
                         }
                     } else {
                         HStack(spacing: 0) {
-                            if let route = interpretRoute(getKey(eventInfo, "EventRouteNumber") ?? "", getKey(eventInfo, "EventCode") ?? "", getKey(eventInfo, "EventServiceProvider") ?? "") {
+                            if let route = event.route {
                                 LineIcons(lines: [route], size: 50.0)
                             } else {
-                                Text("\(self.eventTransportMode)")
+                                Text("\(event.mode)")
                                     .font(.largeTitle)
                                     .fontWeight(.bold)
                             }
                         }
-                        
-                        Text("\(self.eventTransition)")
+
+                        Text("\(event.transition)")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.gray)
-
-                        // L'arrêt manque au référentiel : proposer de l'identifier
-                        if let locationId = getKey(eventInfo, "EventLocationId").flatMap({ Int($0, radix: 2) }) {
-                            Button {
-                                showingStopReport = true
-                            } label: {
-                                Label("Arrêt inconnu (\(locationId))", systemImage: "mappin.slash")
-                                    .font(.system(size: 15, weight: .medium))
-                            }
-                            .buttonStyle(.bordered)
-                            .padding(.top, 4)
-                        }
                     }
-                    
-                    
+
+                    // Ce que la carte annonce sans que le référentiel sache le
+                    // nommer : chaque manque se comble ici, et la saisie se
+                    // relit dans Réglages › Données.
+                    if event.hasSomethingToIdentify {
+                        VStack(spacing: 6) {
+                            if event.isStopUnidentified, let locationId = event.locationId {
+                                identifyButton("Arrêt inconnu (\(locationId))", icon: "mappin.slash") {
+                                    identifying = .stop
+                                }
+                            }
+                            if event.isLineUnidentified, let routeNumber = event.routeNumber {
+                                identifyButton("Ligne inconnue (\(routeNumber))", icon: "arrow.triangle.swap") {
+                                    identifying = .line
+                                }
+                            }
+                            if event.isProviderUnidentified {
+                                identifyButton("Réseau inconnu (\(event.providerId))", icon: "building.2") {
+                                    identifying = .provider
+                                }
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
+
                     if let eventResult = getKey(eventInfo, "EventResult") {
                         Text("\(interpretEventResult(eventResult))")
                             .font(.system(size: 18, weight: .medium))
@@ -180,7 +143,7 @@ struct EventView: View {
                         Text("Transporteur")
                             .fontWeight(.semibold)
                         Spacer()
-                        Text(interpretServiceProvider(getKey(eventInfo, "EventServiceProvider") ?? ""))
+                        Text(interpretServiceProviderName(event.providerId))
                             .fontWeight(.semibold)
                     }
                     
@@ -218,7 +181,7 @@ struct EventView: View {
                         }
                     }
                     
-                    if let route = interpretRoute(getKey(eventInfo, "EventRouteNumber") ?? "", getKey(eventInfo, "EventCode") ?? "", getKey(eventInfo, "EventServiceProvider") ?? ""), self.eventLocation.lines.contains(where: {$0.line_id == route.line_id && $0.provider_id == route.provider_id}), let routeFromLocation = self.eventLocation.lines.first(where: {$0.line_id == route.line_id && $0.provider_id == route.provider_id}), let direction = routeFromLocation.direction {
+                    if let route = event.route, let routeFromLocation = event.location.lines.first(where: { $0.line_id == route.line_id && $0.provider_id == route.provider_id }), let direction = routeFromLocation.direction {
                         Divider()
                         
                         HStack {
@@ -232,17 +195,24 @@ struct EventView: View {
                 }
             }
             
-            if location.isLocatable {
+            if event.location.isLocatable {
+                let center = CLLocationCoordinate2D(latitude: event.location.lat, longitude: event.location.lon)
                 Section {
-                    Map(initialPosition: .region(region)) {
-                        Marker(self.eventLocation.name, systemImage: getTransitIcon(self.eventTransportMode, self.eventTransition), coordinate: region.center)
-                            .tint(self.colorForTransition)
+                    Map(initialPosition: .region(MKCoordinateRegion(
+                        center: center,
+                        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                    ))) {
+                        Marker(event.location.name, systemImage: getTransitIcon(event.mode, event.transition), coordinate: center)
+                            .tint(colorForTransition(event.transition))
                     }
                     .frame(height: 200)
+                    // La carte ne relit sa position initiale qu'à sa création :
+                    // un arrêt identifié en cours de route la fait renaître.
+                    .id("\(center.latitude),\(center.longitude)")
                     Text(cityName)
                         .padding()
-                        .onAppear {
-                            fetchCityName(for: region.center)
+                        .task(id: "\(center.latitude),\(center.longitude)") {
+                            await fetchCityName(for: center)
                         }
                 }
                 .listRowInsets(EdgeInsets())
@@ -254,40 +224,51 @@ struct EventView: View {
                         Text("Emplacement")
                             .fontWeight(.semibold)
                         Spacer()
-                        Text(location.name)
+                        Text(event.location.name)
                             .fontWeight(.semibold)
                     }
                 }
             }
         }
-        .sheet(isPresented: $showingStopReport) {
-            StopReportSheet(providerId: Int(getKey(eventInfo, "EventServiceProvider") ?? "", radix: 2) ?? 0,
-                            locationId: Int(getKey(eventInfo, "EventLocationId") ?? "", radix: 2) ?? 0,
-                            mode: self.eventTransportMode,
-                            routeNumber: self.eventRouteNumber,
-                            lineName: self.eventRouteName,
-                            linePublicId: self.eventRouteData?.public_id,
-                            eventDate: eventInstant)
+        .sheet(item: $identifying) { quoi in
+            switch quoi {
+            case .stop:
+                IdentifyStopSheet(providerId: event.providerId,
+                                  locationId: event.locationId ?? 0,
+                                  mode: event.lookupMode,
+                                  routeNumber: event.routeNumber,
+                                  lineName: event.routeName,
+                                  linePublicId: event.lineData?.public_id,
+                                  eventDate: eventInstant)
+            case .line:
+                IdentifyLineSheet(providerId: event.providerId,
+                                  routeNumber: event.routeNumber ?? 0,
+                                  mode: event.lookupMode)
+            case .provider:
+                IdentifyProviderSheet(providerId: event.providerId)
+            }
         }
-        .onChange(of: stopJournal.reports) {
-            location = interpretLocationId(getKey(eventInfo, "EventLocationId") ?? "", getKey(eventInfo, "EventCode") ?? "", getKey(eventInfo, "EventServiceProvider") ?? "", getKey(eventInfo, "EventRouteNumber"))
+    }
+
+    private func identifyButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.system(size: 15, weight: .medium))
         }
+        .buttonStyle(.bordered)
     }
     
     // Reverse Geocoding to get City Name
-    func fetchCityName(for location: CLLocationCoordinate2D) {
+    func fetchCityName(for coordinate: CLLocationCoordinate2D) async {
         let geocoder = CLGeocoder()
-        let location = CLLocation(latitude: location.latitude, longitude: location.longitude)
-        
-        geocoder.reverseGeocodeLocation(location) { placemarks, error in
-            if let city = placemarks?.first?.locality {
-                if let region = placemarks?.first?.administrativeArea {
-                    self.cityName = "\(city), \(region)"
-                }
-            } else {
-                self.cityName = "Unknown Location"
-            }
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+
+        guard let placemark = try? await geocoder.reverseGeocodeLocation(location).first,
+              let city = placemark.locality else {
+            cityName = "Unknown Location"
+            return
         }
+        cityName = placemark.administrativeArea.map { "\(city), \($0)" } ?? city
     }
 }
 

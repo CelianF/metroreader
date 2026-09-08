@@ -45,6 +45,19 @@ public class ProviderCatalog {
 
     static var networks: [NetworkInfo] { file?.networks ?? [] }
 
+    /// Les libellés déjà employés, pour que ce qui se saisit à la main
+    /// s'écrive comme ce qui vient du référentiel.
+    static let knownNetworkNames: [String] = distinct { $0.network }
+    static let knownOperatorNames: [String] = distinct { $0.operatorName }
+
+    private static func distinct(_ champ: (ServiceProviderInfo) -> String?) -> [String] {
+        var vus = Set<String>()
+        return (file?.serviceProviders ?? [])
+            .compactMap(champ)
+            .filter { !$0.isEmpty && vus.insert($0).inserted }
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
     private static let file: ProvidersFile? = {
         guard let url = Bundle.main.url(forResource: "Providers", withExtension: "json"),
               let data = try? Data(contentsOf: url) else {

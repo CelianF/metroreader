@@ -9,70 +9,31 @@ import SwiftUI
 
 struct EventPreview: View {
     var eventInfo: [String: Any]
-    
-    let eventLocation: NavigoStationInfo
-    let eventRouteNumber: Int?
-    let eventRouteName: String?
-    let eventTransportMode: String
-    let eventTransition: String
-    let eventRouteData: NavigoLineInfo?
-    
+
+    // La résolution suit le journal des saisies : identifier un arrêt met à
+    // jour la liste sans qu'il faille quitter l'écran.
+    @ObservedObject private var entries = ManualEntries.shared
+
     init(eventInfo: [String : Any] = [:]) {
         self.eventInfo = eventInfo
-        
-        self.eventRouteNumber = Int(getKey(eventInfo, "EventRouteNumber") ?? "", radix: 2)
-        var finalRouteName: String? = nil
-        if self.eventRouteNumber != nil {
-            finalRouteName = interpretRouteNumber(getKey(eventInfo, "EventRouteNumber") ?? "", getKey(eventInfo, "EventCode") ?? "", getKey(eventInfo, "EventServiceProvider") ?? "")
-        }
-        
-        self.eventLocation = interpretLocationId(getKey(eventInfo, "EventLocationId") ?? "", getKey(eventInfo, "EventCode") ?? "", getKey(eventInfo, "EventServiceProvider") ?? "", getKey(eventInfo, "EventRouteNumber"))
-        
-        let eventCode = interpretEventCode(getKey(eventInfo, "EventCode") ?? "", isRouteNumberPresent: getKey(eventInfo, "EventRouteNumber") != nil, routeNumber: Int(getKey(eventInfo, "EventRouteNumber") ?? "0", radix: 2), serviceProvider: Int(getKey(eventInfo, "EventServiceProvider") ?? "", radix: 2))
-        var finalMode = eventCode.0
-        self.eventTransition = eventCode.1
-        if (self.eventLocation.found && finalMode == "Train") {
-            let stationModes = Set(self.eventLocation.lines.map { $0.mode })
-            
-            let hasRER = stationModes.contains("RER")
-            let hasTrain = stationModes.contains("Transilien") || stationModes.contains("TER")
-            
-            if hasRER && hasTrain {
-                finalMode = "Train / RER"
-            } else if hasRER {
-                finalMode = "RER"
-            } else if hasTrain {
-                finalMode = "Train"
-            }
-            
-            if self.eventLocation.lines.count == 1 {
-                finalRouteName = self.eventLocation.lines.first!.name
-            }
-        }
-        
-        self.eventRouteData = NavigoLines.find(Int(getKey(eventInfo, "EventServiceProvider") ?? "", radix: 2) ?? 0, self.eventRouteNumber ?? 0, finalMode)
-        
-        if self.eventRouteData?.is_noctilien == true {
-            finalMode = "Noctilien"
-        }
-        
-        self.eventTransportMode = finalMode
-        self.eventRouteName = finalRouteName
     }
-    
+
+    private var event: ResolvedEvent { ResolvedEvent(eventInfo) }
+
     var body: some View {
+        let event = self.event
         HStack {
-            EventIcon(eventTransportMode: self.eventTransportMode, eventTransition: self.eventTransition)
+            EventIcon(eventTransportMode: event.mode, eventTransition: event.transition)
             VStack(alignment: .leading) {
-                if self.eventLocation.found {
-                    Text("\(self.eventLocation.name)")
+                if event.location.found {
+                    Text("\(event.location.name)")
                         .fontWeight(.bold)
                     
                     HStack(spacing: 0) {
-                        Text("\(self.eventTransportMode)")
+                        Text("\(event.mode)")
                             .font(.caption)
                             .foregroundColor(Color.gray)
-                        if let routeName = self.eventRouteName {
+                        if let routeName = event.routeName {
                             Text(" \(routeName)")
                                 .font(.caption)
                                 .foregroundColor(Color.gray)
@@ -83,7 +44,7 @@ struct EventPreview: View {
                                 .foregroundColor(Color.gray)
                         }
                         else {
-                            Text(" - \(self.eventTransition)")
+                            Text(" - \(event.transition)")
                                 .font(.caption)
                                 .foregroundColor(Color.gray)
                         }
@@ -91,9 +52,9 @@ struct EventPreview: View {
                 }
                 else {
                     HStack(spacing: 0) {
-                        Text("\(self.eventTransportMode)")
+                        Text("\(event.mode)")
                             .fontWeight(.bold)
-                        if let routeName = self.eventRouteName {
+                        if let routeName = event.routeName {
                             Text(" \(routeName)")
                                 .fontWeight(.bold)
                         }
@@ -104,7 +65,7 @@ struct EventPreview: View {
                             .foregroundColor(Color.gray)
                     }
                     else {
-                        Text("\(self.eventTransition)")
+                        Text("\(event.transition)")
                             .font(.caption)
                             .foregroundColor(Color.gray)
                     }

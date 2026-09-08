@@ -189,6 +189,12 @@ func interpretRouteNumber(_ routeNumberBitstring: String, _ eventCodeBitstring: 
 
     let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: true, routeNumber: routeNumber, serviceProvider: serviceProviderCode).0
     
+    // Une ligne ne se saisit que si le référentiel n'a pas su la nommer : la
+    // saisie passe donc devant, elle ne peut rien recouvrir.
+    if let saisie = ManualEntries.shared.lineEntry(provider: serviceProviderCode, route: routeNumber, mode: eventTransport) {
+        return saisie.name
+    }
+    
     if (eventTransport == "RER") {
         if (routeNumber == 16) || (routeNumber == 17) || (routeNumber == 26) {
             return "A"
@@ -267,6 +273,10 @@ func interpretRoute(_ routeNumberBitstring: String, _ eventCodeBitstring: String
 
     let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: true, routeNumber: routeNumber, serviceProvider: serviceProviderCode).0
     
+    if let saisie = ManualEntries.shared.line(provider: serviceProviderCode, route: routeNumber, mode: eventTransport) {
+        return saisie
+    }
+    
     if (eventTransport == "RER") {
         if (routeNumber == 16) || (routeNumber == 17) || (routeNumber == 26) {
             return NavigoLineInfo(name: "A", mode: "RER", public_id: "C01742", provider_id: 3, line_id: 16, background_color: "eb2132", text_color: "ffffff", is_noctilien: false)
@@ -285,12 +295,66 @@ func interpretRoute(_ routeNumberBitstring: String, _ eventCodeBitstring: String
         return route
     }
     
-    return NavigoLineInfo(name: "\(routeNumber)", mode: eventTransport, public_id: "UNK\(routeNumber)", provider_id: 0, line_id: routeNumber, background_color: "c5c5c5", text_color: "000000", is_noctilien: false)
+    // Ni référentiel ni saisie : on rend le numéro de course brut, et on le dit.
+    return NavigoLineInfo(name: "\(routeNumber)", mode: eventTransport, public_id: "UNK\(routeNumber)", provider_id: serviceProviderCode, line_id: routeNumber, background_color: LineEntry.defaultBackground, text_color: LineEntry.defaultText, is_noctilien: false, found: false)
 }
 
 func interpretServiceProvider(_ bitstring: String) -> String {
-    let id = Int(bitstring, radix: 2) ?? 0
-    return ProviderCatalog.findProvider(id)?.displayName ?? "Unknown (\(id))"
+    interpretServiceProviderName(Int(bitstring, radix: 2) ?? 0)
+}
+
+/// Le libellé d'exploitant, sans passer par le bitstring. Le référentiel
+/// d'abord, puis ce que l'utilisateur a saisi pour les exploitants qui n'y
+/// figurent pas.
+func interpretServiceProviderName(_ id: Int) -> String {
+    ProviderCatalog.findProvider(id)?.displayName
+        ?? ManualEntries.shared.providerName(id)
+        ?? "Unknown (\(id))"
+}
+
+/// Le nom court d'un exploitant : celui de son réseau, ou son libellé s'il n'en
+/// a pas. Le libellé complet — réseau, exploitant et numéro de lot — ne tient
+/// pas sur la ligne d'une liste.
+func interpretServiceProviderShortName(_ id: Int) -> String {
+    if let catalogue = ProviderCatalog.findProvider(id) {
+        if let reseau = catalogue.network, !reseau.isEmpty { return reseau }
+        if let nom = catalogue.name, !nom.isEmpty { return nom }
+    }
+    if let saisie = ManualEntries.shared.provider(id) {
+        if let reseau = saisie.network, !reseau.isEmpty { return reseau }
+        if let nom = saisie.name, !nom.isEmpty { return nom }
+    }
+    return "Exploitant \(id)"
+}
+
+/// Ce que le nom court laisse de côté : l'exploitant et son numéro de lot.
+/// Nil pour ce qui n'est pas une délégation — SNCF, RATP.
+func interpretServiceProviderDetail(_ id: Int) -> String? {
+    let exploitant: String?
+    let dsp: Int?
+    if let catalogue = ProviderCatalog.findProvider(id), catalogue.network?.isEmpty == false {
+        exploitant = catalogue.operatorName
+        dsp = catalogue.dsp
+    } else if let saisie = ManualEntries.shared.provider(id), saisie.network?.isEmpty == false {
+        exploitant = saisie.operatorName
+        dsp = saisie.dsp
+    } else {
+        return nil
+    }
+    let societe = (exploitant?.isEmpty == false) ? exploitant! : "Exploitant inconnu"
+    return dsp.map { "\(societe) (DSP \($0))" } ?? societe
+}
+
+/// Vrai quand le nom affiché vient du journal et non du référentiel. Une
+/// saisie que le référentiel a fini par rattraper est masquée par lui : la
+/// signaler comme saisie ferait mentir la pastille.
+func isServiceProviderNamedByHand(_ id: Int) -> Bool {
+    ProviderCatalog.findProvider(id) == nil && ManualEntries.shared.provider(id) != nil
+}
+
+/// Vrai quand ni le référentiel ni le journal ne savent nommer cet exploitant.
+func isServiceProviderUnknown(_ id: Int) -> Bool {
+    ProviderCatalog.findProvider(id) == nil && ManualEntries.shared.provider(id) == nil
 }
 
 func interpretLocationId(_ locationIdBitString: String, _ eventCodeBitstring: String, _ eventServiceProviderBitstring: String, _ routeNumberBitstring: String?) -> NavigoStationInfo {
@@ -306,7 +370,7 @@ func interpretLocationId(_ locationIdBitString: String, _ eventCodeBitstring: St
 
     guard let station = NavigoStations.find(eventServiceProviderId, eventRouteNumberPresent ? Int(routeNumberBitstring ?? "", radix: 2) : nil, value, eventTransport) else {
         // Faute de référentiel, l'arrêt a pu être identifié à la main
-        if let signale = StopReports.shared.station(provider: eventServiceProviderId, location: value, mode: eventTransport) {
+        if let signale = ManualEntries.shared.station(provider: eventServiceProviderId, location: value, mode: eventTransport) {
             return signale
         }
         return NavigoStationInfo.init(name: "\(value)", provider_id: eventServiceProviderId, line_id: nil, location_id: value, mode: eventTransport, lat: 0, lon: 0, found: false)

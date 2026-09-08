@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Combine
 
 
 /// Clés des trois interrupteurs de Réglages
@@ -13,14 +14,41 @@ enum TimerSettings {
     static let control = "timerControl"
 }
 
+
+/// Une horloge qui bat la seconde.
+///
+/// Les décomptes ne changent pas de contenu, ils changent d'état : à zéro, le
+/// « Pass déjà validé » n'a plus lieu d'être affiché, et un titre valable
+/// devient expiré. Rien dans les données ne bouge à cet instant-là, donc rien
+/// ne redemande le rendu — la vue restait figée sur 0:00:00 jusqu'à ce qu'on
+/// change d'onglet. C'est cette horloge qui la réveille.
+final class SecondTicker: ObservableObject {
+    @Published private(set) var now = Date()
+
+    private var timer: AnyCancellable?
+
+    init() {
+        timer = Timer.publish(every: 1, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] date in self?.now = date }
+    }
+}
+
+
 struct TimersView: View {
     let timers: PassTimers
+
+    @StateObject private var ticker = SecondTicker()
 
     @AppStorage(TimerSettings.alreadyValidated) private var alreadyValidatedEnabled = true
     @AppStorage(TimerSettings.sale) private var saleEnabled = true
     @AppStorage(TimerSettings.control) private var controlEnabled = true
 
     var body: some View {
+        // `ticker.now` n'est pas affiché : le lire suffit à faire dépendre le
+        // rendu de l'heure, donc à le refaire à chaque seconde.
+        let _ = ticker.now
+
         Group {
             if alreadyValidatedEnabled, let countdown = timers.alreadyValidated, countdown.isRunning {
                 box(color: .orange) {
@@ -28,17 +56,15 @@ struct TimersView: View {
                 }
             }
 
-            if saleEnabled, let sale = timers.sale {
+            if saleEnabled, let sale = timers.sale, sale.countdown?.isRunning ?? true {
                 box(color: .red) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Achat impossible pour \(TimersView.list(sale.blocked))")
                             .fontWeight(.semibold)
                         if let countdown = sale.countdown {
-                            TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-                                Text("Disponible dans \(TimersView.hoursMinutes(countdown.remaining))")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                            Text("Disponible dans \(TimersView.hoursMinutes(countdown.remaining))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         } else {
                             Text("Tant qu'un titre bloquant reste sur le pass")
                                 .font(.caption)
@@ -57,11 +83,9 @@ struct TimersView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Titre expiré")
                                 .fontWeight(.semibold)
-                            TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-                                Text("Depuis \(TimersView.clock(-countdown.remaining))")
-                                    .font(.system(.caption2, design: .monospaced))
-                                    .foregroundStyle(.secondary)
-                            }
+                            Text("Depuis \(TimersView.clock(-countdown.remaining))")
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundStyle(.secondary)
                         }
                     }
                 case .expired:
@@ -69,8 +93,6 @@ struct TimersView: View {
                         Text("Titre non valable")
                             .fontWeight(.semibold)
                     }
-                case .unknown:
-                    EmptyView()
                 }
             }
         }
@@ -88,12 +110,10 @@ struct TimersView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .fontWeight(.semibold)
-            TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-                Text("Restant : \(TimersView.clock(countdown.remaining))")
-                    .font(.system(.caption2, design: .monospaced))
-                    .fontWeight(.bold)
-                    .foregroundStyle(.secondary)
-            }
+            Text("Restant : \(TimersView.clock(countdown.remaining))")
+                .font(.system(.caption2, design: .monospaced))
+                .fontWeight(.bold)
+                .foregroundStyle(.secondary)
         }
     }
 
