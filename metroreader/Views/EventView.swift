@@ -79,8 +79,7 @@ struct EventView: View {
     /// Jour et heure de la validation, pour juger la fraîcheur d'une position
     private var eventInstant: Date? {
         guard let jour = getKey(eventInfo, "EventDateStamp") else { return nil }
-        return interpretDateAsDate(jour)
-            .addingTimeInterval(interpretTimeAsTimeInterval(getKey(eventInfo, "EventTimeStamp") ?? ""))
+        return interpretEventInstant(jour, getKey(eventInfo, "EventTimeStamp") ?? "")
     }
 
     private var colorForTransition: Color {

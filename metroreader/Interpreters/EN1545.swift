@@ -31,18 +31,35 @@ func interpretNetworkId(_ bitstring: String) -> (String, String) {
     return (countryString, networkString)
 }
 
+/// La carte date en heure locale : des jours depuis le 1er janvier 1997, des
+/// minutes depuis minuit. Les résoudre en heure de Paris, et non au décalage
+/// fixe de +1 h, est ce qui évite de décaler tout l'été d'une heure.
+let intercodeTimeZone = TimeZone(identifier: "Europe/Paris") ?? TimeZone(secondsFromGMT: 3600)!
+
+private let intercodeCalendar: Calendar = {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = intercodeTimeZone
+    return calendar
+}()
+
+private let intercodeEpoch: Date = intercodeCalendar.date(from: DateComponents(year: 1997, month: 1, day: 1))
+    ?? Date(timeIntervalSince1970: 852073200)
+
+/// Minuit, heure de Paris, du jour annoncé par la carte.
+private func intercodeDay(_ daysSince1997: Int) -> Date {
+    intercodeCalendar.date(byAdding: .day, value: daysSince1997, to: intercodeEpoch)
+        ?? intercodeEpoch.addingTimeInterval(TimeInterval(daysSince1997 * 86400))
+}
+
 func interpretDate(_ bitstring: String) -> String {
-    let daysSince1997 = Int(bitstring, radix: 2) ?? 0
-    // return date in format dd/mm/yyyy
-    let date = Date(timeIntervalSince1970: TimeInterval(daysSince1997 * 86400 + 852073200))
     let dateFormatter = DateFormatter()
     dateFormatter.dateFormat = "dd/MM/yyyy"
-    return dateFormatter.string(from: date)
+    dateFormatter.timeZone = intercodeTimeZone
+    return dateFormatter.string(from: interpretDateAsDate(bitstring))
 }
 
 func interpretDateAsDate(_ bitstring: String) -> Date {
-    let daysSince1997 = Int(bitstring, radix: 2) ?? 0
-    return Date(timeIntervalSince1970: TimeInterval(daysSince1997 * 86400 + 852073200))
+    intercodeDay(Int(bitstring, radix: 2) ?? 0)
 }
 
 func interpretTime(_ bitstring: String) -> String {
@@ -54,9 +71,17 @@ func interpretTime(_ bitstring: String) -> String {
     return dateFormatter.string(from: date)
 }
 
-func interpretTimeAsTimeInterval(_ bitstring: String) -> TimeInterval {
-    let minutesSinceMidnight = Int(bitstring, radix: 2) ?? 0
-    return TimeInterval(minutesSinceMidnight * 60)
+/// Instant exact d'un événement, du couple date + heure de la carte. Ajouter
+/// les minutes à minuit donnerait une heure de trop dès le passage à l'heure
+/// d'été : c'est bien une heure murale que la carte enregistre.
+func interpretEventInstant(_ dateBitstring: String, _ timeBitstring: String) -> Date {
+    let jour = interpretDateAsDate(dateBitstring)
+    let minutesSinceMidnight = Int(timeBitstring, radix: 2) ?? 0
+    var composantes = intercodeCalendar.dateComponents([.year, .month, .day], from: jour)
+    composantes.hour = minutesSinceMidnight / 60
+    composantes.minute = minutesSinceMidnight % 60
+    return intercodeCalendar.date(from: composantes)
+        ?? jour.addingTimeInterval(TimeInterval(minutesSinceMidnight * 60))
 }
 
 func interpretPersonalizationStatusCode(_ bitstring: String) -> (String, Bool, Bool) {

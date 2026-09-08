@@ -102,8 +102,7 @@ struct PassTimers {
         // Les événements arrivent de la carte du plus récent au plus ancien.
         let parsed: [TimedEvent] = events.compactMap { event in
             guard let dateBits = getKey(event, "EventDateStamp") else { return nil }
-            var date = interpretDateAsDate(dateBits)
-            date.addTimeInterval(interpretTimeAsTimeInterval(getKey(event, "EventTimeStamp") ?? ""))
+            let date = interpretEventInstant(dateBits, getKey(event, "EventTimeStamp") ?? "")
 
             let routeNumber = getKey(event, "EventRouteNumber").flatMap { Int($0, radix: 2) }
             let provider = getKey(event, "EventServiceProvider").flatMap { Int($0, radix: 2) }
