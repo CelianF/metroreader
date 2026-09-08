@@ -290,7 +290,7 @@ func interpretRoute(_ routeNumberBitstring: String, _ eventCodeBitstring: String
 
 func interpretServiceProvider(_ bitstring: String) -> String {
     let id = Int(bitstring, radix: 2) ?? 0
-    return ProviderCatalog.findProvider(id)?.name ?? "Unknown (\(id))"
+    return ProviderCatalog.findProvider(id)?.displayName ?? "Unknown (\(id))"
 }
 
 func interpretLocationId(_ locationIdBitString: String, _ eventCodeBitstring: String, _ eventServiceProviderBitstring: String, _ routeNumberBitstring: String?) -> NavigoStationInfo {
