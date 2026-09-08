@@ -22,16 +22,32 @@ struct PassTimers {
         let countdown: Countdown? // nil : blocage permanent, un titre bloquant est encore sur le pass
     }
 
-    /// Validité opposable à un contrôle, telle que la calcule le timer « Contrôle ».
+    /// Validité opposable à un contrôle, telle que la calcule le timer
+    /// « Contrôle ».
     ///
-    /// Il n'y a pas de troisième terme : un pass sur lequel aucune validation
-    /// n'ouvre de droit ne vaut rien face à un contrôle, qu'il n'ait plus de
-    /// validation ou qu'il n'en ait jamais eu. Un pass neuf est donc non
-    /// valable, et se lit comme tel.
+    /// Deux choses s'y jouent à la fois : le temps, et le mode. Une validation
+    /// peut courir encore et ne rien valoir — un titre ferré ne couvre pas un
+    /// bus. Elle peut être éteinte depuis peu et passer quand même.
     enum Validity {
+        /// Vert : une validation en cours, qui couvre le mode contrôlé.
         case valid(Countdown)
-        case recentlyExpired(Countdown) // Expiré depuis moins de recentlyExpiredWindow
-        case expired
+        /// Jaune : ça devrait passer sans que ce soit net.
+        case tolerated(Tolerance)
+        /// Rouge : une validation en cours, mais pas pour ce mode-là.
+        case wrongMode
+        /// Orange sanguin : rien de validé, mais un titre valable est chargé.
+        /// C'est l'oubli de validation, pas la fraude.
+        case notValidated
+        /// Rouge : ni validation ni titre valable.
+        case none
+
+        enum Tolerance {
+            /// Éteinte depuis moins que le délai de tolérance.
+            case recentlyExpired(Countdown)
+            /// En cours, mais validée sur le mode voisin : la correspondance
+            /// n'a pas été revalidée.
+            case neighbouringMode(Countdown, validated: ControlMode?)
+        }
     }
 
     /// Ce sur quoi la validation en cours donne un droit.
@@ -48,18 +64,50 @@ struct PassTimers {
         let airport: Bool
     }
 
-    static let recentlyExpiredWindow: TimeInterval = 1800 // 30 min
+    static let defaultToleranceWindow: TimeInterval = 1800 // 30 min
 
     let alreadyValidated: Countdown? // 7 min après une entrée ou une correspondance
     let sale: SaleBlock? // 4 h après la consommation d'un T+, TMTR ou Aéroport
     let control: Countdown? // Temps de validité : 2 h en rail, 1 h 30 en surface
     let coverage: Coverage? // Le mode que ce temps de validité couvre
 
-    var validity: Validity {
-        guard let control else { return .expired }
-        if control.isRunning { return .valid(control) }
-        if -control.remaining < Self.recentlyExpiredWindow { return .recentlyExpired(control) }
-        return .expired
+    /// Un titre utilisable est chargé sur le pass, indépendamment de toute
+    /// validation. C'est ce qui sépare l'oubli — un forfait au fond de la
+    /// poche — de l'absence de titre.
+    let hasUsableContract: Bool
+
+    /// - Parameters:
+    ///   - mode: le mode dans lequel on se déclare contrôlé.
+    ///   - tolerance: le délai pendant lequel un titre éteint passe encore,
+    ///     ou nil si la tolérance est désactivée.
+    func validity(mode: ControlMode = .automatique,
+                  tolerance: TimeInterval? = defaultToleranceWindow) -> Validity {
+        guard let control else { return sansValidation }
+
+        // Le mode d'abord : une validation qui ne couvre pas ce qu'on contrôle
+        // ne vaut rien, si récente soit-elle.
+        let accord = coverage.map { mode.accord(avec: $0) } ?? .exact
+
+        if control.isRunning {
+            switch accord {
+            case .exact:  return .valid(control)
+            case .voisin: return .tolerated(.neighbouringMode(control,
+                                                              validated: coverage.flatMap { ControlMode.couvrant($0.mode) }))
+            case .non:    return .wrongMode
+            }
+        }
+
+        if accord == .non { return .wrongMode }
+        if let tolerance, -control.remaining < tolerance {
+            return .tolerated(.recentlyExpired(control))
+        }
+        return sansValidation
+    }
+
+    /// Rien qui coure : reste à savoir si le pass porte quand même de quoi
+    /// voyager.
+    private var sansValidation: Validity {
+        hasUsableContract ? .notValidated : .none
     }
 
     // MARK: - Classification
@@ -138,6 +186,18 @@ struct PassTimers {
         sale = Self.saleTimer(contracts: contracts, events: parsed)
         control = Self.controlTimer(parsed)
         coverage = Self.coverage(parsed)
+        hasUsableContract = Self.usableContract(contracts)
+    }
+
+    /// Un titre encore utilisable aujourd'hui. `isContractDisabled` couvre le
+    /// statut, l'échéance et le compteur ; reste la date de début, qu'un titre
+    /// acheté pour le mois prochain n'a pas encore atteinte.
+    private static func usableContract(_ contracts: [[String: Any]]) -> Bool {
+        contracts.contains { contract in
+            guard !isContractDisabled(contract) else { return false }
+            guard let start = getKey(contract, "ContractValidityStartDate") else { return true }
+            return interpretDateAsDate(start) <= Date()
+        }
     }
 
     /// Le dernier mode emprunté, et si le titre qui l'a payé ouvre aussi les

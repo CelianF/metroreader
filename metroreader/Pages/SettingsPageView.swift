@@ -93,6 +93,13 @@ struct SettingsPageView: View {
                 Toggle(isOn: $controlTimer) {
                     Label("Contrôle", systemImage: "checkmark.seal")
                 }
+
+                NavigationLink {
+                    ControlSettingsView()
+                } label: {
+                    Label("Options du contrôle", systemImage: "slider.horizontal.3")
+                }
+                .disabled(!controlTimer)
             }
 
             Section {

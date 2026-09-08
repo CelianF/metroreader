@@ -87,29 +87,7 @@ struct EventView: View {
                                 // bon : on le propose d'un bouton, et la liste
                                 // reste à côté pour les cas où il ne l'est pas.
                                 if let voisin = suggestion(pour: event) {
-                                    VStack(spacing: 6) {
-                                        Text("Arrêt \(locationId) inconnu · « \(voisin.stop.name) » à \(voisin.distance.courte)")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                            .multilineTextAlignment(.center)
-                                        HStack(spacing: 8) {
-                                            Button {
-                                                ajouter(voisin.stop, pour: event)
-                                            } label: {
-                                                Label("Ajouter", systemImage: "plus")
-                                                    .font(.system(size: 15, weight: .medium))
-                                            }
-                                            .buttonStyle(.borderedProminent)
-
-                                            Button {
-                                                identifying = .stop
-                                            } label: {
-                                                Label("Autre arrêt", systemImage: "list.bullet")
-                                                    .font(.system(size: 15, weight: .medium))
-                                            }
-                                            .buttonStyle(.bordered)
-                                        }
-                                    }
+                                    suggestionCard(voisin, locationId: locationId, event: event)
                                 } else {
                                     identifyButton("Arrêt inconnu (\(locationId))", icon: "mappin.slash") {
                                         identifying = .stop
@@ -270,6 +248,58 @@ struct EventView: View {
                 IdentifyProviderSheet(providerId: event.providerId)
             }
         }
+    }
+
+    /// Le nom de l'arrêt d'abord, en grand : c'est lui qu'on vient lire, et
+    /// c'est sur lui qu'on décide. Le code brut et l'explication passent
+    /// derrière.
+    private func suggestionCard(_ voisin: (stop: NearbyStop, distance: CLLocationDistance),
+                                locationId: Int,
+                                event: ResolvedEvent) -> some View {
+        VStack(spacing: 14) {
+            VStack(spacing: 2) {
+                Label("Arrêt trouvé à \(voisin.distance.courte)", systemImage: "location.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text(voisin.stop.name)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+            }
+
+            HStack(spacing: 10) {
+                // Texte seul : l'icône poussait « Autre arrêt » sur deux lignes.
+                Button {
+                    ajouter(voisin.stop, pour: event)
+                } label: {
+                    Text("Ajouter")
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button {
+                    identifying = .stop
+                } label: {
+                    Text("Autre arrêt")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
+            .controlSize(.large)
+
+            Text("Le code \(locationId) ne figure pas au référentiel. La position relevée pendant le scan désigne cet arrêt.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.accentColor.opacity(0.10)))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.accentColor.opacity(0.35)))
+        .padding(.top, 6)
     }
 
     /// L'arrêt connu le plus proche du relevé fait pendant le scan, quand ce

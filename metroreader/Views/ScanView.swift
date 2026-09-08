@@ -33,6 +33,10 @@ struct ScanView: View {
     private static let outlineFade: Double = 1.5
 
     @AppStorage(TimerSettings.control) private var controlTimerEnabled = true
+    @AppStorage(TimerSettings.controlOutline) private var controlOutlineEnabled = true
+    @AppStorage(TimerSettings.controlMode) private var controlMode = ControlMode.automatique.rawValue
+    @AppStorage(TimerSettings.controlTolerance) private var toleranceEnabled = true
+    @AppStorage(TimerSettings.controlToleranceMinutes) private var toleranceMinutes = TimerSettings.defaultToleranceMinutes
 
     // La carte des événements et les libellés d'arrêt suivent le journal des
     // saisies : ce qui vient d'être identifié apparaît sans changer d'écran.
@@ -42,15 +46,15 @@ struct ScanView: View {
         PassTimers(contracts: tagContracts, events: tagEvents)
     }
 
-    // Contour du visuel : vert tant que le titre est valable, orange pendant la
-    // demi-heure qui suit son expiration, rouge ensuite.
+    // Contour du visuel : la couleur de l'encart Contrôle, portée sur la carte
+    // pour qu'un coup d'œil suffise.
     private var validityOutline: (color: Color, glow: CGFloat)? {
-        guard controlTimerEnabled else { return nil }
-        switch timers.validity {
-        case .valid:           return (.green, 6)
-        case .recentlyExpired: return (.orange, 16)
-        case .expired:         return (.red, 6)
-        }
+        guard controlTimerEnabled, controlOutlineEnabled else { return nil }
+        let validity = timers.validity(
+            mode: ControlMode(rawValue: controlMode) ?? .automatique,
+            tolerance: toleranceEnabled ? TimeInterval(toleranceMinutes) * 60 : nil
+        )
+        return (validity.color, validity.glow)
     }
 
     /// Renommer le pass et changer son image n'existent que dans l'historique :

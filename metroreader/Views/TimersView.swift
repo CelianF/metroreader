@@ -7,11 +7,50 @@ import SwiftUI
 import Combine
 
 
-/// Clés des trois interrupteurs de Réglages
+/// Clés des interrupteurs de Réglages
 enum TimerSettings {
     static let alreadyValidated = "timerAlreadyValidated"
     static let sale = "timerSale"
     static let control = "timerControl"
+
+    // Options du contrôle
+    static let controlOutline = "timerControlOutline"
+    static let controlMode = "timerControlMode"
+    static let controlTolerance = "timerControlTolerance"
+    static let controlToleranceMinutes = "timerControlToleranceMinutes"
+
+    static let defaultToleranceMinutes = 30
+    static let toleranceRange: ClosedRange<Double> = 10...120
+}
+
+
+extension Color {
+    /// L'oubli de validation : ni le vert du droit ouvert, ni le rouge de la
+    /// fraude. Un rouge chaud qui alerte sans accuser.
+    static let orangeSanguine = Color(red: 0.79, green: 0.25, blue: 0.09)
+}
+
+
+extension PassTimers.Validity {
+    /// La couleur de l'état, la même pour l'encart et pour le contour du pass.
+    var color: Color {
+        switch self {
+        case .valid:        return .green
+        case .tolerated:    return .yellow
+        case .wrongMode:    return .red
+        case .notValidated: return .orangeSanguine
+        case .none:         return .red
+        }
+    }
+
+    /// Le halo du contour. Ce qui demande une seconde d'attention rayonne plus.
+    var glow: CGFloat {
+        switch self {
+        case .tolerated:    return 16
+        case .notValidated: return 12
+        default:            return 6
+        }
+    }
 }
 
 
@@ -43,6 +82,15 @@ struct TimersView: View {
     @AppStorage(TimerSettings.alreadyValidated) private var alreadyValidatedEnabled = true
     @AppStorage(TimerSettings.sale) private var saleEnabled = true
     @AppStorage(TimerSettings.control) private var controlEnabled = true
+    @AppStorage(TimerSettings.controlMode) private var controlMode = ControlMode.automatique.rawValue
+    @AppStorage(TimerSettings.controlTolerance) private var toleranceEnabled = true
+    @AppStorage(TimerSettings.controlToleranceMinutes) private var toleranceMinutes = TimerSettings.defaultToleranceMinutes
+
+    private var mode: ControlMode { ControlMode(rawValue: controlMode) ?? .automatique }
+
+    private var tolerance: TimeInterval? {
+        toleranceEnabled ? TimeInterval(toleranceMinutes) * 60 : nil
+    }
 
     var body: some View {
         // `ticker.now` n'est pas affiché : le lire suffit à faire dépendre le
@@ -75,29 +123,70 @@ struct TimersView: View {
             }
 
             if controlEnabled {
-                switch timers.validity {
-                case .valid(let countdown):
-                    box(color: .green) {
-                        row(TimersView.titreValable(timers.coverage),
-                            countdown: countdown,
-                            coverage: timers.coverage)
-                    }
-                case .recentlyExpired(let countdown):
-                    box(color: .orange) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Titre expiré")
-                                .fontWeight(.semibold)
-                            Text("Depuis \(TimersView.clock(-countdown.remaining))")
-                                .font(.system(.caption2, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                case .expired:
-                    box(color: .red) {
-                        Text("Titre non valable")
-                            .fontWeight(.semibold)
-                    }
+                let validity = timers.validity(mode: mode, tolerance: tolerance)
+                box(color: validity.color) { controle(validity) }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func controle(_ validity: PassTimers.Validity) -> some View {
+        switch validity {
+        case .valid(let countdown):
+            row(TimersView.titreValable(timers.coverage),
+                countdown: countdown,
+                coverage: timers.coverage)
+
+        case .tolerated(.neighbouringMode(let countdown, let validated)):
+            // La correspondance n'a pas été revalidée. Ça se plaide.
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    if let coverage = timers.coverage { ModeBadges(coverage: coverage) }
+                    Text("Validé \(validated?.enPhrase ?? "ailleurs"), contrôlé \(mode.enPhrase)")
+                        .fontWeight(.semibold)
                 }
+                Text("Correspondance non revalidée · restant \(TimersView.clock(countdown.remaining))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+        case .tolerated(.recentlyExpired(let countdown)):
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Titre expiré")
+                    .fontWeight(.semibold)
+                Text("Depuis \(TimersView.clock(-countdown.remaining))")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+
+        case .wrongMode:
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Titre non valable \(mode.enPhrase)")
+                    .fontWeight(.semibold)
+                if let coverage = timers.coverage,
+                   let valide = ControlMode.couvrant(coverage.mode) {
+                    Text("La validation ne couvre que \(valide.label.lowercased()).")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+        case .notValidated:
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Pas de titre validé")
+                    .fontWeight(.semibold)
+                Text("Un titre valable est chargé sur le pass, mais il n'a pas été validé.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+        case .none:
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Pas de titre valable")
+                    .fontWeight(.semibold)
+                Text("Aucune validation, et aucun titre utilisable sur le pass.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -200,7 +289,7 @@ private struct ModeBadges: View {
                 badge(mode)
             }
             if coverage.airport {
-                badge("ic_ticketing_orly_roissy")
+                badge(ControlMode.aeroport.icon)
             }
         }
     }
