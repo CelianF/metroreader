@@ -10,8 +10,19 @@ struct EmptyScanView: View {
     let onScan: () -> Void
     let onImport: () -> Void
 
+    @State private var pulse = false
+
     var body: some View {
         VStack(spacing: 24) {
+            Image("Cible")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 96, height: 96)
+                // Pendant la lecture, la cible bat entre demi-opacité et pleine
+                .opacity(pulse ? 0.5 : 1.0)
+                .onChange(of: isScanning) { _, enCours in battre(enCours) }
+                .onAppear { battre(isScanning) }
+
             Text("Aucun Navigo scanné")
                 .font(.title2)
                 .fontWeight(.semibold)
@@ -51,6 +62,16 @@ struct EmptyScanView: View {
                 .padding(.vertical, 8)
         }
         #endif
+    }
+
+    private func battre(_ enCours: Bool) {
+        if enCours {
+            withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+        } else {
+            withAnimation(.easeInOut(duration: 0.2)) { pulse = false }
+        }
     }
 }
 
