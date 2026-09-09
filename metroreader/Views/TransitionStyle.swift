@@ -30,12 +30,15 @@ enum TransitionKind {
         }
     }
 
-    /// Une correspondance se peint comme une entrée : le voyage continue.
+    /// Une correspondance n'est ni tout à fait une entrée ni une sortie : le
+    /// voyage continue, mais ailleurs. Elle se peint donc du cyan, voisin du
+    /// bleu de l'entrée sans s'y confondre, et loin du rouge qui arrête.
     var color: Color {
         switch self {
-        case .entree, .correspondance: return .blue
-        case .sortie:                  return .red
-        case .autre:                   return .purple
+        case .entree:         return .blue
+        case .correspondance: return .cyan
+        case .sortie:         return .red
+        case .autre:          return .purple
         }
     }
 }

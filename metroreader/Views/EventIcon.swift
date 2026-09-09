@@ -10,10 +10,19 @@ import SwiftUI
 struct EventIcon: View {
     var eventTransportMode: String
     let eventTransition: String
-    
+
+    /// Le mode que le pictogramme annonce : celui où l'on entre, pas celui
+    /// qu'on quitte. Sortir du RER par une porte de correspondance, c'est
+    /// entrer dans le métro — le libellé, lui, garde la ligne d'où l'on vient.
+    private var mode: String {
+        correspondanceVersMetro(transition: eventTransition, mode: eventTransportMode)
+            ? "Métro"
+            : eventTransportMode
+    }
+
     var body: some View {
         ZStack {
-            switch (eventTransportMode) {
+            switch (mode) {
             case "Bus urbain":
                 Image("mode_bus")
                     .resizable(resizingMode: .stretch)
