@@ -83,6 +83,30 @@ struct IdentifyStopSheet: View {
 
     private func precisionOuZero(_ m: CLLocationDistance) -> CLLocationDistance { max(0, m) }
 
+    /// Ce que vaut le relevé : son âge par rapport à la validation, et sa
+    /// précision. Sans quoi une suggestion à 300 m passe pour une certitude.
+    private func qualiteDuReleve(_ releve: (position: CLLocationCoordinate2D,
+                                            accuracy: CLLocationDistance)) -> String {
+        "Position relevée au moment du scan, à \(Int(gps.gap(from: eventDate) ?? 0)) s de la validation, précise à \(precisionOuZero(releve.accuracy).courte) près."
+    }
+
+    /// Une proposition d'arrêt, avec la distance qui dit ce qu'elle vaut.
+    @ViewBuilder
+    private func suggestion(nom: String, lat: Double, lon: Double,
+                            distance: CLLocationDistance) -> some View {
+        Button {
+            enregistrer(nom: nom, lat: lat, lon: lon)
+        } label: {
+            HStack {
+                Text(nom).foregroundStyle(.primary)
+                Spacer()
+                Text(distance.courte)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -99,35 +123,52 @@ struct IdentifyStopSheet: View {
                 }
 
                 if let releve {
+                    // Le code lu vient d'un valideur de la ligne empruntée :
+                    // son arrêt est dans la liste de cette ligne, forcément.
+                    // Les arrêts du voisinage, eux, appartiennent à n'importe
+                    // quelle ligne passant là — les mêler aux premiers, c'est
+                    // inviter à nommer la validation d'après une ligne qu'on
+                    // n'a pas prise.
+                    let prochesDeLaLigne = LineStops.around(releve.position, forLine: linePublicId)
+                    let deLaLigne = Set(prochesDeLaLigne.map(\.stop.name))
+                    let voisins = NearbyStops.around(releve.position, mode: mode)
+                        .filter { !deLaLigne.contains($0.stop.name) }
+
                     Section {
-                        // Les arrêts les plus proches, tous exploitants
-                        // confondus. Dix des treize réseaux concernés n'ont
-                        // aucun arrêt en base, mais leurs arrêts physiques sont
-                        // souvent desservis aussi par un réseau qu'on connaît :
-                        // c'est de là que vient la suggestion.
-                        let voisins = NearbyStops.around(releve.position, mode: mode)
-                        if voisins.isEmpty {
+                        if !prochesDeLaLigne.isEmpty {
+                            ForEach(prochesDeLaLigne, id: \.stop.name) { arret, distance in
+                                suggestion(nom: arret.name, lat: arret.lat,
+                                           lon: arret.lon, distance: distance)
+                            }
+                        } else if voisins.isEmpty {
                             Text("Aucun arrêt connu à moins de 400 m")
                                 .foregroundStyle(.secondary)
                         } else {
+                            // Ligne inconnue, ou aucun de ses arrêts à portée.
                             ForEach(voisins, id: \.stop.name) { station, distance in
-                                Button {
-                                    enregistrer(nom: station.name, lat: station.lat, lon: station.lon)
-                                } label: {
-                                    HStack {
-                                        Text(station.name).foregroundStyle(.primary)
-                                        Spacer()
-                                        Text(distance.courte)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
+                                suggestion(nom: station.name, lat: station.lat,
+                                           lon: station.lon, distance: distance)
                             }
                         }
                     } header: {
                         Text("Là où tu étais au scan")
                     } footer: {
-                        Text("Position relevée au moment du scan, à \(Int(gps.gap(from: eventDate) ?? 0)) s de la validation, précise à \(precisionOuZero(releve.accuracy).courte) près. Les arrêts proposés viennent de tous les réseaux — c'est souvent le même arrêt physique.")
+                        Text(prochesDeLaLigne.isEmpty
+                             ? "\(qualiteDuReleve(releve)) Les arrêts proposés viennent de tous les réseaux — c'est souvent le même arrêt physique."
+                             : "\(qualiteDuReleve(releve)) Seuls les arrêts desservis par la ligne \(lineName ?? "") sont proposés ici.")
+                    }
+
+                    if !prochesDeLaLigne.isEmpty && !voisins.isEmpty {
+                        Section {
+                            ForEach(voisins, id: \.stop.name) { station, distance in
+                                suggestion(nom: station.name, lat: station.lat,
+                                           lon: station.lon, distance: distance)
+                            }
+                        } header: {
+                            Text("Autres arrêts à proximité")
+                        } footer: {
+                            Text("Ces arrêts ne sont pas dans la liste de la ligne \(lineName ?? ""). Un même arrêt physique change parfois de nom d'un réseau à l'autre, mais la suggestion est alors moins sûre.")
+                        }
                     }
                 } else if let ecoule, ecoule < LocationProvider.freshnessWindow {
                     Section {
@@ -135,6 +176,12 @@ struct IdentifyStopSheet: View {
                         case .denied:
                             Text("Accès à la position refusé. Il se réactive dans les réglages de l'iPhone.")
                                 .foregroundStyle(.secondary)
+                        case .requesting:
+                            HStack(spacing: 10) {
+                                ProgressView()
+                                Text("Relevé de la position en cours…")
+                                    .foregroundStyle(.secondary)
+                            }
                         default:
                             Text("Aucune position relevée pendant ce scan. Le relevé s'active dans les Réglages, et n'a lieu qu'au moment où tu scannes.")
                                 .foregroundStyle(.secondary)

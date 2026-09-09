@@ -253,7 +253,8 @@ struct EventView: View {
     /// Le nom de l'arrêt d'abord, en grand : c'est lui qu'on vient lire, et
     /// c'est sur lui qu'on décide. Le code brut et l'explication passent
     /// derrière.
-    private func suggestionCard(_ voisin: (stop: NearbyStop, distance: CLLocationDistance),
+    private func suggestionCard(_ voisin: (nom: String, lat: Double, lon: Double,
+                                           distance: CLLocationDistance),
                                 locationId: Int,
                                 event: ResolvedEvent) -> some View {
         VStack(spacing: 14) {
@@ -262,7 +263,7 @@ struct EventView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Text(voisin.stop.name)
+                Text(voisin.nom)
                     .font(.title2)
                     .fontWeight(.bold)
                     .multilineTextAlignment(.center)
@@ -273,7 +274,7 @@ struct EventView: View {
             HStack(spacing: 10) {
                 // Texte seul : l'icône poussait « Autre arrêt » sur deux lignes.
                 Button {
-                    ajouter(voisin.stop, pour: event)
+                    ajouter(nom: voisin.nom, lat: voisin.lat, lon: voisin.lon, pour: event)
                 } label: {
                     Text("Ajouter")
                         .fontWeight(.semibold)
@@ -302,14 +303,27 @@ struct EventView: View {
         .padding(.top, 6)
     }
 
-    /// L'arrêt connu le plus proche du relevé fait pendant le scan, quand ce
-    /// relevé est assez proche de la validation pour vouloir dire quelque chose.
-    private func suggestion(pour event: ResolvedEvent) -> (stop: NearbyStop, distance: CLLocationDistance)? {
+    /// L'arrêt le plus proche du relevé fait pendant le scan, quand ce relevé
+    /// est assez proche de la validation pour vouloir dire quelque chose.
+    ///
+    /// La ligne empruntée passe avant le voisinage : le code lu vient d'un de
+    /// ses valideurs, donc son arrêt est dans sa liste. Le plus proche tous
+    /// réseaux confondus, lui, appartient souvent à une autre ligne passant au
+    /// même endroit — et ce bouton-là s'accepte d'un geste, sans relecture.
+    private func suggestion(pour event: ResolvedEvent)
+    -> (nom: String, lat: Double, lon: Double, distance: CLLocationDistance)? {
         guard let releve = gps.fix(for: eventInstant) else { return nil }
-        return NearbyStops.nearest(releve.position, mode: event.lookupMode)
+        if let arret = LineStops.around(releve.position, forLine: event.lineData?.public_id,
+                                        limit: 1).first {
+            return (arret.stop.name, arret.stop.lat, arret.stop.lon, arret.distance)
+        }
+        guard let voisin = NearbyStops.nearest(releve.position, mode: event.lookupMode) else {
+            return nil
+        }
+        return (voisin.stop.name, voisin.stop.lat, voisin.stop.lon, voisin.distance)
     }
 
-    private func ajouter(_ stop: NearbyStop, pour event: ResolvedEvent) {
+    private func ajouter(nom: String, lat: Double, lon: Double, pour event: ResolvedEvent) {
         guard let locationId = event.locationId else { return }
         entries.save(StopReport(
             id: UUID(),
@@ -319,10 +333,10 @@ struct EventView: View {
             mode: event.lookupMode,
             routeNumber: event.routeNumber,
             lineName: event.routeName,
-            stationName: stop.name,
+            stationName: nom,
             referenceId: nil,
-            lat: stop.lat,
-            lon: stop.lon
+            lat: lat,
+            lon: lon
         ))
     }
 
