@@ -15,6 +15,12 @@ struct ScanView: View {
     let tagEvents: [[String: Any]]
     let tagSpecialEvents: [[String: Any]]
     var exportDataAsJSON: Data?
+
+    /// Vrai quand la fiche vient de l'historique. Le contrôle se juge à
+    /// l'instant où l'on est devant l'agent : sur un scan d'il y a trois jours,
+    /// il ne dit plus rien de vrai. Les deux autres timers, eux, décrivent
+    /// l'état du pass et gardent leur sens.
+    var depuisHistorique: Bool = false
     
     @ObservedObject var historyManager: HistoryManager
     
@@ -74,7 +80,10 @@ struct ScanView: View {
     // Contour du visuel : la couleur de l'encart Contrôle, portée sur la carte
     // pour qu'un coup d'œil suffise.
     private var validityOutline: (color: Color, glow: CGFloat)? {
-        guard controlTimerEnabled, controlOutlineEnabled else { return nil }
+        // Le contour dit la même chose que l'encart Contrôle, en plus criant :
+        // le taire dans l'historique et garder son halo rouge reviendrait à
+        // juger quand même un scan d'il y a trois jours.
+        guard !depuisHistorique, controlTimerEnabled, controlOutlineEnabled else { return nil }
         let validity = timers.validity(
             mode: ControlMode(rawValue: controlMode) ?? .automatique,
             tolerance: toleranceEnabled ? TimeInterval(toleranceMinutes) * 60 : nil
@@ -193,7 +202,7 @@ struct ScanView: View {
             
             // Sans contrat ni événement non plus : un pass neuf n'ouvre aucun
             // droit, et le dire est le seul renseignement qu'on ait à donner.
-            TimersView(timers: timers)
+            TimersView(timers: timers, sansControle: depuisHistorique)
             
             if tagContracts.count > 0 {
                 Section(header: Text("Contrats")) {

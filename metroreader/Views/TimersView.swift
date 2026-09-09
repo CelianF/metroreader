@@ -77,6 +77,10 @@ final class SecondTicker: ObservableObject {
 struct TimersView: View {
     let timers: PassTimers
 
+    /// Tait l'encart Contrôle, sans toucher au réglage : il ne se juge que sur
+    /// une carte qu'on vient de lire.
+    var sansControle: Bool = false
+
     @StateObject private var ticker = SecondTicker()
 
     @AppStorage(TimerSettings.alreadyValidated) private var alreadyValidatedEnabled = true
@@ -122,7 +126,7 @@ struct TimersView: View {
                 }
             }
 
-            if controlEnabled {
+            if controlEnabled, !sansControle {
                 let validity = timers.validity(mode: mode, tolerance: tolerance)
                 box(color: validity.color) { controle(validity) }
             }

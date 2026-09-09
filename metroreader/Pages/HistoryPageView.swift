@@ -92,6 +92,7 @@ struct HistoryPageView: View {
                     tagEvents: record.events,
                     tagSpecialEvents: record.specialEvents,
                     exportDataAsJSON: record.exportDataAsJSON,
+                    depuisHistorique: true,
                     historyManager: historyManager
                 )
                 .toolbar {
