@@ -127,7 +127,7 @@ struct SettingsPageView: View {
                 } label: {
                     Label("Supprimer", systemImage: "trash")
                 }
-                .eteint(quand: journal.isEmpty)
+                .destructrice(vide: journal.isEmpty)
             } header: {
                 Text("Données")
             } footer: {
@@ -140,7 +140,7 @@ struct SettingsPageView: View {
                 } label: {
                     Label("Effacer tout l'historique", systemImage: "trash")
                 }
-                .eteint(quand: historyManager.history.isEmpty)
+                .destructrice(vide: historyManager.history.isEmpty)
             } header: {
                 Text("Confidentialité")
             }
@@ -278,6 +278,24 @@ private extension View {
             self.disabled(true).foregroundStyle(.tertiary)
         } else {
             self
+        }
+    }
+
+    /// Une rangée qui efface : rouge d'un bout à l'autre, et éteinte quand il
+    /// n'y a rien à effacer.
+    ///
+    /// Le rôle destructeur ne rougit que le libellé ; le pictogramme, lui,
+    /// suit la teinte d'accentuation et restait bleu. `.tint(.red)` n'y change
+    /// rien, il faut le dire en couleur de premier plan. Mais alors la rangée
+    /// éteinte garderait son rouge — une couleur posée ici l'emporte sur le
+    /// gris que `eteint` appliquerait par-dessus. Les deux états sont donc
+    /// décidés au même endroit, l'un excluant l'autre.
+    @ViewBuilder
+    func destructrice(vide: Bool) -> some View {
+        if vide {
+            self.disabled(true).foregroundStyle(.tertiary)
+        } else {
+            self.foregroundStyle(.red)
         }
     }
 }
