@@ -60,6 +60,11 @@ struct ContentView: View {
             }
             .tag(2)
         }
+        .task {
+            // Au lancement, et là seulement : c'est le moment où une
+            // autorisation accordée « cette fois seulement » a expiré.
+            LocationProvider.shared.forgetLapsedPermission()
+        }
         .onOpenURL { url in
             handleIncomingFile(url: url)
         }

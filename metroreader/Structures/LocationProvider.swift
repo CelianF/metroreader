@@ -79,6 +79,19 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         }
     }
 
+    /// Remet le réglage en accord avec ce qu'iOS accorde encore, au lancement.
+    ///
+    /// « Cette fois seulement » ne vaut que pour une exécution : au lancement
+    /// suivant, l'autorisation est retombée à « pas encore décidé ». Le réglage
+    /// resterait coché alors que plus rien n'est permis, et le scan suivant
+    /// réclamerait l'autorisation au pire moment — la feuille NFC occupe déjà
+    /// l'écran. Un refus franc, lui, n'est pas touché : le réglage l'affiche et
+    /// propose d'aller le lever dans les réglages du système.
+    func forgetLapsedPermission() {
+        guard manager.authorizationStatus == .notDetermined else { return }
+        UserDefaults.standard.set(false, forKey: Self.settingKey)
+    }
+
     /// Vrai quand iOS refuse, et que l'app n'y peut plus rien : il faut passer
     /// par ses réglages.
     var isDeniedBySystem: Bool {
