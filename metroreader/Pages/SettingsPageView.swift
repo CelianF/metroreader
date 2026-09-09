@@ -92,7 +92,7 @@ struct SettingsPageView: View {
                 }
 
                 Toggle(isOn: $saleTimer) {
-                    Label("Vente", systemImage: "cart")
+                    Label("Titres Incompatibles", systemImage: "cart")
                 }
 
                 Toggle(isOn: $controlTimer) {
@@ -119,7 +119,7 @@ struct SettingsPageView: View {
                               preview: SharePreview("Données saisies")) {
                         Label("Partager", systemImage: "square.and.arrow.up")
                     }
-                    .disabled(journal.isEmpty)
+                    .eteint(quand: journal.isEmpty)
                 }
 
                 Button(role: .destructive) {
@@ -127,7 +127,7 @@ struct SettingsPageView: View {
                 } label: {
                     Label("Supprimer", systemImage: "trash")
                 }
-                .disabled(journal.isEmpty)
+                .eteint(quand: journal.isEmpty)
             } header: {
                 Text("Données")
             } footer: {
@@ -140,7 +140,7 @@ struct SettingsPageView: View {
                 } label: {
                     Label("Effacer tout l'historique", systemImage: "trash")
                 }
-                .disabled(historyManager.history.isEmpty)
+                .eteint(quand: historyManager.history.isEmpty)
             } header: {
                 Text("Confidentialité")
             }
@@ -261,4 +261,23 @@ struct SettingsPageView: View {
 
 #Preview {
     SettingsPageView(historyManager: HistoryManager())
+}
+
+
+private extension View {
+    /// Éteint une rangée quand il n'y a rien à partager ni à effacer.
+    ///
+    /// `.disabled` seul bloque bien le geste, mais ne grise rien dans une liste :
+    /// le libellé garde son noir et l'icône sa teinte, si bien que le bouton
+    /// paraît disponible et qu'on le touche pour rien. On dit donc
+    /// l'indisponibilité nous-mêmes, et seulement dans ce cas — sinon le rouge
+    /// du bouton destructeur y passerait aussi.
+    @ViewBuilder
+    func eteint(quand vide: Bool) -> some View {
+        if vide {
+            self.disabled(true).foregroundStyle(.tertiary)
+        } else {
+            self
+        }
+    }
 }
