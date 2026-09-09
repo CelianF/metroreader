@@ -28,6 +28,11 @@ struct SettingsPageView: View {
     
     @ObservedObject private var journal = ManualEntries.shared
 
+    /// Les logos de marque ne sont pas des SF Symbols : il faut les
+    /// dimensionner soi-même, et leur faire suivre les tailles de texte de
+    /// l'utilisateur.
+    @ScaledMetric(relativeTo: .body) private var coteLogo: CGFloat = 20
+
     @State private var showingDeleteAlert = false
     @State private var showingJournalAlert = false
     
@@ -140,7 +145,7 @@ struct SettingsPageView: View {
                 Text("Confidentialité")
             }
             
-            Section(header: Text("Crédits")) {
+            Section(header: Text("Fait avec ❤️ par")) {
                 VStack(alignment: .leading, spacing: 8) {
                     // Lien pour DocSystem
                     Link(destination: URL(string: "https://twitter.com/TheDocSystem")!) {
@@ -183,10 +188,40 @@ struct SettingsPageView: View {
                     Text("\(appVersion) (\(buildNumber))")
                         .foregroundColor(.secondary)
                 }
-                Link(destination: URL(string: "https://github.com/DocSystem/metroreader")!) {
+                Link(destination: URL(string: "https://github.com/CelianF/metroreader")!) {
                     HStack {
-                        Label("GitHub", systemImage: "terminal.fill")
-                            .foregroundColor(.primary)
+                        Label {
+                            Text("GitHub").foregroundColor(.primary)
+                        } icon: {
+                            // Le sigle est presque noir : rendu en template
+                            // pour qu'il suive le thème au lieu de disparaître
+                            // sur fond sombre. Le Discord, lui, garde sa
+                            // couleur, qui tient dans les deux.
+                            Image("GitHub")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: coteLogo, height: coteLogo)
+                                .foregroundColor(.primary)
+                        }
+                        Spacer()
+                        Image(systemName: "arrow.up.right.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                Link(destination: URL(string: "https://discord.gg/KJbVn9wXBg")!) {
+                    HStack {
+                        Label {
+                            Text("Discord").foregroundColor(.primary)
+                        } icon: {
+                            // Le logo de la marque plutôt qu'un symbole
+                            // approchant. Encadré à la largeur d'un SF Symbol
+                            // pour que les deux libellés s'alignent.
+                            Image("Discord")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: coteLogo, height: coteLogo)
+                        }
                         Spacer()
                         Image(systemName: "arrow.up.right.circle.fill")
                             .font(.caption)
