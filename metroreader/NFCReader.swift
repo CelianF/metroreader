@@ -99,6 +99,17 @@ private func interpretCardID(_ iccBitstring: String) -> UInt64 {
 class NFCReader: NSObject, ObservableObject, NFCTagReaderSessionDelegate {
     @Published var tagID: String = "Tap 'Scan' to read NFC"
     @Published var isScanning: Bool = false
+
+    /// Vrai dès qu'une carte est sous l'antenne et que la lecture commence.
+    /// L'écran vide s'en sert pour ne pas relancer son animation : à partir de
+    /// là le fil principal est accaparé, et elle saccaderait.
+    @Published var isTagDetected: Bool = false
+
+    /// Vrai seulement quand une carte a été lue jusqu'au bout, ou importée.
+    /// Les contrats et les événements arrivent par vagues : sans ce drapeau,
+    /// le passe s'afficherait à moitié rempli dès l'en-tête lu, et un abandon
+    /// en cours de route laisserait une carte tronquée à l'écran.
+    @Published var isReadComplete: Bool = false
     @Published var cardID: UInt64 = 0
     @Published var tagIcc: String = ""
     @Published var tagEnvHolder: [String: Any] = [:]
@@ -149,6 +160,7 @@ class NFCReader: NSObject, ObservableObject, NFCTagReaderSessionDelegate {
                     self.tagSpecialEvents = json["specialEvents"] as? [[String: Any]] ?? []
                     
                     self.tagID = "Imported Card: \(self.cardID)"
+                    self.isReadComplete = true
                     
                     self.historyManager?.saveScan(
                         cardID: self.cardID,
@@ -174,7 +186,7 @@ class NFCReader: NSObject, ObservableObject, NFCTagReaderSessionDelegate {
         self.historyManager = historyManager
         
         session = NFCTagReaderSession(pollingOption: .iso14443, delegate: self, queue: DispatchQueue.main)
-        session?.alertMessage = "Placez votre passe sur le haut de votre iPhone pendant quelques secondes."
+        session?.alertMessage = "Placez votre passe sur la cible pendant quelques secondes."
         session?.begin()
         isScanning = true
 
@@ -204,6 +216,8 @@ class NFCReader: NSObject, ObservableObject, NFCTagReaderSessionDelegate {
             self.tagMinContractPriority = nil
             self.tagEvents = []
             self.tagSpecialEvents = []
+            self.isReadComplete = false
+            self.isTagDetected = false
         }
     }
     
@@ -241,6 +255,9 @@ class NFCReader: NSObject, ObservableObject, NFCTagReaderSessionDelegate {
             }
             
             session.alertMessage = "Lecture en cours..."
+            // La file de la session est la principale : on est déjà au bon
+            // endroit pour toucher à l'état publié.
+            self.isTagDetected = true
             
             DispatchQueue.main.async {
                 Task {
@@ -356,6 +373,10 @@ class NFCReader: NSObject, ObservableObject, NFCTagReaderSessionDelegate {
                             }
                         }
                         session.alertMessage = "🔵🔵🔵🔵🔵🔵🔵"
+                        // Seul endroit qui marque la lecture complète : le
+                        // `catch` plus bas invalide aussi la session, mais sans
+                        // passer par ici, et l'abandon par l'utilisateur non plus.
+                        self.isReadComplete = true
                         session.invalidate()
                         
                         // Save the scan to history
@@ -380,6 +401,17 @@ class NFCReader: NSObject, ObservableObject, NFCTagReaderSessionDelegate {
 class NFCReader: NSObject, ObservableObject {
     @Published var tagID: String = "Tap 'Scan' to read NFC"
     @Published var isScanning: Bool = false
+
+    /// Vrai dès qu'une carte est sous l'antenne et que la lecture commence.
+    /// L'écran vide s'en sert pour ne pas relancer son animation : à partir de
+    /// là le fil principal est accaparé, et elle saccaderait.
+    @Published var isTagDetected: Bool = false
+
+    /// Vrai seulement quand une carte a été lue jusqu'au bout, ou importée.
+    /// Les contrats et les événements arrivent par vagues : sans ce drapeau,
+    /// le passe s'afficherait à moitié rempli dès l'en-tête lu, et un abandon
+    /// en cours de route laisserait une carte tronquée à l'écran.
+    @Published var isReadComplete: Bool = false
     @Published var cardID: UInt64 = 0
     @Published var tagIcc: String = ""
     @Published var tagEnvHolder: [String: Any] = [:]
@@ -425,6 +457,7 @@ class NFCReader: NSObject, ObservableObject {
                     self.tagSpecialEvents = json["specialEvents"] as? [[String: Any]] ?? []
                     
                     self.tagID = "Imported Card: \(self.cardID)"
+                    self.isReadComplete = true
                     
                     self.historyManager?.saveScan(
                         cardID: self.cardID,
@@ -456,6 +489,8 @@ class NFCReader: NSObject, ObservableObject {
             self.tagMinContractPriority = nil
             self.tagEvents = []
             self.tagSpecialEvents = []
+            self.isReadComplete = false
+            self.isTagDetected = false
         }
     }
 }

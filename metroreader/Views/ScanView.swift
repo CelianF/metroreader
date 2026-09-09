@@ -26,11 +26,26 @@ struct ScanView: View {
 
     /// Le contour dit la validité à l'instant où la carte s'affiche — c'est là
     /// qu'on la regarde. Passé quelques secondes il n'apprend plus rien et ne
-    /// fait que masquer le visuel, alors il s'efface.
-    @State private var outlineShown = true
+    /// fait que masquer le visuel, alors il s'efface. Il n'apparaît qu'une fois
+    /// la carte posée : dessiné sur une carte encore en vol, il n'aurait rien
+    /// à cerner.
+    @State private var outlineShown = false
+
+    /// Faux tant que la carte n'a pas rejoint sa place et sa taille.
+    @State private var carteEnPlace = false
 
     private static let outlineLifetime: Duration = .seconds(10)
     private static let outlineFade: Double = 1.5
+
+    /// La carte entre à la taille qu'elle avait dans l'animation de l'écran
+    /// vide, pour prendre sa suite sans rupture : là-bas 0,55 × 0,72 du côté de
+    /// la cible, soit 134 pt, ici 370 pt de large. Le rapport tient d'un modèle
+    /// à l'autre, les deux largeurs dérivant de celle de l'écran.
+    private static let echelleArrivee: CGFloat = 0.36
+
+    /// De combien elle redescend en arrivant, depuis le haut où l'animation
+    /// l'avait emmenée.
+    private static let monteeArrivee: CGFloat = 150
 
     @AppStorage(TimerSettings.control) private var controlTimerEnabled = true
     @AppStorage(TimerSettings.controlOutline) private var controlOutlineEnabled = true
@@ -41,6 +56,16 @@ struct ScanView: View {
     // La carte des événements et les libellés d'arrêt suivent le journal des
     // saisies : ce qui vient d'être identifié apparaît sans changer d'écran.
     @ObservedObject private var entries = ManualEntries.shared
+
+    /// Dort, et dit si la tâche a survécu — faux quand elle a été annulée.
+    private func patiente(_ duree: Duration) async -> Bool {
+        do {
+            try await Task.sleep(for: duree)
+            return true
+        } catch {
+            return false
+        }
+    }
 
     private var timers: PassTimers {
         PassTimers(contracts: tagContracts, events: tagEvents)
@@ -156,6 +181,10 @@ struct ScanView: View {
                         .padding()
                     }
                 }
+                // La carte reprend la course là où l'écran vide l'a laissée :
+                // elle redescend du haut en grandissant jusqu'à sa taille.
+                .scaleEffect(carteEnPlace ? 1 : Self.echelleArrivee)
+                .offset(y: carteEnPlace ? 0 : -Self.monteeArrivee)
             ) {}
             .frame(maxWidth: .infinity)
             .listRowBackground(Color.clear)
@@ -249,7 +278,11 @@ struct ScanView: View {
             }
         }
         .task {
-            try? await Task.sleep(for: Self.outlineLifetime)
+            withAnimation(.spring(duration: 0.65, bounce: 0.22)) { carteEnPlace = true }
+            // Le contour n'entre qu'une fois la carte immobile et à sa taille.
+            guard await patiente(.seconds(0.7)) else { return }
+            withAnimation(.easeIn(duration: 0.45)) { outlineShown = true }
+            guard await patiente(Self.outlineLifetime) else { return }
             withAnimation(.easeOut(duration: Self.outlineFade)) { outlineShown = false }
         }
         .toolbar {

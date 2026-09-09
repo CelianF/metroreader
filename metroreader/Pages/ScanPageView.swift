@@ -17,9 +17,11 @@ struct ScanPageView: View {
     #endif
     @State private var isImporting = false
 
-    // Tant qu'aucune carte n'est chargée, on n'affiche que l'état vide :
-    // les boutons de scan, de menu et de partage restent masqués.
-    private var hasCard: Bool { !nfcReader.tagEnvHolder.isEmpty }
+    // Tant qu'aucune carte n'est lue en entier, on n'affiche que l'état vide :
+    // les boutons de scan, de menu et de partage restent masqués. C'est la
+    // lecture achevée qui compte, pas l'en-tête reçu : la cible tient l'écran
+    // jusqu'au bout plutôt que de céder la place à un passe encore à moitié vide.
+    private var hasCard: Bool { nfcReader.isReadComplete }
 
     var body: some View {
         Group {
@@ -28,6 +30,7 @@ struct ScanPageView: View {
             } else {
                 EmptyScanView(
                     isScanning: nfcReader.isScanning,
+                    isTagDetected: nfcReader.isTagDetected,
                     onScan: { nfcReader.beginScanning(historyManager: historyManager) },
                     onImport: { isImporting = true }
                 )
