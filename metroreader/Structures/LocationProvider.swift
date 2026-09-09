@@ -44,6 +44,15 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     /// validation : un bus a déjà quitté l'arrêt.
     static let freshnessWindow: TimeInterval = 90
 
+    /// Précision à partir de laquelle on cesse d'affiner. On choisit un arrêt
+    /// dans une liste au rayon de 400 m, pas une place de parking : continuer
+    /// à chercher le dernier mètre coûte des secondes qui, elles, comptent.
+    private static let precisionSuffisante: CLLocationDistance = 50
+
+    /// Au-delà, on garde ce qu'on a. Un relevé qui traîne sort de toute façon
+    /// de la fenêtre de fraîcheur avant d'arriver.
+    private static let delaiMax: TimeInterval = 12
+
     @Published private(set) var state: State = .idle
 
     /// Instant du relevé, à comparer à celui de la validation
@@ -53,6 +62,9 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published private(set) var authorization: CLAuthorizationStatus = .notDetermined
 
     private let manager = CLLocationManager()
+
+    /// Relevé en cours, pour qu'une échéance ne vienne pas couper le suivant.
+    private var releveEnCours: UUID?
 
     override init() {
         super.init()
@@ -113,8 +125,48 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
             state = .denied
         default:
             state = .requesting
-            manager.requestLocation()
+            demarrer()
         }
+    }
+
+    /// Le relevé le plus rapide qu'on puisse obtenir.
+    ///
+    /// `requestLocation()` attend d'avoir convergé vers la précision demandée
+    /// avant de rendre quoi que ce soit — dix à trente secondes radio froide,
+    /// et à chaque scan, puisqu'il coupe tout entre deux. En enchaînant les
+    /// arrêts, la position arrivait après le départ du bus. On part donc du
+    /// dernier point connu quand il éclaire encore la validation, puis on
+    /// affine par un flux qui livre ses points au fur et à mesure, coupé dès
+    /// qu'il est assez précis.
+    private func demarrer() {
+        let jeton = UUID()
+        releveEnCours = jeton
+
+        if let connu = manager.location,
+           Date().timeIntervalSince(connu.timestamp) < Self.freshnessWindow {
+            retenir(connu)
+        }
+
+        manager.startUpdatingLocation()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.delaiMax) { [weak self] in
+            guard let self, self.releveEnCours == jeton else { return }
+            self.arreter()
+            if self.state == .requesting { self.state = .failed }
+        }
+    }
+
+    private func arreter() {
+        releveEnCours = nil
+        manager.stopUpdatingLocation()
+    }
+
+    /// Le point retenu, daté de sa mesure et non de sa réception : un point
+    /// repris du cache a déjà vécu, et c'est cet âge-là que la fenêtre de
+    /// fraîcheur doit juger.
+    private func retenir(_ point: CLLocation) {
+        capturedAt = point.timestamp
+        state = .located(point.coordinate, accuracy: point.horizontalAccuracy)
     }
 
     /// L'écart entre le relevé et la validation. On compare l'instant du scan à
@@ -137,7 +189,7 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         authorization = manager.authorizationStatus
         switch manager.authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways:
-            if state == .requesting { manager.requestLocation() }
+            if state == .requesting { demarrer() }
         case .denied, .restricted:
             state = .denied
         default:
@@ -146,12 +198,21 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let position = locations.last else { return }
-        capturedAt = Date()
-        state = .located(position.coordinate, accuracy: position.horizontalAccuracy)
+        // Une précision négative signale un point invalide. On prend toujours
+        // le plus récent : en mouvement, un point frais et large vaut mieux
+        // qu'un point serré mesuré à l'arrêt précédent.
+        guard let position = locations.last, position.horizontalAccuracy >= 0 else { return }
+        retenir(position)
+        if position.horizontalAccuracy <= Self.precisionSuffisante { arreter() }
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        // « Position inconnue » est transitoire : Core Location continue de
+        // chercher, couper le flux là reviendrait à abandonner au premier
+        // tunnel. Les autres erreurs, elles, ne se règlent pas en attendant.
+        if (error as? CLError)?.code == .locationUnknown { return }
+        arreter()
+        if case .located = state { return }
         state = .failed
     }
 }
