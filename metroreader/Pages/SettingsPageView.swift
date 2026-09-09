@@ -12,6 +12,7 @@ struct SettingsPageView: View {
     // This stores the preference in the phone's memory automatically
     #if os(iOS)
     @AppStorage("autoLaunchScan") private var autoLaunchScan = false
+    @AppStorage(ScanSettings.sansAnimation) private var sansAnimation = false
     #endif
     @AppStorage("isHistoryEnabled") private var isHistoryEnabled = false
     #if os(iOS)
@@ -51,6 +52,10 @@ struct SettingsPageView: View {
                 Toggle(isOn: $autoLaunchScan) {
                     Label("Scan au démarrage", systemImage: "bolt.fill")
                 }
+
+                Toggle(isOn: $sansAnimation) {
+                    Label("Sans animation", systemImage: "livephoto.slash")
+                }
                 #endif
 
                 
@@ -60,7 +65,15 @@ struct SettingsPageView: View {
             } header: {
                 Text("Comportement")
             } footer: {
+                #if os(iOS)
+                Text("""
+                Sans animation, la cible se tient d'emblée à l'aplomb de l'antenne, coupée par le haut de l'écran, et plus rien ne bouge pendant la lecture.
+
+                Sans historique, un pass ne peut être ni renommé ni recoloré : il n'y a pas de fiche où l'écrire.
+                """)
+                #else
                 Text("Sans historique, un pass ne peut être ni renommé ni recoloré : il n'y a pas de fiche où l'écrire.")
+                #endif
             }
 
             #if os(iOS)

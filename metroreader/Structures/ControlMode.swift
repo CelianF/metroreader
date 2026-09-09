@@ -90,6 +90,17 @@ enum ControlMode: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Bus et tramway se valident à bord ou sur le quai, sans barrière à
+    /// franchir. Avec un forfait en poche, y oublier le geste n'est pas voyager
+    /// sans titre : le trajet est déjà payé, et l'encart le dit en jaune plutôt
+    /// qu'en rouge. Partout ailleurs, on n'entre pas sans valider.
+    var oubliVeniel: Bool {
+        switch self {
+        case .bus, .tram: return true
+        default:          return false
+        }
+    }
+
     /// Le mode couvert par une validation, ramené aux mêmes termes.
     static func couvrant(_ mode: String) -> ControlMode? {
         switch mode {

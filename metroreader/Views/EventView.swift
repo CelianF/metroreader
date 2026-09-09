@@ -56,7 +56,7 @@ struct EventView: View {
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(.gray)
                             }
-                            Text(" - \(interpretTransitionLabel(event.transition))")
+                            Text(" - \(interpretTransitionLabel(event.transition, mode: event.mode))")
                                 .font(.system(size: 18, weight: .medium))
                                 .foregroundColor(.gray)
                         }
@@ -71,7 +71,7 @@ struct EventView: View {
                             }
                         }
 
-                        Text(interpretTransitionLabel(event.transition))
+                        Text(interpretTransitionLabel(event.transition, mode: event.mode))
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.gray)
                     }

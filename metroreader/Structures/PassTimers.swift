@@ -47,6 +47,10 @@ struct PassTimers {
             /// En cours, mais validée sur le mode voisin : la correspondance
             /// n'a pas été revalidée.
             case neighbouringMode(Countdown, validated: ControlMode?)
+            /// Rien de validé, mais un forfait illimité est chargé et l'on se
+            /// dit contrôlé en bus ou en tramway : le trajet est payé, seul le
+            /// geste manque.
+            case unvalidatedPass
         }
     }
 
@@ -76,13 +80,18 @@ struct PassTimers {
     /// poche — de l'absence de titre.
     let hasUsableContract: Bool
 
+    /// Parmi eux, un forfait illimité — jour, mois, année. Il paie le trajet à
+    /// lui seul, là où un carnet ne paie que ce qu'on en décompte : ne pas
+    /// l'avoir validé ne se juge pas comme un voyage sans titre.
+    let hasUsableForfait: Bool
+
     /// - Parameters:
     ///   - mode: le mode dans lequel on se déclare contrôlé.
     ///   - tolerance: le délai pendant lequel un titre éteint passe encore,
     ///     ou nil si la tolérance est désactivée.
     func validity(mode: ControlMode = .automatique,
                   tolerance: TimeInterval? = defaultToleranceWindow) -> Validity {
-        guard let control else { return sansValidation }
+        guard let control else { return sansValidation(mode) }
 
         // Le mode d'abord : une validation qui ne couvre pas ce qu'on contrôle
         // ne vaut rien, si récente soit-elle.
@@ -93,21 +102,33 @@ struct PassTimers {
             case .exact:  return .valid(control)
             case .voisin: return .tolerated(.neighbouringMode(control,
                                                               validated: coverage.flatMap { ControlMode.couvrant($0.mode) }))
-            case .non:    return .wrongMode
+            case .non:    return horsMode(mode)
             }
         }
 
-        if accord == .non { return .wrongMode }
+        if accord == .non { return horsMode(mode) }
         if let tolerance, -control.remaining < tolerance {
             return .tolerated(.recentlyExpired(control))
         }
-        return sansValidation
+        return sansValidation(mode)
+    }
+
+    /// La validation ne couvre pas le mode contrôlé.
+    ///
+    /// Un ticket ne paie qu'un réseau : le prendre ailleurs est une fraude, et
+    /// c'est rouge. Un forfait illimité, lui, paie déjà le trajet — le mode où
+    /// l'on a validé en dernier ne lui retire rien. En bus et en tramway, où
+    /// l'on monte sans barrière, il ne reste alors que le geste oublié.
+    private func horsMode(_ mode: ControlMode) -> Validity {
+        if hasUsableForfait, mode.oubliVeniel { return .tolerated(.unvalidatedPass) }
+        return .wrongMode
     }
 
     /// Rien qui coure : reste à savoir si le pass porte quand même de quoi
-    /// voyager.
-    private var sansValidation: Validity {
-        hasUsableContract ? .notValidated : .none
+    /// voyager, et si l'oubli se plaide là où l'on se dit contrôlé.
+    private func sansValidation(_ mode: ControlMode) -> Validity {
+        if hasUsableForfait, mode.oubliVeniel { return .tolerated(.unvalidatedPass) }
+        return hasUsableContract ? .notValidated : .none
     }
 
     // MARK: - Classification
@@ -139,6 +160,9 @@ struct PassTimers {
         let date: Date
         let mode: String
         let kind: Kind
+        /// La transition telle que la borne l'a écrite. `Kind` confond les deux
+        /// correspondances, or seule la sortie mène au métro.
+        let transition: String
         let contract: [String: Any]?
 
         var isRail: Bool { PassTimers.railModes.contains(mode) }
@@ -179,7 +203,8 @@ struct PassTimers {
             let pointer = interpretInt(getKey(event, "EventContractPointer") ?? "")
             let contract = (pointer > 0 && pointer <= contracts.count) ? contracts[pointer - 1] : nil
 
-            return TimedEvent(date: date, mode: mode, kind: Kind(transition: transition), contract: contract)
+            return TimedEvent(date: date, mode: mode, kind: Kind(transition: transition),
+                              transition: transition, contract: contract)
         }
 
         alreadyValidated = Self.alreadyValidatedTimer(parsed)
@@ -187,24 +212,43 @@ struct PassTimers {
         control = Self.controlTimer(parsed)
         coverage = Self.coverage(parsed)
         hasUsableContract = Self.usableContract(contracts)
+        hasUsableForfait = Self.usableForfait(contracts)
     }
 
     /// Un titre encore utilisable aujourd'hui. `isContractDisabled` couvre le
     /// statut, l'échéance et le compteur ; reste la date de début, qu'un titre
     /// acheté pour le mois prochain n'a pas encore atteinte.
+    private static func isUsable(_ contract: [String: Any]) -> Bool {
+        guard !isContractDisabled(contract) else { return false }
+        guard let start = getKey(contract, "ContractValidityStartDate") else { return true }
+        return interpretDateAsDate(start) <= Date()
+    }
+
     private static func usableContract(_ contracts: [[String: Any]]) -> Bool {
-        contracts.contains { contract in
-            guard !isContractDisabled(contract) else { return false }
-            guard let start = getKey(contract, "ContractValidityStartDate") else { return true }
-            return interpretDateAsDate(start) <= Date()
-        }
+        contracts.contains { isUsable($0) }
+    }
+
+    /// Parmi eux, ceux qui donnent un droit illimité : ni carnet à décompter,
+    /// ni post-paiement.
+    private static func usableForfait(_ contracts: [[String: Any]]) -> Bool {
+        contracts.contains { isUsable($0) && !isSingleUse($0) }
     }
 
     /// Le dernier mode emprunté, et si le titre qui l'a payé ouvre aussi les
     /// aéroports.
     private static func coverage(_ events: [TimedEvent]) -> Coverage? {
         guard let last = events.first, last.isTransit else { return nil }
-        return Coverage(mode: last.mode, airport: airportAllowed(last))
+        return Coverage(mode: modeCouvert(last), airport: airportAllowed(last))
+    }
+
+    /// Le mode dans lequel on voyage après cette validation. Sortir du RER par
+    /// une porte de correspondance, c'est entrer dans le métro : le titre s'y
+    /// juge désormais, et non sur le réseau qu'on vient de quitter — qui est
+    /// pourtant le seul à avoir écrit quelque chose.
+    private static func modeCouvert(_ event: TimedEvent) -> String {
+        correspondanceVersMetro(transition: event.transition, mode: event.mode)
+            ? "Métro"
+            : event.mode
     }
 
     // Titres qui couvrent les liaisons aéroport quelles que soient les zones.
@@ -213,12 +257,23 @@ struct PassTimers {
         0x1000, 0x1001, // Navigo Liberté +
     ]
 
+    // Forfaits d'une journée : leurs conditions excluent nommément les liaisons
+    // aéroport, si loin que leurs zones aillent. Un Navigo Jour toutes zones
+    // couvre la zone 5 sans couvrir Roissy ni Orly, et se lisait valable.
+    private static let noAirportTariffs: Set<Int> = [
+        0x0003, // Navigo Jour
+        0x000F, // Forfait Antipollution, et les journées offertes qui l'empruntent
+    ]
+
     /// Les aéroports ne s'ajoutent qu'au rail, et qu'avec un titre qui les
     /// couvre : le ticket dédié, Liberté+ qui facture le trajet réellement
     /// effectué, ou un abonnement dont les zones vont jusqu'à la quatrième.
     private static func airportAllowed(_ event: TimedEvent) -> Bool {
         guard event.isRail, let contract = event.contract else { return false }
-        if let tariff = tariffCode(contract), airportTariffs.contains(tariff) { return true }
+        if let tariff = tariffCode(contract) {
+            if airportTariffs.contains(tariff) { return true }
+            if noAirportTariffs.contains(tariff) { return false }
+        }
         guard let zoneBits = getKey(contract, "ContractValidityZones") else { return false }
         return interpretZoneSet(zoneBits).contains(4)
     }

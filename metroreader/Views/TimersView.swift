@@ -154,6 +154,17 @@ struct TimersView: View {
                     .foregroundStyle(.secondary)
             }
 
+        case .tolerated(.unvalidatedPass):
+            // Le forfait paie le trajet ; c'est le geste qui manque, et en bus
+            // ou en tramway ça se plaide.
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Forfait non validé")
+                    .fontWeight(.semibold)
+                Text("Un forfait chargé sur le pass couvre le trajet \(mode.enPhrase) ; seule la validation manque.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
         case .tolerated(.recentlyExpired(let countdown)):
             VStack(alignment: .leading, spacing: 6) {
                 Text("Titre expiré")

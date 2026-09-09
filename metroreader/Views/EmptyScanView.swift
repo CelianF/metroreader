@@ -8,6 +8,12 @@ import SwiftUI
 import UIKit
 #endif
 
+/// Clé de l'interrupteur de Réglages qui fige l'écran de scan.
+enum ScanSettings {
+    static let sansAnimation = "scanSansAnimation"
+}
+
+
 struct EmptyScanView: View {
     var isScanning: Bool = false
     /// Levé dès que la carte est sous l'antenne : l'animation en cours va à son
@@ -15,6 +21,10 @@ struct EmptyScanView: View {
     var isTagDetected: Bool = false
     let onScan: () -> Void
     let onImport: () -> Void
+
+    /// Écran figé : la cible se tient d'emblée à sa place haute, sans monter,
+    /// sans battre, et sans carte qui défile. Rien ne bouge.
+    @AppStorage(ScanSettings.sansAnimation) private var sansAnimation = false
 
     @State private var pulse = false
 
@@ -137,11 +147,15 @@ struct EmptyScanView: View {
             dessinCible
             carteExemple
         }
-        .task(id: isScanning) { await defilerExemples() }
+        .task(id: defileExemples) { await defilerExemples() }
         .onChange(of: isTagDetected) { _, detectee in
             if detectee { dernierTour = true }
         }
     }
+
+    /// Les exemples ne traversent l'écran que pendant une lecture, et
+    /// seulement si l'animation est permise.
+    private var defileExemples: Bool { isScanning && !sansAnimation }
 
     private var dessinCible: some View {
         Image("Cible")
@@ -154,10 +168,7 @@ struct EmptyScanView: View {
             // L'animation est choisie ici plutôt qu'au moment de la
             // mutation : à l'arrêt, c'est le fondu court qui reprend la
             // main, là où un withAnimation laissait la boucle courir.
-            .animation(isScanning
-                       ? .easeInOut(duration: 0.7).repeatForever(autoreverses: true)
-                       : .easeInOut(duration: 0.35),
-                       value: pulse)
+            .animation(animationPulse, value: pulse)
             // Le glissement est posé au-dessus du battement : plus bas, il
             // serait happé par la boucle infinie et la cible ferait la navette
             // au lieu de monter une fois. Un décalage plutôt qu'une mise en
@@ -166,9 +177,19 @@ struct EmptyScanView: View {
             // L'animation suit le décalage lui-même et non isScanning : quand
             // la lecture repart depuis une carte affichée, l'écran vide naît
             // alors qu'elle a déjà commencé et isScanning ne change plus.
-            .animation(.snappy(duration: 0.4), value: decalage)
-            .onChange(of: isScanning) { _, enCours in pulse = enCours }
-            .onAppear { pulse = isScanning }
+            .animation(sansAnimation ? nil : .snappy(duration: 0.4), value: decalage)
+            .onChange(of: isScanning) { _, enCours in pulse = enCours && !sansAnimation }
+            .onChange(of: sansAnimation) { _, fige in if fige { pulse = false } }
+            .onAppear { pulse = isScanning && !sansAnimation }
+    }
+
+    /// Le battement de la cible. Nul quand l'écran est figé : sans animation à
+    /// relayer, `pulse` reste faux et la cible garde son opacité pleine.
+    private var animationPulse: Animation? {
+        guard !sansAnimation else { return nil }
+        return isScanning
+            ? .easeInOut(duration: 0.7).repeatForever(autoreverses: true)
+            : .easeInOut(duration: 0.35)
     }
 
     // MARK: - Carte d'exemple
@@ -230,7 +251,7 @@ struct EmptyScanView: View {
     /// qu'une minuterie : SwiftUI l'annule de lui-même à la fin de la lecture,
     /// et le sommeil s'interrompt avec.
     private func defilerExemples() async {
-        guard isScanning else {
+        guard defileExemples else {
             withAnimation(.easeInOut(duration: 0.3)) { exemple = nil }
             etape = .cachee
             return
@@ -341,10 +362,12 @@ struct EmptyScanView: View {
         }
     }
 
-    /// De combien remonter pour amener le centre de la cible sur l'île.
+    /// De combien remonter pour amener le centre de la cible sur l'île. Écran
+    /// figé, elle y est en permanence : c'est la même place, atteinte sans le
+    /// glissement qui l'annonçait.
     private var decalage: CGFloat {
         #if os(iOS)
-        guard isScanning, mesure.cote > 0 else { return 0 }
+        guard isScanning || sansAnimation, mesure.cote > 0 else { return 0 }
         return centreIle - mesure.centre
         #else
         return 0
