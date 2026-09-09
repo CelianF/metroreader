@@ -69,6 +69,14 @@ public class NavigoLines {
     }()
 
     public class func find(_ provider: Int, _ line_id: Int, _ mode: String) -> NavigoLineInfo? {
+        if let line = chez(provider, line_id, mode) { return line }
+        // Les délégations « RATP Cap » n'ont pas redéclaré leurs lignes : le
+        // référentiel les garde sous la RATP, avec le même numéro.
+        guard ProviderCatalog.isRATPDelegation(provider) else { return nil }
+        return chez(ProviderCatalog.ratpId, line_id, mode)
+    }
+
+    private class func chez(_ provider: Int, _ line_id: Int, _ mode: String) -> NavigoLineInfo? {
         if let line = allLines.first(where: { $0.provider_id == provider && $0.line_id == line_id && $0.mode == mode }) {
             return line
         }

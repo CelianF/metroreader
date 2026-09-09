@@ -35,8 +35,26 @@ private struct ProvidersFile: Decodable {
 }
 
 public class ProviderCatalog {
+    /// La RATP au référentiel, sous qui restent classées les lignes que ses
+    /// délégations exploitent désormais.
+    static let ratpId = 3
+
     // Exploitants (EnvApplicationIssuerId, EventServiceProvider, ContractSaleAgent)
     static func findProvider(_ id: Int) -> ServiceProviderInfo? { providersById[id] }
+
+    /// Les délégations que la RATP exploite sous la marque « RATP Cap ».
+    ///
+    /// Elles ont repris des lignes RATP en gardant leurs numéros, mais le
+    /// référentiel ne les a pas redéclarées sous le nouvel exploitant : Massy –
+    /// Juvisy n'y annonce aucune ligne, Pompadour une seule. La carte, elle,
+    /// annonce la délégation — d'où des lignes à nommer à la main alors que le
+    /// référentiel les contient. Le renvoi vers la RATP s'arrête à cette
+    /// marque : un numéro de bus se recycle d'un réseau à l'autre, et les
+    /// autres délégations, elles, ont bien déclaré leurs lignes.
+    static func isRATPDelegation(_ id: Int) -> Bool {
+        guard let exploitant = findProvider(id) else { return false }
+        return (exploitant.operatorName ?? exploitant.name ?? "").hasPrefix("RATP Cap")
+    }
 
     // Réseaux, identifiés par le couple pays / réseau en hexadécimal
     static func findNetwork(countryId: String, networkId: String) -> NetworkInfo? {
