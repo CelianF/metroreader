@@ -176,7 +176,7 @@ struct SettingsPageView: View {
                 .padding(.vertical, 4)
             }
             
-            Section(header: Text("À propos")) {
+            Section {
                 HStack {
                     Text("Version")
                     Spacer()
@@ -193,6 +193,17 @@ struct SettingsPageView: View {
                             .foregroundColor(.secondary)
                     }
                 }
+            } header: {
+                Text("À propos")
+            } footer: {
+                // Dernier mot de l'écran, et de l'application : ce qu'elle est,
+                // et surtout ce qu'elle n'est pas.
+                Text("""
+                Cette application est un service indépendant et non officiel. Elle n'est en aucun cas affiliée, approuvée ou gérée par Île-de-France Mobilités ou la Calypso Networks Association.
+
+                L'application permet uniquement la lecture locale des données à titre informatif. Elle ne permet aucunement d'acheter, de recharger, de valider ou de modifier des titres de transport.
+                """)
+                .padding(.top, 4)
             }
         }
         .navigationTitle("Réglages")
