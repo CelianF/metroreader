@@ -27,6 +27,13 @@ struct EmptyScanView: View {
     /// Le passe montré en exemple, retiré au sort à chaque tour.
     @State private var exemple: String?
 
+    /// Ce que le cycle a déjà montré. Une carte vue ne repasse plus jusqu'à la
+    /// lecture suivante ; annuler et relancer rend tout le vivier disponible.
+    @State private var dejaVues: Set<String> = []
+
+    /// La catégorie du tour précédent, pour ne pas la reprendre aussitôt.
+    @State private var derniereCategorie: String?
+
     /// Où en est la carte dans sa traversée.
     @State private var etape = Etape.cachee
 
@@ -68,11 +75,22 @@ struct EmptyScanView: View {
     /// s'attarde le plus, autant qu'elle y soit entière.
     private static let poseSousCentre: CGFloat = 0.20
 
-    /// Le vivier des exemples, les cartes d'entreprise écartées.
-    /// Ordre et contenu : Data/PassCategories.json
-    private static let exemples: [String] = PassCatalog.categories
+    /// Le vivier des exemples, les cartes d'entreprise écartées. Rangé par
+    /// catégorie et non à plat : le tirage a besoin de savoir d'où vient
+    /// chaque carte. Ordre et contenu : Data/PassCategories.json
+    private static let vivier: [PassCategory] = PassCatalog.categories
         .filter { $0.folder != "Entreprises" }
-        .flatMap(\.images)
+
+    /// Les visuels par défaut, ceux qu'on a vraiment en poche. Ils sortent une
+    /// fois et demie plus souvent que les autres.
+    private static let categorieCourante = "Originaux"
+    private static let faveurCourante = 1.5
+
+    /// Une carte et la catégorie d'où elle sort.
+    private struct Tirage {
+        let image: String
+        let categorie: String
+    }
 
     /// Les quatre temps de la traversée d'une carte.
     private enum Etape {
@@ -218,10 +236,23 @@ struct EmptyScanView: View {
             return
         }
         dernierTour = isTagDetected
+        // Chaque lecture repart d'un vivier entier : une carte vue ne compte
+        // que pour la lecture où elle est passée.
+        dejaVues = []
+        derniereCategorie = nil
         while !Task.isCancelled {
+            // Le vivier épuisé, on cesse de montrer plutôt que de recommencer :
+            // une carte ne repasse pas dans le même cycle.
+            guard let tirage = Self.tirage(apres: derniereCategorie, dejaVues: dejaVues) else {
+                exemple = nil
+                return
+            }
+            dejaVues.insert(tirage.image)
+            derniereCategorie = tirage.categorie
+
             // Hors animation : la carte doit reparaître sur le côté sans
             // revenir en arrière depuis sa sortie par le haut.
-            exemple = Self.tirage(sauf: exemple)
+            exemple = tirage.image
             sensEntree = Bool.random() ? -1 : 1
             angleEntree = Double.random(in: 9...20) * (Bool.random() ? -1 : 1)
             anglePose = Double.random(in: -4...4)
@@ -266,10 +297,32 @@ struct EmptyScanView: View {
         }
     }
 
-    /// Jamais deux fois de suite le même, sinon un tour passe pour un bégaiement.
-    private static func tirage(sauf actuel: String?) -> String? {
-        let autres = exemples.filter { $0 != actuel }
-        return autres.randomElement() ?? exemples.randomElement()
+    /// La carte suivante : jamais une déjà vue dans ce cycle, jamais deux fois
+    /// de suite la même catégorie — sans quoi deux Schol'R voisines passeraient
+    /// pour un bégaiement.
+    private static func tirage(apres derniere: String?, dejaVues: Set<String>) -> Tirage? {
+        let restantes = vivier.flatMap { categorie in
+            categorie.images
+                .filter { !dejaVues.contains($0) }
+                .map { Tirage(image: $0, categorie: categorie.folder) }
+        }
+        let autreCategorie = restantes.filter { $0.categorie != derniere }
+        // La règle de catégorie cède la première : quand elle ne laisse plus
+        // rien, mieux vaut répéter une catégorie que s'arrêter de montrer.
+        return pondere(autreCategorie.isEmpty ? restantes : autreCategorie)
+    }
+
+    /// Tirage pondéré : les visuels courants pèsent une fois et demie les autres.
+    private static func pondere(_ cartes: [Tirage]) -> Tirage? {
+        guard !cartes.isEmpty else { return nil }
+        let poids = cartes.map { $0.categorie == categorieCourante ? faveurCourante : 1 }
+        let total = poids.reduce(0, +)
+        var seuil = Double.random(in: 0..<total)
+        for (carte, p) in zip(cartes, poids) {
+            seuil -= p
+            if seuil < 0 { return carte }
+        }
+        return cartes.last
     }
 
     // MARK: - Géométrie
