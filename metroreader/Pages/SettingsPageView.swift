@@ -153,7 +153,7 @@ struct SettingsPageView: View {
                 } label: {
                     Label("Corrections livrées", systemImage: "checkmark.seal")
                 }
-                .eteint(quand: LineCorrections.all.isEmpty)
+                .eteint(quand: LineCorrections.all.isEmpty && StopCorrections.all.isEmpty)
             } footer: {
                 Text("Là où le référentiel rattache un numéro de course à la mauvaise ligne, l'app le redresse. Ces corrections se lisent mais ne se modifient pas — une surcharge invisible serait une surcharge qu'on ne peut pas contester. Tes propres saisies l'emportent sur elles.")
             }

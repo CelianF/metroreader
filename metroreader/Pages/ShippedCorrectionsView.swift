@@ -21,7 +21,7 @@ struct ShippedCorrectionsView: View {
 
     var body: some View {
         List {
-            if corrections.isEmpty {
+            if corrections.isEmpty && StopCorrections.all.isEmpty {
                 Section {
                     Text("Aucune correction livrée")
                         .foregroundStyle(.secondary)
@@ -53,8 +53,29 @@ struct ShippedCorrectionsView: View {
                     Text("Le numéro de course qu'une carte annonce n'est publié nulle part : le référentiel ne donne qu'un code, qu'il partage parfois entre plusieurs lignes. Le rapprochement se fait donc en observant de vraies cartes, et il se trompe parfois de ligne.")
                 }
 
+                if !StopCorrections.parExploitant.isEmpty {
+                    Section {
+                        ForEach(StopCorrections.parExploitant, id: \.providerId) { reseau in
+                            NavigationLink {
+                                ShippedStopsView(providerId: reseau.providerId)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(interpretServiceProviderShortName(reseau.providerId))
+                                    Text("\(reseau.arrets) arrêts")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("Arrêts")
+                    } footer: {
+                        Text("Treize réseaux en délégation n'ont jamais déclaré le code billettique de leurs arrêts au référentiel : leurs validations n'y portent qu'un nombre. Ce que l'exploitant nous transmet directement comble ce trou.")
+                    }
+                }
+
                 Section {
-                    Text("Ces corrections sont livrées avec l'app et ne se modifient pas ici. Ce que tu nommes toi-même, dans Données saisies, l'emporte sur elles.")
+                    Text("Ces données sont livrées avec l'app et ne se modifient pas ici. Ce que tu nommes toi-même, dans Données saisies, l'emporte sur elles.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -92,6 +113,51 @@ private struct ShippedNetworkCorrectionsView: View {
                 Text("Le numéro de course est ce que la carte annonce. Le référentiel le rattachait à une autre ligne, ou à aucune.")
             }
         }
+        .navigationTitle(interpretServiceProviderShortName(providerId))
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+
+/// Les arrêts qu'un exploitant nous a transmis.
+private struct ShippedStopsView: View {
+    let providerId: Int
+
+    @State private var recherche = ""
+
+    private var arrets: [ShippedStop] {
+        StopCorrections.all
+            .filter { $0.provider_id == providerId }
+            .filter { recherche.isEmpty || $0.name.localizedCaseInsensitiveContains(recherche) }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(arrets, id: \.location_id) { arret in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(arret.name)
+                            if arret.lat == nil {
+                                Text("sans position")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        Text("\(arret.location_id)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } footer: {
+                Text("Le nombre à droite est le code que la carte annonce. Un arrêt sans position s'affiche par son nom mais ne se place pas sur la carte.")
+            }
+        }
+        .searchable(text: $recherche, prompt: "Rechercher un arrêt")
         .navigationTitle(interpretServiceProviderShortName(providerId))
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

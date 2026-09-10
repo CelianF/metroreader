@@ -384,6 +384,12 @@ func interpretLocationId(_ locationIdBitString: String, _ eventCodeBitstring: St
         if let signale = ManualEntries.shared.station(provider: eventServiceProviderId, location: value, mode: eventTransport) {
             return signale
         }
+        // Ou venir de l'exploitant lui-même, quand il nous a transmis ce qu'il
+        // n'a jamais déclaré au référentiel. La saisie de l'utilisateur passe
+        // devant : c'est lui qui corrige ce qu'on livre, pas l'inverse.
+        if let livre = StopCorrections.find(eventServiceProviderId, value, eventTransport) {
+            return livre
+        }
         return NavigoStationInfo.init(name: "\(value)", provider_id: eventServiceProviderId, line_id: nil, location_id: value, mode: eventTransport, lat: 0, lon: 0, found: false)
     }
     return station
