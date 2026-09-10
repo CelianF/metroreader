@@ -114,9 +114,15 @@ public class NavigoStations {
             else if line_id == 17, let station = allStations.first(where: { $0.provider_id == 59 && $0.line_id == 17 && $0.location_id == (location_id ^ 0x8000) && $0.mode == modeToUse }) {
                 return station
             }
-            else {
-                return allStations.first(where: { $0.provider_id == 59 && $0.location_id == location_id && $0.mode == modeToUse })
+            else if let station = allStations.first(where: { $0.provider_id == 59 && $0.location_id == location_id && $0.mode == modeToUse }) {
+                return station
             }
+            // Le référentiel range la RATP sous deux exploitants : 59 pour le
+            // métro, le tram et le train, 3 pour ses lignes de bus. La
+            // recherche ne consultait que le premier, si bien que les neuf
+            // mille arrêts de bus n'étaient jamais atteints — une validation
+            // sur un bus RATP n'affichait qu'un nombre.
+            return allStations.first { $0.provider_id == 3 && $0.location_id == location_id && $0.mode == modeToUse }
         }
         if let station = allStations.first(where: { $0.provider_id == provider_id && $0.line_id == line_id && $0.location_id == location_id && $0.mode == modeToUse }) {
             return station
