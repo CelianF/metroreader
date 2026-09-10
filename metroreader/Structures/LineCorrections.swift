@@ -26,7 +26,7 @@ import Foundation
 /// l'utilisateur, effaçable d'un geste depuis les Réglages, et il ne doit pas
 /// porter ce que l'app livre — l'utilisateur corrige nos erreurs, il n'en
 /// hérite pas comme des siennes.
-struct LineCorrection: Decodable {
+struct LineCorrection: Decodable, Identifiable {
     /// Ce que la carte annonce
     let provider_id: Int
     let line_id: Int
@@ -39,6 +39,21 @@ struct LineCorrection: Decodable {
     /// Quand la course a été observée, et ce qui fonde la correction
     let constate: String?
     let raison: String?
+    /// « validation observée » quand une carte l'a montrée, « relevé » quand
+    /// elle vient du terrain sans trace billettique. La nuance compte : la
+    /// première se rejoue, la seconde se croit.
+    let fonde_sur: String?
+
+    var id: String { "\(provider_id)|\(line_id)|\(mode)" }
+
+    /// Le jour du constat, quand il se laisse lire.
+    var jour: Date? {
+        guard let constate else { return nil }
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f.date(from: constate)
+    }
 }
 
 
@@ -63,6 +78,12 @@ public class LineCorrections {
 
     private static func cle(_ provider: Int, _ line_id: Int, _ mode: String) -> String {
         "\(provider)|\(line_id)|\(mode)"
+    }
+
+    /// Les corrections livrées, du plus récent constat au plus ancien, pour
+    /// l'écran qui les donne à lire.
+    static var lisibles: [LineCorrection] {
+        all.sorted { ($0.jour ?? .distantPast) > ($1.jour ?? .distantPast) }
     }
 
     /// La ligne corrigée pour cette course, quand il y en a une.

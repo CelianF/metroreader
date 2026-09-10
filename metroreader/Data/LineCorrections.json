@@ -11,6 +11,26 @@
   },
   {
     "provider_id": 235,
+    "line_id": 121,
+    "mode": "Bus urbain",
+    "public_id": "C01797",
+    "remplace": "C01796",
+    "constate": "2026-06-09",
+    "raison": "Le référentiel donne le privatecode 000535002 à 5412 comme à 5413 : rien n'y distingue la course. La table livrée range 5412, 5413 et 5462 sous les trois mêmes courses 121, 122 et 123, et rendait 5413 la première. La validation du 9 juin 2026 était sur la 5412.",
+    "fonde_sur": "validation observée"
+  },
+  {
+    "provider_id": 235,
+    "line_id": 123,
+    "mode": "Bus urbain",
+    "public_id": "C01797",
+    "remplace": "C01796",
+    "constate": "2026-05-20",
+    "raison": "Même code partagé 000535002 que la course 121, même arbitraire levé de la même façon. La validation du 20 mai 2026 était sur la 5412.",
+    "fonde_sur": "validation observée"
+  },
+  {
+    "provider_id": 235,
     "line_id": 124,
     "mode": "Bus urbain",
     "public_id": "C02248",

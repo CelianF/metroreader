@@ -68,6 +68,11 @@ public class NavigoLines {
         }
     }()
 
+    /// La ligne du référentiel portant cet identifiant IDFM.
+    public class func byPublicId(_ public_id: String) -> NavigoLineInfo? {
+        allLines.first { $0.public_id == public_id }
+    }
+
     public class func find(_ provider: Int, _ line_id: Int, _ mode: String) -> NavigoLineInfo? {
         candidates(provider, line_id, mode).first
     }

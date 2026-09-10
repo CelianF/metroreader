@@ -148,6 +148,17 @@ struct SettingsPageView: View {
             }
 
             Section {
+                NavigationLink {
+                    ShippedCorrectionsView()
+                } label: {
+                    Label("Corrections livrées", systemImage: "checkmark.seal")
+                }
+                .eteint(quand: LineCorrections.all.isEmpty)
+            } footer: {
+                Text("Là où le référentiel rattache un numéro de course à la mauvaise ligne, l'app le redresse. Ces corrections se lisent mais ne se modifient pas — une surcharge invisible serait une surcharge qu'on ne peut pas contester. Tes propres saisies l'emportent sur elles.")
+            }
+
+            Section {
                 Button(role: .destructive) {
                     showingDeleteAlert = true
                 } label: {
