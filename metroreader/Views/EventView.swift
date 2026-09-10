@@ -49,8 +49,8 @@ struct EventView: View {
                         LineIcons(lines: event.location.lines)
 
                         HStack(spacing: 0) {
-                            if let route = event.route {
-                                LineIcons(lines: [route])
+                            if !event.routeCandidates.isEmpty {
+                                LineIcons(lines: event.routeCandidates)
                             } else {
                                 Text("\(event.mode)")
                                     .font(.system(size: 18, weight: .medium))
@@ -62,8 +62,8 @@ struct EventView: View {
                         }
                     } else {
                         HStack(spacing: 0) {
-                            if let route = event.route {
-                                LineIcons(lines: [route], size: 50.0)
+                            if !event.routeCandidates.isEmpty {
+                                LineIcons(lines: event.routeCandidates, size: 50.0)
                             } else {
                                 Text("\(event.mode)")
                                     .font(.largeTitle)
@@ -74,6 +74,16 @@ struct EventView: View {
                         Text(interpretTransitionLabel(event.transition, mode: event.mode))
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.gray)
+                    }
+
+                    // Deux pastilles côte à côte se liraient comme un arrêt
+                    // desservi par deux lignes. Ici c'est l'inverse : une seule
+                    // a été prise, et on ne sait pas laquelle.
+                    if event.isLineAmbiguous {
+                        Text("\(event.routeCandidates.count) lignes répondent à ce numéro de course : rien sur la carte ne dit laquelle tu as prise.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
                     }
 
                     // Ce que la carte annonce sans que le référentiel sache le

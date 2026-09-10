@@ -261,8 +261,17 @@ func interpretRouteNumber(_ routeNumberBitstring: String, _ eventCodeBitstring: 
 }
 
 func interpretRoute(_ routeNumberBitstring: String, _ eventCodeBitstring: String, _ eventServiceProviderBitstring: String) -> NavigoLineInfo? {
+    interpretRouteCandidates(routeNumberBitstring, eventCodeBitstring, eventServiceProviderBitstring).first
+}
+
+/// Les lignes que ce numéro de course peut désigner, la retenue en tête.
+///
+/// Presque toujours une seule. Mais le référentiel partage parfois un
+/// `privatecode` entre plusieurs lignes, et rien sur la carte ne les
+/// départage : on rend alors tout le paquet plutôt que d'en élire une.
+func interpretRouteCandidates(_ routeNumberBitstring: String, _ eventCodeBitstring: String, _ eventServiceProviderBitstring: String) -> [NavigoLineInfo] {
     guard let routeNumber = Int(routeNumberBitstring, radix: 2) else {
-        return nil
+        return []
     }
     
     let serviceProviderCode = Int(eventServiceProviderBitstring, radix: 2)!
@@ -270,29 +279,35 @@ func interpretRoute(_ routeNumberBitstring: String, _ eventCodeBitstring: String
     let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: true, routeNumber: routeNumber, serviceProvider: serviceProviderCode).0
     
     if let saisie = ManualEntries.shared.line(provider: serviceProviderCode, route: routeNumber, mode: eventTransport) {
-        return saisie
+        return [saisie]
     }
     
     if (eventTransport == "RER") {
         if (routeNumber == 16) || (routeNumber == 17) || (routeNumber == 26) {
-            return NavigoLineInfo(name: "A", mode: "RER", public_id: "C01742", provider_id: 3, line_id: 16, background_color: "eb2132", text_color: "ffffff", is_noctilien: false)
+            return [NavigoLineInfo(name: "A", mode: "RER", public_id: "C01742", provider_id: 3, line_id: 16, background_color: "eb2132", text_color: "ffffff", is_noctilien: false)]
         }
         else if routeNumber == 18 {
-            return NavigoLineInfo(name: "B", mode: "RER", public_id: "C01743", provider_id: 3, line_id: 18, background_color: "5091cb", text_color: "ffffff", is_noctilien: false)
+            return [NavigoLineInfo(name: "B", mode: "RER", public_id: "C01743", provider_id: 3, line_id: 18, background_color: "5091cb", text_color: "ffffff", is_noctilien: false)]
         }
     }
     else if (eventTransport == "Métro" && routeNumber == 29) {
-        return NavigoLineInfo(name: "Orlyval", mode: "Métro", public_id: "C01388", provider_id: 4, line_id: 29, background_color: "5ec5ed", text_color: "ffffff", is_noctilien: false)
+        return [NavigoLineInfo(name: "Orlyval", mode: "Métro", public_id: "C01388", provider_id: 4, line_id: 29, background_color: "5ec5ed", text_color: "ffffff", is_noctilien: false)]
     }
-    else if var route = NavigoLines.find(serviceProviderCode, routeNumber, eventTransport) {
-        if route.is_noctilien {
-            route.mode = "Noctilien"
+    else {
+        let trouvees = NavigoLines.candidates(serviceProviderCode, routeNumber, eventTransport)
+        if !trouvees.isEmpty {
+            return trouvees.map { ligne in
+                var route = ligne
+                if route.is_noctilien {
+                    route.mode = "Noctilien"
+                }
+                return route
+            }
         }
-        return route
     }
     
     // Ni référentiel ni saisie : on rend le numéro de course brut, et on le dit.
-    return NavigoLineInfo(name: "\(routeNumber)", mode: eventTransport, public_id: "UNK\(routeNumber)", provider_id: serviceProviderCode, line_id: routeNumber, background_color: LineEntry.defaultBackground, text_color: LineEntry.defaultText, is_noctilien: false, found: false)
+    return [NavigoLineInfo(name: "\(routeNumber)", mode: eventTransport, public_id: "UNK\(routeNumber)", provider_id: serviceProviderCode, line_id: routeNumber, background_color: LineEntry.defaultBackground, text_color: LineEntry.defaultText, is_noctilien: false, found: false)]
 }
 
 func interpretServiceProvider(_ bitstring: String) -> String {

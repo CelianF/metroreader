@@ -21,6 +21,9 @@ struct ResolvedEvent {
     /// La ligne à représenter, éventuellement un repli portant le numéro de
     /// course brut — c'est `route.found` qui le dit.
     let route: NavigoLineInfo?
+    /// Toutes les lignes que le numéro de course peut désigner, `route` en
+    /// tête. Plus d'une quand le référentiel leur a donné le même code.
+    let routeCandidates: [NavigoLineInfo]
     /// La ligne du référentiel ou du journal, d'où viennent le public_id et
     /// l'appartenance au réseau Noctilien.
     let lineData: NavigoLineInfo?
@@ -94,7 +97,9 @@ struct ResolvedEvent {
 
         self.mode = finalMode
         self.routeName = finalRouteName
-        self.route = routeBits.map { interpretRoute($0, codeBits, providerBits) } ?? nil
+        let candidats = routeBits.map { interpretRouteCandidates($0, codeBits, providerBits) } ?? []
+        self.routeCandidates = candidats
+        self.route = candidats.first
     }
 
     /// Jour et heure de la validation, pour juger la fraîcheur d'une position.
@@ -114,6 +119,10 @@ struct ResolvedEvent {
         guard let route, let routeNumber, !route.found else { return false }
         return routeName == "\(routeNumber)"
     }
+
+    /// Le numéro de course répond à plusieurs lignes à la fois : le référentiel
+    /// leur a donné le même code, et rien sur la carte ne dit laquelle c'était.
+    var isLineAmbiguous: Bool { routeCandidates.count > 1 }
 
     /// L'exploitant est annoncé par un numéro auquel aucun libellé ne répond.
     var isProviderUnidentified: Bool {

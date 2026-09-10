@@ -69,17 +69,36 @@ public class NavigoLines {
     }()
 
     public class func find(_ provider: Int, _ line_id: Int, _ mode: String) -> NavigoLineInfo? {
-        if let line = chez(provider, line_id, mode) { return line }
+        candidates(provider, line_id, mode).first
+    }
+
+    /// Toutes les lignes qui répondent à ce numéro de course, dédoublonnées.
+    ///
+    /// Une seule, presque toujours. Mais le référentiel donne parfois le même
+    /// `privatecode` à plusieurs lignes — cinquante codes pour cent dix-neuf
+    /// lignes, dont « 5412 » et « 5413 » sur le Mantois, ou « 7820 », « 7823 »
+    /// et « 7825 » — et ce code est le seul pont entre la carte et le
+    /// référentiel. Rien n'y départage les prétendantes : rendre la première
+    /// venue, c'était présenter un tirage au sort comme une certitude.
+    public class func candidates(_ provider: Int, _ line_id: Int, _ mode: String) -> [NavigoLineInfo] {
+        let siennes = chez(provider, line_id, mode)
+        if !siennes.isEmpty { return siennes }
         // Les délégations « RATP Cap » n'ont pas redéclaré leurs lignes : le
         // référentiel les garde sous la RATP, avec le même numéro.
-        guard ProviderCatalog.isRATPDelegation(provider) else { return nil }
+        guard ProviderCatalog.isRATPDelegation(provider) else { return [] }
         return chez(ProviderCatalog.ratpId, line_id, mode)
     }
 
-    private class func chez(_ provider: Int, _ line_id: Int, _ mode: String) -> NavigoLineInfo? {
-        if let line = allLines.first(where: { $0.provider_id == provider && $0.line_id == line_id && $0.mode == mode }) {
-            return line
-        }
-        return allLines.first { $0.provider_id == provider && $0.line_id == (line_id >> 8) && $0.mode == mode }
+    private class func chez(_ provider: Int, _ line_id: Int, _ mode: String) -> [NavigoLineInfo] {
+        let exactes = distinctes { $0.provider_id == provider && $0.line_id == line_id && $0.mode == mode }
+        if !exactes.isEmpty { return exactes }
+        return distinctes { $0.provider_id == provider && $0.line_id == (line_id >> 8) && $0.mode == mode }
+    }
+
+    /// Une même ligne figure sous plusieurs numéros de course : on ne la compte
+    /// qu'une fois, sans quoi la moindre recherche paraîtrait ambiguë.
+    private class func distinctes(_ retenir: (NavigoLineInfo) -> Bool) -> [NavigoLineInfo] {
+        var vues = Set<String>()
+        return allLines.filter { retenir($0) && vues.insert($0.public_id).inserted }
     }
 }
