@@ -13,7 +13,11 @@ import SwiftUI
 /// mais elles se lisent, parce qu'une surcharge invisible est une surcharge
 /// qu'on ne peut pas contester.
 struct ShippedCorrectionsView: View {
-    private var corrections: [LineCorrection] { LineCorrections.lisibles }
+    private var corrections: [LineCorrection] { LineCorrections.all }
+
+    private func compteCourses(_ n: Int) -> String {
+        n == 1 ? "1 course" : "\(n) courses"
+    }
 
     var body: some View {
         List {
@@ -26,15 +30,25 @@ struct ShippedCorrectionsView: View {
                 }
             } else {
                 Section {
-                    ForEach(corrections) { correction in
+                    ForEach(LineCorrections.parExploitant, id: \.providerId) { reseau in
                         NavigationLink {
-                            ShippedCorrectionDetailView(correction: correction)
+                            ShippedNetworkCorrectionsView(providerId: reseau.providerId)
                         } label: {
-                            LigneCorrigee(correction: correction)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(interpretServiceProviderShortName(reseau.providerId))
+                                if let detail = interpretServiceProviderDetail(reseau.providerId) {
+                                    Text(detail)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Text(compteCourses(reseau.corrections.count))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 } header: {
-                    Text("Lignes")
+                    Text("Réseaux")
                 } footer: {
                     Text("Le numéro de course qu'une carte annonce n'est publié nulle part : le référentiel ne donne qu'un code, qu'il partage parfois entre plusieurs lignes. Le rapprochement se fait donc en observant de vraies cartes, et il se trompe parfois de ligne.")
                 }
@@ -54,11 +68,43 @@ struct ShippedCorrectionsView: View {
 }
 
 
+/// Les courses redressées d'un réseau.
+private struct ShippedNetworkCorrectionsView: View {
+    let providerId: Int
+
+    private var corrections: [LineCorrection] {
+        LineCorrections.parExploitant.first { $0.providerId == providerId }?.corrections ?? []
+    }
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(corrections) { correction in
+                    NavigationLink {
+                        ShippedCorrectionDetailView(correction: correction)
+                    } label: {
+                        LigneCorrigee(correction: correction)
+                    }
+                }
+            } header: {
+                Text("Courses")
+            } footer: {
+                Text("Le numéro de course est ce que la carte annonce. Le référentiel le rattachait à une autre ligne, ou à aucune.")
+            }
+        }
+        .navigationTitle(interpretServiceProviderShortName(providerId))
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+
 /// La ligne retenue, et celle qu'elle déloge.
 private struct LigneCorrigee: View {
     let correction: LineCorrection
 
-    private var retenue: NavigoLineInfo? { NavigoLines.byPublicId(correction.public_id) }
+    private var retenue: NavigoLineInfo? { LineCorrections.ligne(correction) }
     private var delogee: NavigoLineInfo? {
         correction.remplace.flatMap { NavigoLines.byPublicId($0) }
     }
@@ -72,7 +118,7 @@ private struct LigneCorrigee: View {
                     Text(correction.public_id).fontWeight(.semibold)
                 }
             }
-            Text("course \(correction.line_id) · \(interpretServiceProviderShortName(correction.provider_id))")
+            Text("course \(correction.line_id)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if let delogee {
@@ -93,7 +139,7 @@ private struct LigneCorrigee: View {
 private struct ShippedCorrectionDetailView: View {
     let correction: LineCorrection
 
-    private var retenue: NavigoLineInfo? { NavigoLines.byPublicId(correction.public_id) }
+    private var retenue: NavigoLineInfo? { LineCorrections.ligne(correction) }
     private var delogee: NavigoLineInfo? {
         correction.remplace.flatMap { NavigoLines.byPublicId($0) }
     }

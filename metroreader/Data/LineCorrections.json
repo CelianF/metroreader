@@ -1,12 +1,95 @@
 [
   {
     "provider_id": 235,
+    "line_id": 1,
+    "mode": "Bus urbain",
+    "public_id": "C02161",
+    "remplace": null,
+    "constate": "2026-09-10",
+    "raison": "La table livrée range 5431, 5435 et 5477 sous les courses 1 et 75 à la fois. Le référentiel de l'exploitant donne la course 1 à la 5431.",
+    "fonde_sur": "référentiel exploitant"
+  },
+  {
+    "provider_id": 235,
+    "line_id": 4,
+    "mode": "Bus urbain",
+    "public_id": "C01035",
+    "remplace": null,
+    "constate": "2026-09-10",
+    "raison": "La table livrée range 5436 et 5474 sous la course 4. Le référentiel de l'exploitant donne la course 4 à la 5474, et la 76 à la 5436.",
+    "fonde_sur": "référentiel exploitant"
+  },
+  {
+    "provider_id": 235,
+    "line_id": 39,
+    "mode": "Bus urbain",
+    "public_id": "C02806",
+    "remplace": null,
+    "constate": "2026-09-10",
+    "raison": "Course absente de la table livrée, et ligne absente aussi : le référentiel écrit son code « 000-535-205 », ponctué de tirets là où les autres n'en portent pas, et la génération l'écarte. Le référentiel ne publiant ni couleur ni libellé pour elle, elle s'affiche en gris.",
+    "fonde_sur": "référentiel exploitant",
+    "name": "5404",
+    "background_color": null,
+    "text_color": null
+  },
+  {
+    "provider_id": 235,
+    "line_id": 75,
+    "mode": "Bus urbain",
+    "public_id": "C01033",
+    "remplace": null,
+    "constate": "2026-09-10",
+    "raison": "Course partagée dans la table livrée entre 5431, 5435 et 5477. Le référentiel de l'exploitant donne la course 75 à la 5435.",
+    "fonde_sur": "référentiel exploitant"
+  },
+  {
+    "provider_id": 235,
+    "line_id": 76,
+    "mode": "Bus urbain",
+    "public_id": "C02162",
+    "remplace": null,
+    "constate": "2026-09-10",
+    "raison": "Créneau vide dans la table livrée, où la 5436 figurait à tort sous la course 4.",
+    "fonde_sur": "référentiel exploitant"
+  },
+  {
+    "provider_id": 235,
+    "line_id": 77,
+    "mode": "Bus urbain",
+    "public_id": "C02715",
+    "remplace": null,
+    "constate": "2026-09-10",
+    "raison": "Créneau vide dans la table livrée, où la 5477 figurait à tort sous les courses 1 et 75.",
+    "fonde_sur": "référentiel exploitant"
+  },
+  {
+    "provider_id": 235,
+    "line_id": 81,
+    "mode": "Bus urbain",
+    "public_id": "C00748",
+    "remplace": null,
+    "constate": "2026-09-10",
+    "raison": "Le référentiel donne le même privatecode 000535008 à 5451 et 5452, et la table livrée les range toutes deux sous les courses 81 et 82. Le référentiel de l'exploitant donne la course 81 à la 5451.",
+    "fonde_sur": "référentiel exploitant"
+  },
+  {
+    "provider_id": 235,
+    "line_id": 82,
+    "mode": "Bus urbain",
+    "public_id": "C00749",
+    "remplace": null,
+    "constate": "2026-09-10",
+    "raison": "Même code partagé 000535008 que la course 81. Le référentiel de l'exploitant donne la course 82 à la 5452.",
+    "fonde_sur": "référentiel exploitant"
+  },
+  {
+    "provider_id": 235,
     "line_id": 119,
     "mode": "Bus urbain",
     "public_id": "C02716",
     "remplace": null,
     "constate": "2026-09-10",
-    "raison": "Course relevée sur le terrain. Le créneau 119 était vide dans la table livrée, et 7825 y figurait à tort en 124.",
+    "raison": "Créneau vide dans la table livrée, où la 7825 figurait à tort sous la course 124.",
     "fonde_sur": "relevé"
   },
   {
@@ -14,20 +97,30 @@
     "line_id": 121,
     "mode": "Bus urbain",
     "public_id": "C01797",
-    "remplace": "C01796",
-    "constate": "2026-06-09",
-    "raison": "Le référentiel donne le privatecode 000535002 à 5412 comme à 5413 : rien n'y distingue la course. La table livrée range 5412, 5413 et 5462 sous les trois mêmes courses 121, 122 et 123, et rendait 5413 la première. La validation du 9 juin 2026 était sur la 5412.",
-    "fonde_sur": "validation observée"
+    "remplace": null,
+    "constate": "2026-09-10",
+    "raison": "Le référentiel donne le même privatecode 000535002 à 5412 et 5413, et la table livrée range 5412, 5413 et 5462 sous les courses 121, 122 et 123 à la fois. Le référentiel de l'exploitant donne la course 121 à la 5412 — ce que confirme la validation du 9 juin 2026.",
+    "fonde_sur": "référentiel exploitant"
+  },
+  {
+    "provider_id": 235,
+    "line_id": 122,
+    "mode": "Bus urbain",
+    "public_id": "C01796",
+    "remplace": null,
+    "constate": "2026-09-10",
+    "raison": "Même ambiguïté que la course 121. Le référentiel de l'exploitant donne la course 122 à la 5413.",
+    "fonde_sur": "référentiel exploitant"
   },
   {
     "provider_id": 235,
     "line_id": 123,
     "mode": "Bus urbain",
-    "public_id": "C01797",
-    "remplace": "C01796",
-    "constate": "2026-05-20",
-    "raison": "Même code partagé 000535002 que la course 121, même arbitraire levé de la même façon. La validation du 20 mai 2026 était sur la 5412.",
-    "fonde_sur": "validation observée"
+    "public_id": "C01798",
+    "remplace": null,
+    "constate": "2026-09-10",
+    "raison": "Même ambiguïté que la course 121. Le référentiel de l'exploitant donne la course 123 à la 5462.",
+    "fonde_sur": "référentiel exploitant"
   },
   {
     "provider_id": 235,
@@ -36,7 +129,7 @@
     "public_id": "C02248",
     "remplace": "C02716",
     "constate": "2026-09-10",
-    "raison": "Course relevée sur le terrain. La table livrée donnait 124 à 7825, qui appartient en fait au créneau 119.",
+    "raison": "La table livrée donnait la course 124 à la 7825, qui appartient au créneau 119.",
     "fonde_sur": "relevé"
   },
   {
@@ -46,7 +139,7 @@
     "public_id": "C02249",
     "remplace": "C02248",
     "constate": "2026-06-08",
-    "raison": "Le référentiel donne le privatecode 000535201 à 7820, 7823 et 7825 : rien n'y distingue la course billettique 125. La table livrée l'attribuait à 7823, qui part de Bonnières-sur-Seine. IDFM décrit 7820 comme « Mantes-la-Jolie Hôpital → La Défense Terminal Jules Verne », et la validation du 8 juin 2026 à 08:46 suit d'une minute l'arrivée du train à Mantes-la-Jolie.",
+    "raison": "Le référentiel donne le privatecode 000535201 à 7820, 7823 et 7825 : rien n'y distingue la course. La table livrée l'attribuait à 7823, qui part de Bonnières-sur-Seine. IDFM décrit 7820 comme « Mantes-la-Jolie Hôpital → La Défense Terminal Jules Verne », et la validation du 8 juin 2026 à 08:46 suit d'une minute l'arrivée du train à Mantes-la-Jolie.",
     "fonde_sur": "validation observée"
   }
 ]

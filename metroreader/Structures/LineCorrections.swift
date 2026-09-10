@@ -44,6 +44,13 @@ struct LineCorrection: Decodable, Identifiable {
     /// première se rejoue, la seconde se croit.
     let fonde_sur: String?
 
+    /// De quoi représenter la ligne quand elle manque à la table livrée : le
+    /// référentiel la publie, mais la génération l'a écartée — un code ponctué
+    /// de tirets suffit à l'exclure.
+    let name: String?
+    let background_color: String?
+    let text_color: String?
+
     var id: String { "\(provider_id)|\(line_id)|\(mode)" }
 
     /// Le jour du constat, quand il se laisse lire.
@@ -86,6 +93,21 @@ public class LineCorrections {
         all.sorted { ($0.jour ?? .distantPast) > ($1.jour ?? .distantPast) }
     }
 
+    /// Rangées par exploitant, puis par course — comme le journal des saisies
+    /// se parcourt, et comme un réseau se lit.
+    static var parExploitant: [(providerId: Int, corrections: [LineCorrection])] {
+        var ordre: [Int] = []
+        var groupes: [Int: [LineCorrection]] = [:]
+        for correction in all {
+            if groupes[correction.provider_id] == nil { ordre.append(correction.provider_id) }
+            groupes[correction.provider_id, default: []].append(correction)
+        }
+        return ordre
+            .sorted { interpretServiceProviderShortName($0)
+                        .localizedStandardCompare(interpretServiceProviderShortName($1)) == .orderedAscending }
+            .map { ($0, (groupes[$0] ?? []).sorted { $0.line_id < $1.line_id }) }
+    }
+
     /// La ligne corrigée pour cette course, quand il y en a une.
     ///
     /// Le nom et les couleurs viennent du référentiel — c'est bien lui qui
@@ -96,18 +118,34 @@ public class LineCorrections {
     /// rapprochement avec l'arrêt.
     static func corrected(_ provider: Int, _ line_id: Int, _ mode: String,
                           parmi lignes: [NavigoLineInfo]) -> NavigoLineInfo? {
-        guard let correction = index[cle(provider, line_id, mode)],
-              let ligne = lignes.first(where: { $0.public_id == correction.public_id })
-        else { return nil }
+        guard let correction = index[cle(provider, line_id, mode)] else { return nil }
 
-        return NavigoLineInfo(name: ligne.name,
-                              mode: ligne.mode,
-                              direction: ligne.direction,
-                              public_id: ligne.public_id,
+        if let ligne = lignes.first(where: { $0.public_id == correction.public_id }) {
+            return NavigoLineInfo(name: ligne.name,
+                                  mode: ligne.mode,
+                                  direction: ligne.direction,
+                                  public_id: ligne.public_id,
+                                  provider_id: provider,
+                                  line_id: line_id,
+                                  background_color: ligne.background_color,
+                                  text_color: ligne.text_color,
+                                  is_noctilien: ligne.is_noctilien)
+        }
+
+        // La ligne manque à la table : la correction la porte elle-même.
+        guard let name = correction.name else { return nil }
+        return NavigoLineInfo(name: name,
+                              mode: mode,
+                              public_id: correction.public_id,
                               provider_id: provider,
                               line_id: line_id,
-                              background_color: ligne.background_color,
-                              text_color: ligne.text_color,
-                              is_noctilien: ligne.is_noctilien)
+                              background_color: correction.background_color ?? LineEntry.defaultBackground,
+                              text_color: correction.text_color ?? LineEntry.defaultText)
+    }
+
+    /// La ligne que désigne une correction, pour l'écran qui les donne à lire.
+    static func ligne(_ correction: LineCorrection) -> NavigoLineInfo? {
+        corrected(correction.provider_id, correction.line_id, correction.mode,
+                  parmi: NavigoLines.allLines)
     }
 }
