@@ -85,11 +85,15 @@ struct ResolvedEvent {
             }
         }
 
-        let reference = NavigoLines.find(self.providerId, self.routeNumber ?? 0, finalMode)
-        self.lineData = reference
-            ?? ManualEntries.shared.line(provider: self.providerId,
-                                         route: self.routeNumber ?? -1,
-                                         mode: self.lookupMode)
+        // Le journal d'abord, comme dans `interpretRouteCandidates` : les deux
+        // chemins cherchaient dans l'ordre inverse l'un de l'autre, si bien
+        // qu'une ligne nommée à la main s'affichait en pastille pendant que le
+        // `public_id` restait celui du référentiel — et c'est ce `public_id`
+        // qui filtre les arrêts proposés. Même événement, deux réponses.
+        self.lineData = ManualEntries.shared.line(provider: self.providerId,
+                                                  route: self.routeNumber ?? -1,
+                                                  mode: self.lookupMode)
+            ?? NavigoLines.find(self.providerId, self.routeNumber ?? 0, finalMode)
 
         if self.lineData?.is_noctilien == true {
             finalMode = "Noctilien"

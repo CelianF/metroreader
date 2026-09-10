@@ -89,10 +89,18 @@ public class NavigoLines {
         return chez(ProviderCatalog.ratpId, line_id, mode)
     }
 
+    /// La course est annoncée brute chez les uns, logée dans l'octet haut chez
+    /// les autres. À chacun des deux niveaux, une correction livrée tranche
+    /// avant le référentiel : c'est précisément lui qu'elle redresse.
     private class func chez(_ provider: Int, _ line_id: Int, _ mode: String) -> [NavigoLineInfo] {
-        let exactes = distinctes { $0.provider_id == provider && $0.line_id == line_id && $0.mode == mode }
-        if !exactes.isEmpty { return exactes }
-        return distinctes { $0.provider_id == provider && $0.line_id == (line_id >> 8) && $0.mode == mode }
+        for course in [line_id, line_id >> 8] {
+            if let corrigee = LineCorrections.corrected(provider, course, mode, parmi: allLines) {
+                return [corrigee]
+            }
+            let trouvees = distinctes { $0.provider_id == provider && $0.line_id == course && $0.mode == mode }
+            if !trouvees.isEmpty { return trouvees }
+        }
+        return []
     }
 
     /// Une même ligne figure sous plusieurs numéros de course : on ne la compte

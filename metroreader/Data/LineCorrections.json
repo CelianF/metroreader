@@ -1,0 +1,32 @@
+[
+  {
+    "provider_id": 235,
+    "line_id": 119,
+    "mode": "Bus urbain",
+    "public_id": "C02716",
+    "remplace": null,
+    "constate": "2026-09-10",
+    "raison": "Course relevée sur le terrain. Le créneau 119 était vide dans la table livrée, et 7825 y figurait à tort en 124.",
+    "fonde_sur": "relevé"
+  },
+  {
+    "provider_id": 235,
+    "line_id": 124,
+    "mode": "Bus urbain",
+    "public_id": "C02248",
+    "remplace": "C02716",
+    "constate": "2026-09-10",
+    "raison": "Course relevée sur le terrain. La table livrée donnait 124 à 7825, qui appartient en fait au créneau 119.",
+    "fonde_sur": "relevé"
+  },
+  {
+    "provider_id": 235,
+    "line_id": 125,
+    "mode": "Bus urbain",
+    "public_id": "C02249",
+    "remplace": "C02248",
+    "constate": "2026-06-08",
+    "raison": "Le référentiel donne le privatecode 000535201 à 7820, 7823 et 7825 : rien n'y distingue la course billettique 125. La table livrée l'attribuait à 7823, qui part de Bonnières-sur-Seine. IDFM décrit 7820 comme « Mantes-la-Jolie Hôpital → La Défense Terminal Jules Verne », et la validation du 8 juin 2026 à 08:46 suit d'une minute l'arrivée du train à Mantes-la-Jolie.",
+    "fonde_sur": "validation observée"
+  }
+]
