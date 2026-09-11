@@ -163,6 +163,13 @@ func interpretEventCode(_ bitstring: String, isRouteNumberPresent: Bool = false,
     if isRouteNumberPresent && transportModeStr == "Train" {
         if routeNumber == 29 {
             transportModeStr = "Métro"
+        } else if serviceProvider == 3, let route = routeNumber, (1...14).contains(route) {
+            // La RATP ne numérote ses RER qu'en 16, 17 et 26 pour le A, 18 pour
+            // le B : une course de 1 à 14 est une ligne de métro. À La Chapelle,
+            // la porte qui mène du RER de Gare du Nord à la ligne 2 écrit le mode
+            // train avec la course 2 — lue comme un RER, la validation annonçait
+            // un « RER 2 » introuvable, à Gare du Nord.
+            transportModeStr = "Métro"
         } else {
             transportModeStr = "RER"
         }
