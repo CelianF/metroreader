@@ -10,6 +10,9 @@ import MapKit
 
 struct EventView: View {
     var eventInfo: [String: Any] = [:]
+    /// Les validations écrites après celle-ci : elles disent si une sortie
+    /// « voie publique » était une correspondance.
+    var suivants: [[String: Any]] = []
     var contractsInfos: [[String: Any]] = []
 
     // La résolution est refaite à chaque rendu et le journal est observé : ce
@@ -25,14 +28,27 @@ struct EventView: View {
         var id: Int { rawValue }
     }
 
-    init(eventInfo: [String: Any] = [:], contractsInfos: [[String: Any]] = []) {
+    init(eventInfo: [String: Any] = [:], suivants: [[String: Any]] = [], contractsInfos: [[String: Any]] = []) {
         self.eventInfo = eventInfo
+        self.suivants = suivants
         self.contractsInfos = contractsInfos
     }
 
-    private var event: ResolvedEvent { ResolvedEvent(eventInfo) }
+    private var event: ResolvedEvent { ResolvedEvent(eventInfo, suivants: suivants) }
 
     private var eventInstant: Date? { ResolvedEvent.instant(eventInfo) }
+
+    /// Les pastilles de ligne, ou le mode quand aucune ligne n'est connue.
+    @ViewBuilder
+    private func modeOuLignes(_ event: ResolvedEvent) -> some View {
+        if !event.routeCandidates.isEmpty {
+            LineIcons(lines: event.routeCandidates)
+        } else {
+            Text("\(event.mode)")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundColor(.gray)
+        }
+    }
 
     var body: some View {
         let event = self.event
@@ -48,17 +64,22 @@ struct EventView: View {
 
                         LineIcons(lines: event.location.lines)
 
-                        HStack(spacing: 0) {
-                            if !event.routeCandidates.isEmpty {
-                                LineIcons(lines: event.routeCandidates)
-                            } else {
-                                Text("\(event.mode)")
+                        // « Correspondance (voie publique) » ne tient pas à côté
+                        // du mode : le libellé passe dessous plutôt que de se
+                        // replier en deux lignes contre lui.
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 0) {
+                                modeOuLignes(event)
+                                Text(" - \(interpretTransitionLabel(event.transition, mode: event.mode))")
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(.gray)
                             }
-                            Text(" - \(interpretTransitionLabel(event.transition, mode: event.mode))")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.gray)
+                            VStack(spacing: 4) {
+                                modeOuLignes(event)
+                                Text(interpretTransitionLabel(event.transition, mode: event.mode))
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundColor(.gray)
+                            }
                         }
                     } else {
                         HStack(spacing: 0) {

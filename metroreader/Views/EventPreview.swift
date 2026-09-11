@@ -9,16 +9,20 @@ import SwiftUI
 
 struct EventPreview: View {
     var eventInfo: [String: Any]
+    /// Les validations écrites après celle-ci : elles disent si une sortie
+    /// « voie publique » était une correspondance.
+    var suivants: [[String: Any]]
 
     // La résolution suit le journal des saisies : identifier un arrêt met à
     // jour la liste sans qu'il faille quitter l'écran.
     @ObservedObject private var entries = ManualEntries.shared
 
-    init(eventInfo: [String : Any] = [:]) {
+    init(eventInfo: [String : Any] = [:], suivants: [[String: Any]] = []) {
         self.eventInfo = eventInfo
+        self.suivants = suivants
     }
 
-    private var event: ResolvedEvent { ResolvedEvent(eventInfo) }
+    private var event: ResolvedEvent { ResolvedEvent(eventInfo, suivants: suivants) }
 
     var body: some View {
         let event = self.event

@@ -237,10 +237,12 @@ struct ScanView: View {
             if tagEvents.count > 0 {
                 Section(header: Text("Derniers évènements")) {
                     ForEach(displayedEventsIndices, id: \.self) { i in
+                        // La carte range ses événements du plus récent au plus
+                        // ancien : ceux qui précèdent dans la liste ont suivi.
                         NavigationLink {
-                            EventView(eventInfo: tagEvents[i], contractsInfos: tagContracts)
+                            EventView(eventInfo: tagEvents[i], suivants: Array(tagEvents[..<i]), contractsInfos: tagContracts)
                         } label: {
-                            EventPreview(eventInfo: tagEvents[i])
+                            EventPreview(eventInfo: tagEvents[i], suivants: Array(tagEvents[..<i]))
                         }
                     }
                     

@@ -30,7 +30,8 @@ struct EventsMapView: View {
     // Transformation des stations en annotations identifiables
     private var annotations: [EventAnnotation] {
         events.enumerated().compactMap { index, eventInfo in
-            let event = ResolvedEvent(eventInfo)
+            // Du plus récent au plus ancien : ce qui précède a suivi.
+            let event = ResolvedEvent(eventInfo, suivants: Array(events[..<index]))
             guard event.location.isLocatable else { return nil }
 
             return EventAnnotation(

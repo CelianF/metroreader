@@ -39,9 +39,15 @@ struct ResolvedEvent {
     /// introuvable dès que les deux divergeaient — un bus Noctilien s'écrivait
     /// « Noctilien » et se relisait « Bus urbain ».
     let lookupMode: String
+    /// La transition telle que le trajet la raconte : celle de la borne, sauf
+    /// pour une sortie « voie publique » qu'une entrée ferrée suit de près. Elle
+    /// se dit alors « Correspondance (voie publique) », ce que la borne ne
+    /// pouvait pas savoir.
     let transition: String
 
-    init(_ eventInfo: [String: Any]) {
+    /// `suivants` : les validations écrites après celle-ci. Sans elles, une
+    /// sortie « voie publique » reste une sortie.
+    init(_ eventInfo: [String: Any], suivants: [[String: Any]] = []) {
         let routeBits = getKey(eventInfo, "EventRouteNumber")
         let codeBits = getKey(eventInfo, "EventCode") ?? ""
         let providerBits = getKey(eventInfo, "EventServiceProvider") ?? ""
@@ -64,7 +70,11 @@ struct ResolvedEvent {
                                            serviceProvider: self.providerId)
         var finalMode = eventCode.0
         self.lookupMode = eventCode.0
-        self.transition = eventCode.1
+        self.transition = sortieVersCorrespondance(transition: eventCode.1,
+                                                   instant: Self.instant(eventInfo),
+                                                   suivants: suivants)
+            ? correspondanceVoiePublique
+            : eventCode.1
 
         if self.location.found && finalMode == "Train" {
             let stationModes = Set(self.location.lines.map { $0.mode })
