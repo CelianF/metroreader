@@ -51,19 +51,6 @@ enum ControlMode: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Le même, en sujet de phrase.
-    var sujet: String {
-        switch self {
-        case .automatique: return "ce mode"
-        case .bus:         return "le bus"
-        case .tram:        return "le tramway"
-        case .cable:       return "le câble"
-        case .metro:       return "le métro"
-        case .rail:        return "le RER ou le train"
-        case .aeroport:    return "les aéroports"
-        }
-    }
-
     var icon: String {
         switch self {
         // Le ticket vierge : aucun mode déclaré, on s'en remet à la carte.

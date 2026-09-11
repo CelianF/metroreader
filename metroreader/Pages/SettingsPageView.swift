@@ -64,16 +64,6 @@ struct SettingsPageView: View {
                 }
             } header: {
                 Text("Comportement")
-            } footer: {
-                #if os(iOS)
-                Text("""
-                Sans animation, la cible se tient d'emblée à l'aplomb de l'antenne, coupée par le haut de l'écran, et plus rien ne bouge pendant la lecture.
-
-                Sans historique, un pass ne peut être ni renommé ni recoloré : il n'y a pas de fiche où l'écrire.
-                """)
-                #else
-                Text("Sans historique, un pass ne peut être ni renommé ni recoloré : il n'y a pas de fiche où l'écrire.")
-                #endif
             }
 
             #if os(iOS)
@@ -95,11 +85,11 @@ struct SettingsPageView: View {
             } header: {
                 Text("Position")
             } footer: {
-                Text("Relevée au moment du scan seulement, pour proposer les arrêts proches quand la carte annonce un arrêt inconnu. Elle n'est ni enregistrée ni transmise.")
+                Text("Sert à proposer les arrêts proches d'un arrêt inconnu. Jamais enregistrée ni transmise.")
             }
             #endif
             
-            Section(header: Text("Timers"), footer: Text("Affichés sous le visuel de la carte. Le timer Contrôle pilote aussi le contour du pass.")) {
+            Section(header: Text("Timers")) {
                 Toggle(isOn: $alreadyValidatedTimer) {
                     Label("Pass déjà validé", systemImage: "arrow.uturn.backward.circle")
                 }
@@ -144,7 +134,7 @@ struct SettingsPageView: View {
             } header: {
                 Text("Données")
             } footer: {
-                Text("Les réseaux, lignes et arrêts que tu as identifiés faute de référentiel. Ils se parcourent par réseau, puis par ligne, et s'exportent pour être versés au jeu de données.")
+                Text("Les réseaux, lignes et arrêts que tu as identifiés. Partage-les pour enrichir l'app.")
             }
 
             Section {
@@ -155,7 +145,7 @@ struct SettingsPageView: View {
                 }
                 .eteint(quand: LineCorrections.all.isEmpty && StopCorrections.all.isEmpty)
             } footer: {
-                Text("Là où le référentiel rattache un numéro de course à la mauvaise ligne, l'app le redresse. Ces corrections se lisent mais ne se modifient pas — une surcharge invisible serait une surcharge qu'on ne peut pas contester. Tes propres saisies l'emportent sur elles.")
+                Text("Corrections fournies avec l'app, en lecture seule. Tes saisies passent devant.")
             }
 
             Section {
@@ -170,37 +160,44 @@ struct SettingsPageView: View {
             }
             
             Section(header: Text("Fait avec ❤️ par")) {
-                VStack(alignment: .leading, spacing: 8) {
-                    // Lien pour DocSystem
-                    Link(destination: URL(string: "https://twitter.com/TheDocSystem")!) {
-                        HStack {
+                // Lien pour DocSystem, précédé du logo de son compte Twitter
+                // comme GitHub et Discord le sont du leur.
+                Link(destination: URL(string: "https://twitter.com/TheDocSystem")!) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 8) {
                             Text("DocSystem")
                                 .font(.headline)
-                            Image(systemName: "arrow.up.right.circle.fill")
-                                .font(.caption)
-                        }
-                    }
                     
-                    Text("Recherche, rétro-ingénierie et développement")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                            Text("Recherche, rétro-ingénierie et développement")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    } icon: {
+                        Image("Twitter")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: coteLogo, height: coteLogo)
+                    }
                 }
                 .padding(.vertical, 4)
                 
-                VStack(alignment: .leading, spacing: 8) {
-                    // Lien pour Stitch
-                    Link(destination: URL(string: "https://twitter.com/TweetingStitch")!) {
-                        HStack {
+                // Lien pour Stitch
+                Link(destination: URL(string: "https://twitter.com/TweetingStitch")!) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 8) {
                             Text("Stitch")
                                 .font(.headline)
-                            Image(systemName: "arrow.up.right.circle.fill")
-                                .font(.caption)
-                        }
-                    }
                     
-                    Text("Interface de l'application, design des cartes")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                            Text("Interface de l'application, design des cartes")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    } icon: {
+                        Image("Twitter")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: coteLogo, height: coteLogo)
+                    }
                 }
                 .padding(.vertical, 4)
             }

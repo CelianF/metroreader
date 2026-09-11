@@ -17,8 +17,6 @@ struct ControlSettingsView: View {
     @AppStorage(TimerSettings.controlTolerance) private var toleranceEnabled = true
     @AppStorage(TimerSettings.controlToleranceMinutes) private var toleranceMinutes = TimerSettings.defaultToleranceMinutes
 
-    private var mode: ControlMode { ControlMode(rawValue: controlMode) ?? .automatique }
-
     private var minutes: Binding<Double> {
         Binding(get: { Double(toleranceMinutes) },
                 set: { toleranceMinutes = Int($0.rounded()) })
@@ -32,8 +30,6 @@ struct ControlSettingsView: View {
                 }
             } header: {
                 Text("Contour")
-            } footer: {
-                Text("Le contour reprend la couleur de l'encart et s'efface au bout de dix secondes : il renseigne à l'instant où tu sors la carte.")
             }
 
             Section {
@@ -54,8 +50,6 @@ struct ControlSettingsView: View {
                     Label("Mode contrôlé", systemImage: "figure.stand")
                 }
                 .pickerStyle(.navigationLink)
-            } footer: {
-                Text(explication)
             }
 
             Section {
@@ -85,25 +79,12 @@ struct ControlSettingsView: View {
                 }
             } header: {
                 Text("Tolérance")
-            } footer: {
-                Text("Passé le temps de validité, le titre reste affiché en jaune pendant ce délai. Au-delà, il n'est plus opposable.")
             }
         }
         .navigationTitle("Contrôle")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-    }
-
-    private var explication: String {
-        switch mode {
-        case .automatique:
-            return "Le mode de la dernière validation fait foi. Choisis-en un pour dire où tu te trouves : le titre ne sera vert que s'il couvre ce mode-là."
-        case .aeroport:
-            return "Vert avec un titre qui ouvre les aéroports — ticket dédié, Liberté+, ou abonnement allant jusqu'à la zone 4. Rouge sans."
-        default:
-            return "Vert si la validation porte sur \(mode.sujet). Jaune si elle porte sur le mode voisin — la correspondance n'a pas été revalidée. Rouge si elle vient d'une autre famille."
-        }
     }
 
     static func duree(_ minutes: Int) -> String {
