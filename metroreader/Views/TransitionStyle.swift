@@ -16,10 +16,13 @@ enum TransitionKind {
     case entree
     case correspondance
     case sortie
+    case refus
     case autre
 
     init(_ transition: String) {
-        if transition.localizedCaseInsensitiveContains("correspondance") {
+        if transition == transitionRefus {
+            self = .refus
+        } else if transition.localizedCaseInsensitiveContains("correspondance") {
             self = .correspondance
         } else if transition.hasPrefix("Entrée") {
             self = .entree
@@ -38,10 +41,15 @@ enum TransitionKind {
         case .entree:         return .blue
         case .correspondance: return .cyan
         case .sortie:         return .red
+        case .refus:          return .red
         case .autre:          return .purple
         }
     }
 }
+
+/// Ce qu'une validation refusée raconte : rien n'a été franchi, quoi que la
+/// borne ait tenté d'écrire. Elle se peint du rouge de ce qui arrête.
+let transitionRefus = "Refus"
 
 
 /// Les modes ferrés dont on sort par une porte de correspondance. Le métro en

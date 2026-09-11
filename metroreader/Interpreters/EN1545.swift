@@ -229,6 +229,14 @@ func isRefusSansTitre(_ eventInfo: [String: Any]) -> Bool {
     return Int(resultat, radix: 2) == 0 && Int(pointeur, radix: 2) == 0
 }
 
+/// Une validation refusée : la borne a écrit un résultat autre que « OK », ou
+/// n'a trouvé aucun titre à désigner.
+func isRefus(_ eventInfo: [String: Any]) -> Bool {
+    if isRefusSansTitre(eventInfo) { return true }
+    guard let resultat = getKey(eventInfo, "EventResult") else { return false }
+    return Int(resultat, radix: 2) != 0
+}
+
 /// Le résultat à afficher, lu avec le titre que l'événement désigne.
 func interpretEventResult(of eventInfo: [String: Any]) -> String? {
     guard let resultat = getKey(eventInfo, "EventResult") else { return nil }

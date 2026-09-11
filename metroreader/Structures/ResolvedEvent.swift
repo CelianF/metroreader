@@ -42,7 +42,8 @@ struct ResolvedEvent {
     /// La transition telle que le trajet la raconte : celle de la borne, sauf
     /// pour une sortie « voie publique » qu'une entrée ferrée suit de près, et
     /// pour cette entrée. Les deux se disent alors « Correspondance (voie
-    /// publique) », ce que la borne ne pouvait pas savoir.
+    /// publique) », ce que la borne ne pouvait pas savoir. Une validation
+    /// refusée, elle, se dit « Refus » : elle n'a rien franchi.
     let transition: String
 
     /// `suivants` et `precedents` : les validations écrites après et avant
@@ -78,11 +79,14 @@ struct ResolvedEvent {
                                            serviceProvider: self.providerId)
         var finalMode = eventCode.0
         self.lookupMode = eventCode.0
-        // Une porte relevée tranche d'elle-même ; ailleurs, la sortie « voie
-        // publique » et l'entrée qui la suit se reconnaissent l'une l'autre.
+        // Un refus n'a rien franchi. Une porte relevée tranche d'elle-même ;
+        // ailleurs, la sortie « voie publique » et l'entrée qui la suit se
+        // reconnaissent l'une l'autre.
         let instant = Self.instant(eventInfo)
         let parLaPorte = transitionAuxPortes(eventCode.1, eventInfo)
-        if parLaPorte != eventCode.1 {
+        if isRefus(eventInfo) {
+            self.transition = transitionRefus
+        } else if parLaPorte != eventCode.1 {
             self.transition = parLaPorte
         } else if sortieVersCorrespondance(transition: eventCode.1, instant: instant, suivants: suivants)
                     || entreeApresCorrespondance(transition: eventCode.1, mode: eventCode.0, instant: instant, precedents: precedents) {
