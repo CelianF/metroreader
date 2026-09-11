@@ -238,11 +238,12 @@ struct ScanView: View {
                 Section(header: Text("Derniers évènements")) {
                     ForEach(displayedEventsIndices, id: \.self) { i in
                         // La carte range ses événements du plus récent au plus
-                        // ancien : ceux qui précèdent dans la liste ont suivi.
+                        // ancien : ceux qui précèdent dans la liste ont suivi,
+                        // ceux qui viennent après ont précédé.
                         NavigationLink {
-                            EventView(eventInfo: tagEvents[i], suivants: Array(tagEvents[..<i]), contractsInfos: tagContracts)
+                            EventView(eventInfo: tagEvents[i], suivants: Array(tagEvents[..<i]), precedents: Array(tagEvents[(i + 1)...]), contractsInfos: tagContracts)
                         } label: {
-                            EventPreview(eventInfo: tagEvents[i], suivants: Array(tagEvents[..<i]))
+                            EventPreview(eventInfo: tagEvents[i], suivants: Array(tagEvents[..<i]), precedents: Array(tagEvents[(i + 1)...]))
                         }
                     }
                     
@@ -263,7 +264,7 @@ struct ScanView: View {
                 
                 if !stationsToDisplay.isEmpty {
                     Section {
-                        EventsMapView(events: showAllEvents ? tagEvents : Array(tagEvents.prefix(3)))
+                        EventsMapView(events: tagEvents, affiches: showAllEvents ? tagEvents.count : 3)
                     }
                     .listRowInsets(EdgeInsets())
                     .listRowSeparator(.hidden)

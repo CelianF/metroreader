@@ -20,8 +20,11 @@ struct EventAnnotation: Identifiable {
 }
 
 struct EventsMapView: View {
-    // Liste dynamique des stations trouvées
+    /// Tous les événements de la carte, du plus récent au plus ancien : ceux
+    /// qui ne se placent pas disent encore si une entrée formait correspondance.
     let events: [[String: Any]]
+    /// Combien, en tête, se placent sur la carte.
+    let affiches: Int
 
     // Un arrêt identifié à la main entre dans la carte : le journal est observé
     // pour que la vue s'en aperçoive.
@@ -29,9 +32,12 @@ struct EventsMapView: View {
 
     // Transformation des stations en annotations identifiables
     private var annotations: [EventAnnotation] {
-        events.enumerated().compactMap { index, eventInfo in
-            // Du plus récent au plus ancien : ce qui précède a suivi.
-            let event = ResolvedEvent(eventInfo, suivants: Array(events[..<index]))
+        events.prefix(affiches).enumerated().compactMap { index, eventInfo in
+            // Du plus récent au plus ancien : ce qui précède a suivi, ce qui
+            // vient après a précédé.
+            let event = ResolvedEvent(eventInfo,
+                                      suivants: Array(events[..<index]),
+                                      precedents: Array(events[(index + 1)...]))
             guard event.location.isLocatable else { return nil }
 
             return EventAnnotation(

@@ -40,14 +40,15 @@ struct ResolvedEvent {
     /// « Noctilien » et se relisait « Bus urbain ».
     let lookupMode: String
     /// La transition telle que le trajet la raconte : celle de la borne, sauf
-    /// pour une sortie « voie publique » qu'une entrée ferrée suit de près. Elle
-    /// se dit alors « Correspondance (voie publique) », ce que la borne ne
-    /// pouvait pas savoir.
+    /// pour une sortie « voie publique » qu'une entrée ferrée suit de près, et
+    /// pour cette entrée. Les deux se disent alors « Correspondance (voie
+    /// publique) », ce que la borne ne pouvait pas savoir.
     let transition: String
 
-    /// `suivants` : les validations écrites après celle-ci. Sans elles, une
-    /// sortie « voie publique » reste une sortie.
-    init(_ eventInfo: [String: Any], suivants: [[String: Any]] = []) {
+    /// `suivants` et `precedents` : les validations écrites après et avant
+    /// celle-ci, de la plus proche à la plus lointaine. Sans elles, une sortie
+    /// « voie publique » reste une sortie, et l'entrée une entrée.
+    init(_ eventInfo: [String: Any], suivants: [[String: Any]] = [], precedents: [[String: Any]] = []) {
         let routeBits = getKey(eventInfo, "EventRouteNumber")
         let codeBits = getKey(eventInfo, "EventCode") ?? ""
         let providerBits = getKey(eventInfo, "EventServiceProvider") ?? ""
@@ -70,11 +71,10 @@ struct ResolvedEvent {
                                            serviceProvider: self.providerId)
         var finalMode = eventCode.0
         self.lookupMode = eventCode.0
-        self.transition = sortieVersCorrespondance(transition: eventCode.1,
-                                                   instant: Self.instant(eventInfo),
-                                                   suivants: suivants)
-            ? correspondanceVoiePublique
-            : eventCode.1
+        let instant = Self.instant(eventInfo)
+        let enCorrespondance = sortieVersCorrespondance(transition: eventCode.1, instant: instant, suivants: suivants)
+            || entreeApresCorrespondance(transition: eventCode.1, mode: eventCode.0, instant: instant, precedents: precedents)
+        self.transition = enCorrespondance ? correspondanceVoiePublique : eventCode.1
 
         if self.location.found && finalMode == "Train" {
             let stationModes = Set(self.location.lines.map { $0.mode })

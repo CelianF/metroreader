@@ -88,22 +88,51 @@ let correspondanceVoiePublique = "Correspondance (voie publique)"
 /// Reste un angle mort : la porte qui donne droit sur le quai du métro n'est
 /// suivie d'aucune validation, et sa sortie se lit donc comme une vraie.
 ///
-/// L'entrée de ces mêmes gares s'écrit « Entrée (voie publique) ». Souvent
-/// première validation du trajet, elle reste une entrée.
+/// L'entrée de ces mêmes gares s'écrit « Entrée (voie publique) », mais elle
+/// est souvent la première validation du trajet : elle ne se lit comme
+/// correspondance que si une telle sortie la précède — voir
+/// `entreeApresCorrespondance`.
 func sortieVersCorrespondance(transition: String, instant: Date?, suivants: [[String: Any]]) -> Bool {
     guard transition == "Sortie (voie publique)", let instant else { return false }
     return suivants.contains { suivant in
         guard let date = ResolvedEvent.instant(suivant) else { return false }
         let ecart = date.timeIntervalSince(instant)
-        guard ecart >= 0, ecart <= delaiCorrespondance else { return false }
-        let route = getKey(suivant, "EventRouteNumber").flatMap { Int($0, radix: 2) }
-        let provider = getKey(suivant, "EventServiceProvider").flatMap { Int($0, radix: 2) }
-        let (mode, entree) = interpretEventCode(getKey(suivant, "EventCode") ?? "",
-                                                isRouteNumberPresent: route != nil,
-                                                routeNumber: route,
-                                                serviceProvider: provider)
-        return modesFerres.contains(mode) && (entree.hasPrefix("Entrée") || entree == "Validation")
+        return ecart >= 0 && ecart <= delaiCorrespondance && estEntreeFerree(lecture(suivant))
     }
+}
+
+/// L'autre moitié de la même correspondance : l'entrée ferrée qui suit une
+/// sortie « voie publique » de moins de quinze minutes — le métro pris après
+/// le train, et non plus le train seul.
+///
+/// On remonte les validations précédentes, de la plus récente à la plus
+/// ancienne comme la carte les range. La sortie doit venir avant toute autre
+/// entrée ferrée : une entrée intermédiaire aurait déjà formé la paire, et
+/// celle-ci recommence un trajet.
+func entreeApresCorrespondance(transition: String, mode: String, instant: Date?, precedents: [[String: Any]]) -> Bool {
+    guard let instant, estEntreeFerree((mode, transition)) else { return false }
+    for precedent in precedents {
+        guard let date = ResolvedEvent.instant(precedent),
+              instant.timeIntervalSince(date) <= delaiCorrespondance else { return false }
+        let lu = lecture(precedent)
+        if lu.transition == "Sortie (voie publique)" { return true }
+        if estEntreeFerree(lu) { return false }
+    }
+    return false
+}
+
+/// Le mode et la transition d'un événement voisin, tels que la carte les encode.
+private func lecture(_ evenement: [String: Any]) -> (mode: String, transition: String) {
+    let route = getKey(evenement, "EventRouteNumber").flatMap { Int($0, radix: 2) }
+    let provider = getKey(evenement, "EventServiceProvider").flatMap { Int($0, radix: 2) }
+    return interpretEventCode(getKey(evenement, "EventCode") ?? "",
+                              isRouteNumberPresent: route != nil,
+                              routeNumber: route,
+                              serviceProvider: provider)
+}
+
+private func estEntreeFerree(_ lu: (mode: String, transition: String)) -> Bool {
+    modesFerres.contains(lu.mode) && (lu.transition.hasPrefix("Entrée") || lu.transition == "Validation")
 }
 
 /// Le libellé à afficher. Les deux correspondances se disent d'un même mot :
