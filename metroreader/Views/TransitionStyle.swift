@@ -62,6 +62,16 @@ func correspondanceVersMetro(transition: String, mode: String) -> Bool {
     transition == "Sortie (correspondance)" && modesFerresCorrespondance.contains(mode)
 }
 
+/// La transition d'une porte SNCF relevée comme menant au métro. La borne y
+/// écrit « Entrée » ou « Sortie (voie publique) » comme partout ailleurs ; on
+/// la lit comme les portes RATP qui écrivent 6 et 7, puisque c'en est une.
+func transitionAuxPortes(_ transition: String, _ eventInfo: [String: Any]) -> String {
+    guard GateCorrections.contains(eventInfo) else { return transition }
+    if transition.hasPrefix("Sortie") { return "Sortie (correspondance)" }
+    if transition.hasPrefix("Entrée") { return "Entrée (correspondance)" }
+    return transition
+}
+
 /// Les modes dont une entrée prolonge le trajet, tels que la carte les encode.
 private let modesFerres: Set<String> = ["Métro", "RER", "Train"]
 
@@ -125,10 +135,11 @@ func entreeApresCorrespondance(transition: String, mode: String, instant: Date?,
 private func lecture(_ evenement: [String: Any]) -> (mode: String, transition: String) {
     let route = getKey(evenement, "EventRouteNumber").flatMap { Int($0, radix: 2) }
     let provider = getKey(evenement, "EventServiceProvider").flatMap { Int($0, radix: 2) }
-    return interpretEventCode(getKey(evenement, "EventCode") ?? "",
-                              isRouteNumberPresent: route != nil,
-                              routeNumber: route,
-                              serviceProvider: provider)
+    let (mode, transition) = interpretEventCode(getKey(evenement, "EventCode") ?? "",
+                                                isRouteNumberPresent: route != nil,
+                                                routeNumber: route,
+                                                serviceProvider: provider)
+    return (mode, transitionAuxPortes(transition, evenement))
 }
 
 private func estEntreeFerree(_ lu: (mode: String, transition: String)) -> Bool {

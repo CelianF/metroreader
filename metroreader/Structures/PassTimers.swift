@@ -195,10 +195,13 @@ struct PassTimers {
 
             let routeNumber = getKey(event, "EventRouteNumber").flatMap { Int($0, radix: 2) }
             let provider = getKey(event, "EventServiceProvider").flatMap { Int($0, radix: 2) }
-            let (mode, transition) = interpretEventCode(getKey(event, "EventCode") ?? "",
-                                                        isRouteNumberPresent: routeNumber != nil,
-                                                        routeNumber: routeNumber,
-                                                        serviceProvider: provider)
+            let (mode, brute) = interpretEventCode(getKey(event, "EventCode") ?? "",
+                                                   isRouteNumberPresent: routeNumber != nil,
+                                                   routeNumber: routeNumber,
+                                                   serviceProvider: provider)
+            // Une porte SNCF relevée comme menant au métro vaut une porte RATP
+            // de correspondance : en sortir, c'est entrer dans le métro.
+            let transition = transitionAuxPortes(brute, event)
 
             let pointer = interpretInt(getKey(event, "EventContractPointer") ?? "")
             let contract = (pointer > 0 && pointer <= contracts.count) ? contracts[pointer - 1] : nil

@@ -21,7 +21,7 @@ struct ShippedCorrectionsView: View {
 
     var body: some View {
         List {
-            if corrections.isEmpty && StopCorrections.all.isEmpty {
+            if corrections.isEmpty && StopCorrections.all.isEmpty && GateCorrections.all.isEmpty {
                 Section {
                     Text("Aucune correction livrée")
                         .foregroundStyle(.secondary)
@@ -71,6 +71,23 @@ struct ShippedCorrectionsView: View {
                         Text("Arrêts")
                     } footer: {
                         Text("Treize réseaux en délégation n'ont jamais déclaré le code billettique de leurs arrêts au référentiel : leurs validations n'y portent qu'un nombre. Ce que l'exploitant nous transmet directement comble ce trou.")
+                    }
+                }
+
+                if !GateCorrections.all.isEmpty {
+                    Section {
+                        ForEach(GateCorrections.all) { porte in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(GateCorrections.station(porte)?.name ?? "\(porte.location_id)")
+                                Text("porte \(porte.gate)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    } header: {
+                        Text("Portes")
+                    } footer: {
+                        Text("Lignes SNCF qui donnent directement sur le métro : les franchir est une correspondance.")
                     }
                 }
 

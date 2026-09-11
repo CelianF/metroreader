@@ -221,6 +221,20 @@ func interpretEventResult(_ bitstring: String) -> String {
     }
 }
 
+/// Un refus sans titre désigné : résultat 0 — « OK » partout ailleurs — et
+/// pointeur de contrat à 0. C'est la carte vide qu'on présente à la borne.
+func isRefusSansTitre(_ eventInfo: [String: Any]) -> Bool {
+    guard let resultat = getKey(eventInfo, "EventResult"),
+          let pointeur = getKey(eventInfo, "EventContractPointer") else { return false }
+    return Int(resultat, radix: 2) == 0 && Int(pointeur, radix: 2) == 0
+}
+
+/// Le résultat à afficher, lu avec le titre que l'événement désigne.
+func interpretEventResult(of eventInfo: [String: Any]) -> String? {
+    guard let resultat = getKey(eventInfo, "EventResult") else { return nil }
+    return isRefusSansTitre(eventInfo) ? "Refusé : aucun titre chargé" : interpretEventResult(resultat)
+}
+
 func interpretStatus(_ bitstring: String) -> String {
     switch Int(bitstring, radix: 2) ?? 0 {
     case 0x0:

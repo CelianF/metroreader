@@ -51,8 +51,15 @@ struct ResolvedEvent {
     init(_ eventInfo: [String: Any], suivants: [[String: Any]] = [], precedents: [[String: Any]] = []) {
         let routeBits = getKey(eventInfo, "EventRouteNumber")
         let codeBits = getKey(eventInfo, "EventCode") ?? ""
-        let providerBits = getKey(eventInfo, "EventServiceProvider") ?? ""
-        let locationBits = getKey(eventInfo, "EventLocationId") ?? ""
+        var providerBits = getKey(eventInfo, "EventServiceProvider") ?? ""
+        var locationBits = getKey(eventInfo, "EventLocationId") ?? ""
+
+        // Un refus sans titre s'écrit en abrégé chez la SNCF : la gare se
+        // retrouve par la porte, quand elle est relevée.
+        if let porte = GateCorrections.porteDuRefus(eventInfo) {
+            providerBits = String(porte.provider_id, radix: 2)
+            locationBits = String(porte.location_id, radix: 2)
+        }
 
         self.providerId = Int(providerBits, radix: 2) ?? 0
         self.locationId = Int(locationBits, radix: 2)
@@ -71,10 +78,18 @@ struct ResolvedEvent {
                                            serviceProvider: self.providerId)
         var finalMode = eventCode.0
         self.lookupMode = eventCode.0
+        // Une porte relevée tranche d'elle-même ; ailleurs, la sortie « voie
+        // publique » et l'entrée qui la suit se reconnaissent l'une l'autre.
         let instant = Self.instant(eventInfo)
-        let enCorrespondance = sortieVersCorrespondance(transition: eventCode.1, instant: instant, suivants: suivants)
-            || entreeApresCorrespondance(transition: eventCode.1, mode: eventCode.0, instant: instant, precedents: precedents)
-        self.transition = enCorrespondance ? correspondanceVoiePublique : eventCode.1
+        let parLaPorte = transitionAuxPortes(eventCode.1, eventInfo)
+        if parLaPorte != eventCode.1 {
+            self.transition = parLaPorte
+        } else if sortieVersCorrespondance(transition: eventCode.1, instant: instant, suivants: suivants)
+                    || entreeApresCorrespondance(transition: eventCode.1, mode: eventCode.0, instant: instant, precedents: precedents) {
+            self.transition = correspondanceVoiePublique
+        } else {
+            self.transition = eventCode.1
+        }
 
         if self.location.found && finalMode == "Train" {
             let stationModes = Set(self.location.lines.map { $0.mode })

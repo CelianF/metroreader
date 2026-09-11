@@ -143,7 +143,7 @@ struct SettingsPageView: View {
                 } label: {
                     Label("Corrections livrées", systemImage: "checkmark.seal")
                 }
-                .eteint(quand: LineCorrections.all.isEmpty && StopCorrections.all.isEmpty)
+                .eteint(quand: LineCorrections.all.isEmpty && StopCorrections.all.isEmpty && GateCorrections.all.isEmpty)
             } footer: {
                 Text("Corrections fournies avec l'app, en lecture seule. Tes saisies passent devant.")
             }

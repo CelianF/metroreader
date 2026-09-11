@@ -44,8 +44,8 @@ struct EventPreview: View {
                                 .font(.caption)
                                 .foregroundColor(Color.gray)
                         }
-                        if getKey(eventInfo, "EventResult") != nil {
-                            Text(" - \(interpretEventResult(getKey(eventInfo, "EventResult") ?? ""))")
+                        if let resultat = interpretEventResult(of: eventInfo) {
+                            Text(" - \(resultat)")
                                 .font(.caption)
                                 .foregroundColor(Color.gray)
                         }
@@ -65,8 +65,8 @@ struct EventPreview: View {
                                 .fontWeight(.bold)
                         }
                     }
-                    if getKey(eventInfo, "EventResult") != nil {
-                        Text("\(interpretEventResult(getKey(eventInfo, "EventResult") ?? ""))")
+                    if let resultat = interpretEventResult(of: eventInfo) {
+                        Text(resultat)
                             .font(.caption)
                             .foregroundColor(Color.gray)
                     }

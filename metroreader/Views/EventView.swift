@@ -141,8 +141,8 @@ struct EventView: View {
                         .padding(.top, 4)
                     }
 
-                    if let eventResult = getKey(eventInfo, "EventResult") {
-                        Text("\(interpretEventResult(eventResult))")
+                    if let resultat = interpretEventResult(of: eventInfo) {
+                        Text(resultat)
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)

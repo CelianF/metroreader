@@ -1,0 +1,18 @@
+[
+  {
+    "provider_id": 2,
+    "location_id": 25617,
+    "gate": 18,
+    "constate": "2026-09-11",
+    "raison": "La ligne de contrôle donne directement sur le métro, sans validation RATP derrière. Passée valideur par valideur dans les deux sens : toutes les validations écrivent la porte 18.",
+    "fonde_sur": "validation observée"
+  },
+  {
+    "provider_id": 2,
+    "location_id": 25622,
+    "gate": 30,
+    "constate": "2026-09-11",
+    "raison": "Même relevé côté RER E : toutes les validations de la ligne écrivent la porte 30.",
+    "fonde_sur": "validation observée"
+  }
+]
