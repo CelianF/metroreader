@@ -25,6 +25,8 @@ struct EventsMapView: View {
     let events: [[String: Any]]
     /// Combien, en tête, se placent sur la carte.
     let affiches: Int
+    /// Les titres de la carte, pour les correspondances sous forfait.
+    let contrats: [[String: Any]]
 
     // Un arrêt identifié à la main entre dans la carte : le journal est observé
     // pour que la vue s'en aperçoive.
@@ -37,7 +39,8 @@ struct EventsMapView: View {
             // vient après a précédé.
             let event = ResolvedEvent(eventInfo,
                                       suivants: Array(events[..<index]),
-                                      precedents: Array(events[(index + 1)...]))
+                                      precedents: Array(events[(index + 1)...]),
+                                      contrats: contrats)
             guard event.location.isLocatable else { return nil }
 
             return EventAnnotation(

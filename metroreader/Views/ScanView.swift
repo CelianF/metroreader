@@ -243,7 +243,7 @@ struct ScanView: View {
                         NavigationLink {
                             EventView(eventInfo: tagEvents[i], suivants: Array(tagEvents[..<i]), precedents: Array(tagEvents[(i + 1)...]), contractsInfos: tagContracts)
                         } label: {
-                            EventPreview(eventInfo: tagEvents[i], suivants: Array(tagEvents[..<i]), precedents: Array(tagEvents[(i + 1)...]))
+                            EventPreview(eventInfo: tagEvents[i], suivants: Array(tagEvents[..<i]), precedents: Array(tagEvents[(i + 1)...]), contrats: tagContracts)
                         }
                     }
                     
@@ -264,7 +264,7 @@ struct ScanView: View {
                 
                 if !stationsToDisplay.isEmpty {
                     Section {
-                        EventsMapView(events: tagEvents, affiches: showAllEvents ? tagEvents.count : 3)
+                        EventsMapView(events: tagEvents, affiches: showAllEvents ? tagEvents.count : 3, contrats: tagContracts)
                     }
                     .listRowInsets(EdgeInsets())
                     .listRowSeparator(.hidden)

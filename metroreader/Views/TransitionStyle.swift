@@ -35,12 +35,13 @@ enum TransitionKind {
 
     /// Une correspondance n'est ni tout à fait une entrée ni une sortie : le
     /// voyage continue, mais ailleurs. Elle se peint donc du cyan, voisin du
-    /// bleu de l'entrée sans s'y confondre, et loin du rouge qui arrête.
+    /// bleu de l'entrée sans s'y confondre. La sortie prend le vert d'un
+    /// voyage mené à son terme ; le rouge reste à ce qui arrête, les refus.
     var color: Color {
         switch self {
         case .entree:         return .blue
         case .correspondance: return .cyan
-        case .sortie:         return .red
+        case .sortie:         return .green
         case .refus:          return .red
         case .autre:          return .purple
         }
@@ -152,6 +153,118 @@ private func lecture(_ evenement: [String: Any]) -> (mode: String, transition: S
 
 private func estEntreeFerree(_ lu: (mode: String, transition: String)) -> Bool {
     modesFerres.contains(lu.mode) && (lu.transition.hasPrefix("Entrée") || lu.transition == "Validation")
+}
+
+/// Les modes de surface, ceux du ticket Bus-Tram.
+private let modesSurface: Set<String> = ["Bus urbain", "Bus interurbain", "Tramway", "Câble"]
+
+/// Ce que dure un trajet, compté depuis l'entrée qui l'ouvre.
+private let delaiRail: TimeInterval = 2 * 3600
+private let delaiSurface: TimeInterval = 90 * 60
+
+/// Une entrée qui prolonge, sous forfait, un trajet déjà ouvert.
+///
+/// Un forfait ne laisse aucune trace du changement : on valide dans le bus
+/// comme au départ. Liberté+ non plus, et il offre pourtant la correspondance.
+/// Ce qui la révèle, c'est le délai. Un trajet s'ouvre par une entrée et court
+/// 2 h s'il part du métro, du RER ou du train, 1 h 30 s'il part du bus, du tram
+/// ou du câble, compté depuis cette entrée et jamais relancé. Dans ce délai :
+/// - après le rail, une entrée en bus, tram ou câble est une correspondance.
+///   Une entrée en train aussi, sans compter pour un changement : métro, RER
+///   et train ne font qu'un réseau. Une nouvelle entrée en métro ou en RER ne
+///   l'est pas — on n'y revalide pas pour changer de ligne, revalider c'est en
+///   être ressorti ;
+/// - après le bus, le tram ou le câble, toute entrée l'est.
+///
+/// Un trajet ne compte qu'un changement : bus, bus puis bus, ou bus, tram puis
+/// métro, en commencent un autre, quand bus, métro puis train reste d'un seul
+/// tenant. Reprendre une ligne déjà empruntée en commence un autre aussi :
+/// l'aller-retour n'est pas une correspondance. Les tickets à l'unité — ceux
+/// qui portent un compteur — en sont exclus, puisqu'un changement de réseau y
+/// réclame un autre ticket.
+func entreeDansLeDelai(_ eventInfo: [String: Any], precedents: [[String: Any]], contrats: [[String: Any]]) -> Bool {
+    guard !isRefus(eventInfo), entreeDeVoyage(eventInfo) != nil,
+          let instant = ResolvedEvent.instant(eventInfo) else { return false }
+
+    // Deux validations séparées de plus de 2 h ne tiennent dans aucun trajet :
+    // on ne remonte pas au-delà du premier écart de cette taille.
+    var fenetre = [eventInfo]
+    var plusRecente = instant
+    for precedent in precedents {
+        guard let date = ResolvedEvent.instant(precedent),
+              plusRecente.timeIntervalSince(date) <= delaiRail else { break }
+        fenetre.append(precedent)
+        plusRecente = date
+    }
+
+    // Puis on rejoue les entrées dans l'ordre, trajet par trajet. La dernière
+    // est celle qu'on juge.
+    let chrono = Array(fenetre.reversed())
+    var trajet: (debut: Date, depuisLeRail: Bool, forfait: Bool, lignes: Set<String>,
+                 changements: Int, dansLeRail: Bool)?
+    var prolongee = false
+    for (k, evenement) in chrono.enumerated() {
+        guard !isRefus(evenement), let date = ResolvedEvent.instant(evenement),
+              let lu = entreeDeVoyage(evenement) else { continue }
+        let rail = modesFerres.contains(lu.mode)
+        let ligne = cleDeLigne(evenement)
+        let forfait = estForfait(evenement, contrats)
+        // Ce que les portes ou la voie publique disent déjà correspondance est
+        // un passage dans le rail : il prolonge le trajet sans compter pour un
+        // changement.
+        let dejaDite = lu.transition.localizedCaseInsensitiveContains("correspondance")
+            || entreeApresCorrespondance(transition: lu.transition, mode: lu.mode, instant: date,
+                                         precedents: Array(chrono[..<k].reversed()))
+        var prolonge = false
+        var change = false
+        if let t = trajet, date.timeIntervalSince(t.debut) <= (t.depuisLeRail ? delaiRail : delaiSurface) {
+            if dejaDite {
+                prolonge = true
+            } else if t.forfait, forfait, !(ligne.map { t.lignes.contains($0) } ?? false) {
+                if t.dansLeRail && lu.mode == "Train" {
+                    prolonge = true
+                } else if !(t.dansLeRail && rail) {
+                    change = true
+                    prolonge = t.changements == 0
+                }
+            }
+        }
+        if prolonge {
+            if let ligne { trajet?.lignes.insert(ligne) }
+            if change { trajet?.changements += 1 }
+            trajet?.dansLeRail = rail
+        } else {
+            trajet = (debut: date, depuisLeRail: rail, forfait: forfait, lignes: Set([ligne].compactMap { $0 }),
+                      changements: 0, dansLeRail: rail)
+        }
+        prolongee = prolonge && !dejaDite
+    }
+    return prolongee
+}
+
+/// Le mode et la transition d'une entrée en voyage — métro, RER, train, bus,
+/// tram ou câble —, rien pour le reste.
+private func entreeDeVoyage(_ evenement: [String: Any]) -> (mode: String, transition: String)? {
+    let lu = lecture(evenement)
+    guard lu.transition.hasPrefix("Entrée") || lu.transition == "Validation",
+          modesFerres.contains(lu.mode) || modesSurface.contains(lu.mode) else { return nil }
+    return lu
+}
+
+/// L'exploitant et la course, pour reconnaître une ligne reprise. Rien quand la
+/// carte ne les écrit pas, comme aux portes SNCF.
+private func cleDeLigne(_ evenement: [String: Any]) -> String? {
+    guard let course = getKey(evenement, "EventRouteNumber").flatMap({ Int($0, radix: 2) }),
+          let exploitant = getKey(evenement, "EventServiceProvider").flatMap({ Int($0, radix: 2) }) else { return nil }
+    return "\(exploitant)|\(course)"
+}
+
+/// Le titre payé n'est pas un ticket à l'unité : un forfait, ou Liberté+, qui
+/// ne porte pas de compteur. Faute de titre désigné, on ne se prononce pas.
+private func estForfait(_ evenement: [String: Any], _ contrats: [[String: Any]]) -> Bool {
+    guard let pointeur = getKey(evenement, "EventContractPointer").flatMap({ Int($0, radix: 2) }),
+          pointeur > 0, pointeur <= contrats.count else { return false }
+    return getKey(contrats[pointeur - 1], "CounterContractCount") == nil
 }
 
 /// Le libellé à afficher. Les deux correspondances se disent d'un même mot :

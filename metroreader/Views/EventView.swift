@@ -36,7 +36,7 @@ struct EventView: View {
         self.contractsInfos = contractsInfos
     }
 
-    private var event: ResolvedEvent { ResolvedEvent(eventInfo, suivants: suivants, precedents: precedents) }
+    private var event: ResolvedEvent { ResolvedEvent(eventInfo, suivants: suivants, precedents: precedents, contrats: contractsInfos) }
 
     private var eventInstant: Date? { ResolvedEvent.instant(eventInfo) }
 

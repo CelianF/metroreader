@@ -13,18 +13,21 @@ struct EventPreview: View {
     /// sortie ou une entrée « voie publique » formaient une correspondance.
     var suivants: [[String: Any]]
     var precedents: [[String: Any]]
+    /// Les titres de la carte : une entrée sous forfait peut prolonger un trajet.
+    var contrats: [[String: Any]]
 
     // La résolution suit le journal des saisies : identifier un arrêt met à
     // jour la liste sans qu'il faille quitter l'écran.
     @ObservedObject private var entries = ManualEntries.shared
 
-    init(eventInfo: [String : Any] = [:], suivants: [[String: Any]] = [], precedents: [[String: Any]] = []) {
+    init(eventInfo: [String : Any] = [:], suivants: [[String: Any]] = [], precedents: [[String: Any]] = [], contrats: [[String: Any]] = []) {
         self.eventInfo = eventInfo
         self.suivants = suivants
         self.precedents = precedents
+        self.contrats = contrats
     }
 
-    private var event: ResolvedEvent { ResolvedEvent(eventInfo, suivants: suivants, precedents: precedents) }
+    private var event: ResolvedEvent { ResolvedEvent(eventInfo, suivants: suivants, precedents: precedents, contrats: contrats) }
 
     var body: some View {
         let event = self.event

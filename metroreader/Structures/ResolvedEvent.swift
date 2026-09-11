@@ -43,13 +43,15 @@ struct ResolvedEvent {
     /// pour une sortie « voie publique » qu'une entrée ferrée suit de près, et
     /// pour cette entrée. Les deux se disent alors « Correspondance (voie
     /// publique) », ce que la borne ne pouvait pas savoir. Une validation
-    /// refusée, elle, se dit « Refus » : elle n'a rien franchi.
+    /// refusée, elle, se dit « Refus » : elle n'a rien franchi. Et une entrée
+    /// qui prolonge un trajet sous forfait se dit « Entrée (correspondance) ».
     let transition: String
 
     /// `suivants` et `precedents` : les validations écrites après et avant
     /// celle-ci, de la plus proche à la plus lointaine. Sans elles, une sortie
-    /// « voie publique » reste une sortie, et l'entrée une entrée.
-    init(_ eventInfo: [String: Any], suivants: [[String: Any]] = [], precedents: [[String: Any]] = []) {
+    /// « voie publique » reste une sortie, et l'entrée une entrée. `contrats` :
+    /// les titres de la carte, qui disent si l'entrée a été payée sous forfait.
+    init(_ eventInfo: [String: Any], suivants: [[String: Any]] = [], precedents: [[String: Any]] = [], contrats: [[String: Any]] = []) {
         let routeBits = getKey(eventInfo, "EventRouteNumber")
         let codeBits = getKey(eventInfo, "EventCode") ?? ""
         var providerBits = getKey(eventInfo, "EventServiceProvider") ?? ""
@@ -81,7 +83,8 @@ struct ResolvedEvent {
         self.lookupMode = eventCode.0
         // Un refus n'a rien franchi. Une porte relevée tranche d'elle-même ;
         // ailleurs, la sortie « voie publique » et l'entrée qui la suit se
-        // reconnaissent l'une l'autre.
+        // reconnaissent l'une l'autre ; sous forfait enfin, une entrée dans le
+        // délai d'un trajet le prolonge.
         let instant = Self.instant(eventInfo)
         let parLaPorte = transitionAuxPortes(eventCode.1, eventInfo)
         if isRefus(eventInfo) {
@@ -91,6 +94,8 @@ struct ResolvedEvent {
         } else if sortieVersCorrespondance(transition: eventCode.1, instant: instant, suivants: suivants)
                     || entreeApresCorrespondance(transition: eventCode.1, mode: eventCode.0, instant: instant, precedents: precedents) {
             self.transition = correspondanceVoiePublique
+        } else if entreeDansLeDelai(eventInfo, precedents: precedents, contrats: contrats) {
+            self.transition = "Entrée (correspondance)"
         } else {
             self.transition = eventCode.1
         }
