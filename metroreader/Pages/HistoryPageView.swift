@@ -10,7 +10,6 @@ import SwiftUI
 
 struct HistoryPageView: View {
     @ObservedObject var historyManager: HistoryManager
-    @State private var selectedRecord: ScanRecord?
 
     // Ligne en cours de déplacement d'une section à l'autre : elle est retirée
     // des deux listes le temps que son retrait s'anime, puis réinsérée à sa
@@ -56,17 +55,18 @@ struct HistoryPageView: View {
                     Text("Épinglés")
                 }.foregroundColor(.yellow)) {
                     ForEach(pinned) { record in
-                        HistoryRowButton(record: record, selectedRecord: $selectedRecord) {
+                        HistoryRowButton(record: record, historyManager: historyManager) {
                             movePin(record)
                         }
                     }
                 }
             }
 
-            // Section des récents
-            Section(header: Text(pinned.isEmpty ? "Historique" : "Récents")) {
+            // Section des récents. Sans épinglés, pas de titre : l'onglet dit
+            // déjà « Historique ».
+            Section {
                 ForEach(unpinned) { record in
-                    HistoryRowButton(record: record, selectedRecord: $selectedRecord) {
+                    HistoryRowButton(record: record, historyManager: historyManager) {
                         movePin(record)
                     }
                 }
@@ -79,32 +79,9 @@ struct HistoryPageView: View {
                         }
                     }
                 }
-            }
-        }
-        .navigationTitle("Historique")
-        .sheet(item: $selectedRecord) { record in
-            NavigationStack {
-                ScanView(
-                    cardID: record.cardID,
-                    tagIcc: record.icc,
-                    tagEnvHolder: record.envHolder,
-                    tagContracts: record.contracts,
-                    tagEvents: record.events,
-                    tagSpecialEvents: record.specialEvents,
-                    exportDataAsJSON: record.exportDataAsJSON,
-                    depuisHistorique: true,
-                    historyManager: historyManager
-                )
-                .toolbar {
-                    #if os(iOS)
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Fermer") { selectedRecord = nil }
-                    }
-                    #else
-                    ToolbarItem {
-                        Button("Fermer") { selectedRecord = nil }
-                    }
-                    #endif
+            } header: {
+                if !pinned.isEmpty {
+                    Text("Récents")
                 }
             }
         }

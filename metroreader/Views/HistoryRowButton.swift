@@ -11,13 +11,25 @@ import SwiftUI
 
 struct HistoryRowButton: View {
     let record: ScanRecord
-    @Binding var selectedRecord: ScanRecord?
+    let historyManager: HistoryManager
     // Le déplacement entre sections est séquencé par HistoryPageView
     let onTogglePin: () -> Void
     
     var body: some View {
-        Button {
-            selectedRecord = record
+        // Une vraie page, poussée dans la pile de l'onglet : flèche de retour
+        // et geste depuis le bord gauche, comme dans les réglages.
+        NavigationLink {
+            ScanView(
+                cardID: record.cardID,
+                tagIcc: record.icc,
+                tagEnvHolder: record.envHolder,
+                tagContracts: record.contracts,
+                tagEvents: record.events,
+                tagSpecialEvents: record.specialEvents,
+                exportDataAsJSON: record.exportDataAsJSON,
+                depuisHistorique: true,
+                historyManager: historyManager
+            )
         } label: {
             HStack(spacing: 8) {
                 NavigoImage(imageName: record.image)
@@ -56,7 +68,6 @@ struct HistoryRowButton: View {
                 .padding(.vertical, 4)
             }
         }
-        .buttonStyle(.plain)
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             Button(action: onTogglePin) {
                 Label(record.isPinned ? "Désépingler" : "Épingler",

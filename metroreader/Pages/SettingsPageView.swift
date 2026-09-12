@@ -262,7 +262,6 @@ struct SettingsPageView: View {
                 .padding(.top, 4)
             }
         }
-        .navigationTitle("Réglages")
         .alert("Effacer l'historique ?", isPresented: $showingDeleteAlert) {
             Button("Annuler", role: .cancel) { }
             Button("Tout effacer", role: .destructive) {

@@ -49,9 +49,9 @@ struct ScanView: View {
     /// à l'autre, les deux largeurs dérivant de celle de l'écran.
     private static let echelleArrivee: CGFloat = 0.36
 
-    /// De combien la carte remonte vers la barre du haut. La liste laisse
-    /// au-dessus de sa première section une marge que `contentMargins` ne
-    /// réduit pas : sans ça, 62 pt la séparaient des boutons.
+    /// De combien la carte remonte vers la barre du haut. La barre garde la
+    /// place d'un grand titre qu'elle n'affiche pas, que `contentMargins` ne
+    /// réduit pas : sans ça, 62 pt séparaient la carte des boutons.
     private static let remonteeCarte: CGFloat = 40
 
     /// De combien elle redescend en arrivant, depuis le haut où l'animation
@@ -162,8 +162,11 @@ struct ScanView: View {
                 }
                 // La carte reprend la course là où l'écran vide l'a laissée :
                 // elle redescend du haut en grandissant jusqu'à sa taille.
-                .scaleEffect(carteEnPlace ? 1 : Self.echelleArrivee)
-                .offset(y: carteEnPlace ? 0 : -Self.monteeArrivee)
+                // Depuis l'historique, pas d'écran vide, et la page glisse déjà
+                // de la droite : la carte semblait tomber du coin. Elle y est
+                // posée d'emblée.
+                .scaleEffect(carteEnPlace || depuisHistorique ? 1 : Self.echelleArrivee)
+                .offset(y: carteEnPlace || depuisHistorique ? 0 : -Self.monteeArrivee)
                 .padding(.top, -Self.remonteeCarte)
             ) {}
             .frame(maxWidth: .infinity)
@@ -267,6 +270,12 @@ struct ScanView: View {
                 }
             }
         }
+        #if os(iOS)
+        // Grand titre, même vide : venue d'une page sans titre, la fiche
+        // héritait d'une barre compacte, et la carte remontée passait sous les
+        // boutons.
+        .navigationBarTitleDisplayMode(.large)
+        #endif
         .task {
             withAnimation(.spring(duration: 0.65, bounce: 0.22)) { carteEnPlace = true }
             // Le contour n'entre qu'une fois la carte immobile et à sa taille.
