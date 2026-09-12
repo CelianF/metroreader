@@ -94,27 +94,48 @@ public class NavigoStations {
         }
     }()
     
+    /// Les arrêts rangés par exploitant, identifiant et mode, dans l'ordre du
+    /// fichier. Parcourir les quarante mille arrêts à chaque validation coûtait
+    /// plusieurs millisecondes : sur une carte chargée, la carte des validations
+    /// mettait des secondes à se remplir.
+    private static let parCle: [String: [NavigoStationInfo]] = {
+        var index: [String: [NavigoStationInfo]] = [:]
+        for station in allStations {
+            index[cle(station.provider_id, station.location_id, station.mode), default: []].append(station)
+        }
+        return index
+    }()
+
+    private static func cle(_ provider: Int, _ location: Int, _ mode: String) -> String {
+        "\(provider)|\(location)|\(mode)"
+    }
+
+    /// Le premier arrêt du fichier à répondre, comme le rendrait un parcours.
+    private static func premier(_ provider: Int, _ location: Int, _ mode: String) -> NavigoStationInfo? {
+        parCle[cle(provider, location, mode)]?.first
+    }
+
+    /// Le même, sur une ligne donnée — rien comptant pour une ligne absente.
+    private static func premier(_ provider: Int, _ line: Int?, _ location: Int, _ mode: String) -> NavigoStationInfo? {
+        parCle[cle(provider, location, mode)]?.first { $0.line_id == line }
+    }
+
     public class func find(_ provider_id: Int, _ line_id: Int?, _ location_id: Int, _ mode: String) -> NavigoStationInfo? {
         var modeToUse = mode
         if (mode == "RER") {
             modeToUse = "Train"
         }
         if (provider_id == 2) { // Map SNCF Provider
-            if let station = allStations.first(where: { $0.provider_id == 1 && $0.line_id == line_id && $0.location_id == location_id && $0.mode == modeToUse }) {
-                return station
-            }
-            else {
-                return allStations.first(where: { $0.provider_id == 1 && $0.location_id == location_id && $0.mode == modeToUse })
-            }
+            return premier(1, line_id, location_id, modeToUse) ?? premier(1, location_id, modeToUse)
         }
         else if (provider_id == 3) { // Map RATP Provider
-            if let station = allStations.first(where: { $0.provider_id == 59 && $0.line_id == line_id && $0.location_id == location_id && $0.mode == modeToUse }) {
+            if let station = premier(59, line_id, location_id, modeToUse) {
                 return station
             }
-            else if line_id == 17, let station = allStations.first(where: { $0.provider_id == 59 && $0.line_id == 17 && $0.location_id == (location_id ^ 0x8000) && $0.mode == modeToUse }) {
+            else if line_id == 17, let station = premier(59, 17, location_id ^ 0x8000, modeToUse) {
                 return station
             }
-            else if let station = allStations.first(where: { $0.provider_id == 59 && $0.location_id == location_id && $0.mode == modeToUse }) {
+            else if let station = premier(59, location_id, modeToUse) {
                 return station
             }
             // Le référentiel range la RATP sous deux exploitants : 59 pour le
@@ -122,9 +143,9 @@ public class NavigoStations {
             // recherche ne consultait que le premier, si bien que les neuf
             // mille arrêts de bus n'étaient jamais atteints — une validation
             // sur un bus RATP n'affichait qu'un nombre.
-            return allStations.first { $0.provider_id == 3 && $0.location_id == location_id && $0.mode == modeToUse }
+            return premier(3, location_id, modeToUse)
         }
-        if let station = allStations.first(where: { $0.provider_id == provider_id && $0.line_id == line_id && $0.location_id == location_id && $0.mode == modeToUse }) {
+        if let station = premier(provider_id, line_id, location_id, modeToUse) {
             return station
         }
         // Pas de repli sans l'exploitant. Les identifiants d'arrêt sont locaux à
@@ -132,6 +153,6 @@ public class NavigoStations {
         // exploitants — donc chercher sans lui renvoie le premier venu dans
         // l'ordre du fichier, soit un arrêt à l'autre bout de la région annoncé
         // comme une certitude. Mieux vaut rendre l'identifiant brut.
-        return allStations.first(where: { $0.provider_id == provider_id && $0.location_id == location_id && $0.mode == modeToUse })
+        return premier(provider_id, location_id, modeToUse)
     }
 }

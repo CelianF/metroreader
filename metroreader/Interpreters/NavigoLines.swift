@@ -102,16 +102,28 @@ public class NavigoLines {
             if let corrigee = LineCorrections.corrected(provider, course, mode, parmi: allLines) {
                 return [corrigee]
             }
-            let trouvees = distinctes { $0.provider_id == provider && $0.line_id == course && $0.mode == mode }
+            let trouvees = distinctes(parCle["\(provider)|\(course)|\(mode)"] ?? [])
             if !trouvees.isEmpty { return trouvees }
         }
         return []
     }
 
+    /// Les lignes rangées par exploitant, course et mode, dans l'ordre du
+    /// fichier : les parcourir toutes à chaque validation ralentissait les
+    /// cartes chargées.
+    private static let parCle: [String: [NavigoLineInfo]] = {
+        var index: [String: [NavigoLineInfo]] = [:]
+        for ligne in allLines {
+            guard let provider = ligne.provider_id, let course = ligne.line_id else { continue }
+            index["\(provider)|\(course)|\(ligne.mode)", default: []].append(ligne)
+        }
+        return index
+    }()
+
     /// Une même ligne figure sous plusieurs numéros de course : on ne la compte
     /// qu'une fois, sans quoi la moindre recherche paraîtrait ambiguë.
-    private class func distinctes(_ retenir: (NavigoLineInfo) -> Bool) -> [NavigoLineInfo] {
+    private class func distinctes(_ lignes: [NavigoLineInfo]) -> [NavigoLineInfo] {
         var vues = Set<String>()
-        return allLines.filter { retenir($0) && vues.insert($0.public_id).inserted }
+        return lignes.filter { vues.insert($0.public_id).inserted }
     }
 }
