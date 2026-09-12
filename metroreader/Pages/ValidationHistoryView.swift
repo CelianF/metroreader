@@ -38,6 +38,11 @@ struct ValidationHistoryView: View {
     /// La moitié de l'écart ordinaire entre deux sections.
     private static let ecartEntreTrajets: CGFloat = 17.5
 
+    /// Au-dessus de la carte, la liste laissait 35 pt, et la carte tombait à
+    /// 45 pt sous la barre. À 12 pt, elle se tient à 22 pt des boutons, comme
+    /// la carte d'une fiche.
+    private static let margeDuHaut: CGFloat = 12
+
     private static let titreDuJour: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "fr_FR")
@@ -150,6 +155,7 @@ struct ValidationHistoryView: View {
         // Deux trajets d'un même jour se tiennent à mi-distance de l'ordinaire.
         // Entre deux jours, le titre garde son écart : 57 pt avant comme après.
         .listSectionSpacing(Self.ecartEntreTrajets)
+        .contentMargins(.top, Self.margeDuHaut, for: .scrollContent)
         .navigationTitle("Validations")
         .task(id: toutVoir) {
             journees = nil

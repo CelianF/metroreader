@@ -26,6 +26,9 @@ struct ScanView: View {
     
     @State private var showAllContracts = false
     @State private var showAllSpecialEvents = false
+    /// Vrai quand la fiche du pass, telle que l'historique la garde, est
+    /// ouverte par-dessus la carte lue.
+    @State private var ficheOuverte = false
     @State private var showingRenameAlert = false
     @State private var newNickname = ""
     @State private var showingImagePicker = false
@@ -103,6 +106,18 @@ struct ScanView: View {
     private var canPersonalize: Bool {
         cardID != 0 && historyManager.history.contains { $0.cardID == cardID }
     }
+
+    /// Le double toucher sur la carte. Sur la carte lue, il pousse sa fiche de
+    /// l'historique par-dessus : le geste de retour ramène à la carte lue.
+    /// Dans l'historique, où l'on est déjà, il change son image.
+    private func doubleToucherLaCarte() {
+        guard canPersonalize else { return }
+        if depuisHistorique {
+            showingImagePicker = true
+        } else {
+            ficheOuverte = true
+        }
+    }
     
     private var preferredContractIndex: Int? {
         Array(0..<tagContracts.count).first { isContractBest(tagContracts[$0], tagContracts) }
@@ -155,9 +170,7 @@ struct ScanView: View {
                                         .allowsHitTesting(false)
                                 }
                             }
-                            .onTapGesture(count: 2) {
-                                if canPersonalize { showingImagePicker = true }
-                            }
+                            .onTapGesture(count: 2) { doubleToucherLaCarte() }
                     }
                 }
                 // La carte reprend la course là où l'écran vide l'a laissée :
@@ -276,6 +289,21 @@ struct ScanView: View {
         // boutons.
         .navigationBarTitleDisplayMode(.large)
         #endif
+        .navigationDestination(isPresented: $ficheOuverte) {
+            if let fiche = historyManager.history.first(where: { $0.cardID == cardID }) {
+                ScanView(
+                    cardID: fiche.cardID,
+                    tagIcc: fiche.icc,
+                    tagEnvHolder: fiche.envHolder,
+                    tagContracts: fiche.contracts,
+                    tagEvents: fiche.events,
+                    tagSpecialEvents: fiche.specialEvents,
+                    exportDataAsJSON: fiche.exportDataAsJSON,
+                    depuisHistorique: true,
+                    historyManager: historyManager
+                )
+            }
+        }
         .task {
             withAnimation(.spring(duration: 0.65, bounce: 0.22)) { carteEnPlace = true }
             // Le contour n'entre qu'une fois la carte immobile et à sa taille.
