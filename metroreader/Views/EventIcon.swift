@@ -7,68 +7,54 @@
 
 import SwiftUI
 
+/// Le mode que le pictogramme annonce : celui où l'on entre, pas celui qu'on
+/// quitte. Sortir du RER par une porte de correspondance, c'est entrer dans le
+/// métro — le libellé, lui, garde la ligne d'où l'on vient.
+func modeDuPictogramme(mode: String, transition: String) -> String {
+    correspondanceVersMetro(transition: transition, mode: mode) ? "Métro" : mode
+}
+
+/// Le pictogramme IDFM d'un mode, tel qu'il figure au catalogue ; rien pour un
+/// mode qui n'en a pas.
+func pictogrammeIDFM(_ mode: String) -> String? {
+    switch mode {
+    case "Bus urbain", "Bus interurbain": return "mode_bus"
+    case "Noctilien":                     return "mode_noctilien"
+    case "Train":                         return "mode_train"
+    case "RER":                           return "mode_rer"
+    case "Train / RER":                   return "mode_train_rer"
+    case "Tramway":                       return "mode_tram"
+    case "Métro":                         return "mode_metro"
+    case "Câble":                         return "mode_cable"
+    default:                              return nil
+    }
+}
+
 struct EventIcon: View {
     var eventTransportMode: String
     let eventTransition: String
 
-    /// Le mode que le pictogramme annonce : celui où l'on entre, pas celui
-    /// qu'on quitte. Sortir du RER par une porte de correspondance, c'est
-    /// entrer dans le métro — le libellé, lui, garde la ligne d'où l'on vient.
     private var mode: String {
-        correspondanceVersMetro(transition: eventTransition, mode: eventTransportMode)
-            ? "Métro"
-            : eventTransportMode
+        modeDuPictogramme(mode: eventTransportMode, transition: eventTransition)
     }
 
     var body: some View {
         ZStack {
-            switch (mode) {
-            case "Bus urbain":
-                Image("mode_bus")
-                    .resizable(resizingMode: .stretch)
-                    .padding(.all, 8.0)
-                    .colorInvert()
-            case "Noctilien":
-                Image("mode_noctilien")
-                    .resizable(resizingMode: .stretch)
-                    .padding(.all, 8.0)
-                    .brightness(1.0)
-            case "Bus interurbain":
-                Image("mode_bus")
-                    .resizable(resizingMode: .stretch)
-                    .padding(.all, 8.0)
-                    .colorInvert()
-            case "Train":
-                Image("mode_train")
-                    .resizable(resizingMode: .stretch)
-                    .padding(.all, 8.0)
-                    .colorInvert()
-            case "RER":
-                Image("mode_rer")
-                    .resizable(resizingMode: .stretch)
-                    .padding(.all, 8.0)
-                    .colorInvert()
-            case "Train / RER":
-                Image("mode_train_rer")
-                    .resizable(resizingMode: .stretch)
-                    .padding(.all, 8.0)
-                    .colorInvert()
-            case "Tramway":
-                Image("mode_tram")
-                    .resizable(resizingMode: .stretch)
-                    .padding(.all, 8.0)
-                    .colorInvert()
-            case "Métro":
-                Image("mode_metro")
-                    .resizable(resizingMode: .stretch)
-                    .padding(.all, 8.0)
-                    .colorInvert()
-            case "Câble":
-                Image("mode_cable")
-                    .resizable(resizingMode: .stretch)
-                    .padding(.all, 8.0)
-                    .colorInvert()
-            default:
+            if let pictogramme = pictogrammeIDFM(mode) {
+                // Le Noctilien a son propre dessin, qu'on éclaircit plutôt que
+                // d'inverser.
+                if mode == "Noctilien" {
+                    Image(pictogramme)
+                        .resizable(resizingMode: .stretch)
+                        .padding(.all, 8.0)
+                        .brightness(1.0)
+                } else {
+                    Image(pictogramme)
+                        .resizable(resizingMode: .stretch)
+                        .padding(.all, 8.0)
+                        .colorInvert()
+                }
+            } else {
                 Image(systemName: "questionmark.circle.fill")
             }
         }

@@ -25,7 +25,6 @@ struct ScanView: View {
     @ObservedObject var historyManager: HistoryManager
     
     @State private var showAllContracts = false
-    @State private var showAllEvents = false
     @State private var showingRenameAlert = false
     @State private var newNickname = ""
     @State private var showingImagePicker = false
@@ -120,29 +119,11 @@ struct ScanView: View {
     }
     
     private var displayedEventsIndices: [Int] {
-        let allIndices = Array(0..<tagEvents.count)
-        if showAllEvents {
-            return allIndices
-        } else {
-            return Array(allIndices.prefix(3))
-        }
+        // Les trois dernières ; le reste se lit trajet par trajet, dans
+        // l'historique des validations.
+        Array(Array(0..<tagEvents.count).prefix(3))
     }
     
-    private var stationsToDisplay: [NavigoStationInfo] {
-        // 1. On récupère les événements concernés
-        let relevantEvents = showAllEvents ? tagEvents : Array(tagEvents.prefix(3))
-        
-        // 2. On mappe vers les infos de station
-        return relevantEvents.compactMap { event -> NavigoStationInfo? in
-            let locId = getKey(event, "EventLocationId") ?? ""
-            let code = getKey(event, "EventCode") ?? ""
-            let provider = getKey(event, "EventServiceProvider") ?? ""
-            let route = getKey(event, "EventRouteNumber")
-            
-            let location = interpretLocationId(locId, code, provider, route)
-            return location.isLocatable ? location : nil
-        }
-    }
     
     var body: some View {
         List {
@@ -247,14 +228,14 @@ struct ScanView: View {
                         }
                     }
                     
-                    if !showAllEvents && tagEvents.count > displayedEventsIndices.count {
-                        Button(action: {
-                            withAnimation { showAllEvents = true }
-                        }) {
+                    if tagEvents.count > displayedEventsIndices.count {
+                        NavigationLink {
+                            ValidationHistoryView(events: tagEvents, contracts: tagContracts)
+                        } label: {
                             HStack {
-                                Text("Voir tout...")
+                                Text("Voir l'historique des validations")
                                 Spacer()
-                                Text("\(tagEvents.count - displayedEventsIndices.count)")
+                                Text("\(tagEvents.count)")
                                     .foregroundColor(.gray)
                                     .font(.caption)
                             }
@@ -262,13 +243,6 @@ struct ScanView: View {
                     }
                 }
                 
-                if !stationsToDisplay.isEmpty {
-                    Section {
-                        EventsMapView(events: tagEvents, affiches: showAllEvents ? tagEvents.count : 3, contrats: tagContracts)
-                    }
-                    .listRowInsets(EdgeInsets())
-                    .listRowSeparator(.hidden)
-                }
             }
             
             if tagSpecialEvents.count > 0 {

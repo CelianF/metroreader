@@ -395,33 +395,3 @@ func interpretLocationId(_ locationIdBitString: String, _ eventCodeBitstring: St
     return station
 }
 
-func getTransitIcon(_ eventTransportMode: String, _ eventTransition: String) -> String {
-    switch (eventTransportMode) {
-    case "Bus urbain", "Noctilien":
-        return "bus.fill"
-    case "Bus interurbain":
-        return "bus.doubledecker.fill"
-    case "Train", "RER", "Train / RER":
-        // Une correspondance porte « Sortie » sans que le voyage s'arrête :
-        // c'est la voiture du milieu, ni la montée ni la descente.
-        if eventTransition.localizedCaseInsensitiveContains("correspondance") {
-            return "train.side.middle.car"
-        }
-        else if eventTransition.contains("Entrée") {
-            return "train.side.front.car"
-        }
-        else if eventTransition.contains("Sortie") {
-            return "train.side.rear.car"
-        } else {
-            return "train.side.middle.car"
-        }
-    case "Tramway":
-        return "lightrail.fill"
-    case "Métro":
-        return "tram.fill.tunnel"
-    case "Câble":
-        return "cablecar.fill"
-    default:
-        return "questionmark.circle.fill"
-    }
-}

@@ -81,24 +81,7 @@ struct ResolvedEvent {
                                            serviceProvider: self.providerId)
         var finalMode = eventCode.0
         self.lookupMode = eventCode.0
-        // Un refus n'a rien franchi. Une porte relevée tranche d'elle-même ;
-        // ailleurs, la sortie « voie publique » et l'entrée qui la suit se
-        // reconnaissent l'une l'autre ; sous forfait enfin, une entrée dans le
-        // délai d'un trajet le prolonge.
-        let instant = Self.instant(eventInfo)
-        let parLaPorte = transitionAuxPortes(eventCode.1, eventInfo)
-        if isRefus(eventInfo) {
-            self.transition = transitionRefus
-        } else if parLaPorte != eventCode.1 {
-            self.transition = parLaPorte
-        } else if sortieVersCorrespondance(transition: eventCode.1, instant: instant, suivants: suivants)
-                    || entreeApresCorrespondance(transition: eventCode.1, mode: eventCode.0, instant: instant, precedents: precedents) {
-            self.transition = correspondanceVoiePublique
-        } else if entreeDansLeDelai(eventInfo, precedents: precedents, contrats: contrats) {
-            self.transition = "Entrée (correspondance)"
-        } else {
-            self.transition = eventCode.1
-        }
+        self.transition = transitionRacontee(eventInfo, suivants: suivants, precedents: precedents, contrats: contrats)
 
         if self.location.found && finalMode == "Train" {
             let stationModes = Set(self.location.lines.map { $0.mode })

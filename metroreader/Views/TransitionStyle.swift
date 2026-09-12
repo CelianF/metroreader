@@ -33,19 +33,26 @@ enum TransitionKind {
         }
     }
 
-    /// Une correspondance n'est ni tout à fait une entrée ni une sortie : le
-    /// voyage continue, mais ailleurs. Elle se peint donc du cyan, voisin du
-    /// bleu de l'entrée sans s'y confondre. La sortie prend le vert d'un
-    /// voyage mené à son terme ; le rouge reste à ce qui arrête, les refus.
+    /// L'entrée ouvre le voyage en vert pâle, la sortie le clôt en bleu. Une
+    /// correspondance n'est ni l'une ni l'autre : le voyage continue, mais
+    /// ailleurs, et elle se peint du cyan. Le rouge reste à ce qui arrête, les
+    /// refus.
     var color: Color {
         switch self {
-        case .entree:         return .blue
+        case .entree:         return .vertPale
         case .correspondance: return .cyan
-        case .sortie:         return .green
+        case .sortie:         return .blue
         case .refus:          return .red
         case .autre:          return .purple
         }
     }
+}
+
+
+extension Color {
+    /// L'entrée : un vert adouci, qui ne se confond pas avec le vert franc d'un
+    /// titre valable dans l'encart Contrôle.
+    static let vertPale = Color(red: 0.49, green: 0.80, blue: 0.53)
 }
 
 /// Ce qu'une validation refusée raconte : rien n'a été franchi, quoi que la
@@ -265,6 +272,37 @@ private func estForfait(_ evenement: [String: Any], _ contrats: [[String: Any]])
     guard let pointeur = getKey(evenement, "EventContractPointer").flatMap({ Int($0, radix: 2) }),
           pointeur > 0, pointeur <= contrats.count else { return false }
     return getKey(contrats[pointeur - 1], "CounterContractCount") == nil
+}
+
+/// La transition telle que le trajet la raconte, et non telle que la borne l'a
+/// écrite. Un refus n'a rien franchi. Une porte relevée tranche d'elle-même ;
+/// ailleurs, la sortie « voie publique » et l'entrée qui la suit se
+/// reconnaissent l'une l'autre ; sous forfait enfin, une entrée dans le délai
+/// d'un trajet le prolonge.
+///
+/// Les pastilles et le rangement de l'historique en trajets s'en remettent
+/// tous deux à elle : une validation ne peut pas se peindre en correspondance
+/// et ouvrir un trajet à la fois.
+func transitionRacontee(_ eventInfo: [String: Any], suivants: [[String: Any]],
+                        precedents: [[String: Any]], contrats: [[String: Any]]) -> String {
+    let route = getKey(eventInfo, "EventRouteNumber").flatMap { Int($0, radix: 2) }
+    let provider = getKey(eventInfo, "EventServiceProvider").flatMap { Int($0, radix: 2) }
+    let (mode, brute) = interpretEventCode(getKey(eventInfo, "EventCode") ?? "",
+                                           isRouteNumberPresent: route != nil,
+                                           routeNumber: route,
+                                           serviceProvider: provider)
+    if isRefus(eventInfo) { return transitionRefus }
+    let parLaPorte = transitionAuxPortes(brute, eventInfo)
+    if parLaPorte != brute { return parLaPorte }
+    let instant = ResolvedEvent.instant(eventInfo)
+    if sortieVersCorrespondance(transition: brute, instant: instant, suivants: suivants)
+        || entreeApresCorrespondance(transition: brute, mode: mode, instant: instant, precedents: precedents) {
+        return correspondanceVoiePublique
+    }
+    if entreeDansLeDelai(eventInfo, precedents: precedents, contrats: contrats) {
+        return "Entrée (correspondance)"
+    }
+    return brute
 }
 
 /// Le libellé à afficher. Les deux correspondances se disent d'un même mot :

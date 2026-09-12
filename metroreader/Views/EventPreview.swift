@@ -15,16 +15,19 @@ struct EventPreview: View {
     var precedents: [[String: Any]]
     /// Les titres de la carte : une entrée sous forfait peut prolonger un trajet.
     var contrats: [[String: Any]]
+    /// Faux dans l'historique rangé par jour, où la date coiffe déjà le trajet.
+    var afficheDate: Bool
 
     // La résolution suit le journal des saisies : identifier un arrêt met à
     // jour la liste sans qu'il faille quitter l'écran.
     @ObservedObject private var entries = ManualEntries.shared
 
-    init(eventInfo: [String : Any] = [:], suivants: [[String: Any]] = [], precedents: [[String: Any]] = [], contrats: [[String: Any]] = []) {
+    init(eventInfo: [String : Any] = [:], suivants: [[String: Any]] = [], precedents: [[String: Any]] = [], contrats: [[String: Any]] = [], afficheDate: Bool = true) {
         self.eventInfo = eventInfo
         self.suivants = suivants
         self.precedents = precedents
         self.contrats = contrats
+        self.afficheDate = afficheDate
     }
 
     private var event: ResolvedEvent { ResolvedEvent(eventInfo, suivants: suivants, precedents: precedents, contrats: contrats) }
@@ -79,7 +82,9 @@ struct EventPreview: View {
                             .foregroundColor(Color.gray)
                     }
                 }
-                Text("\(interpretDate(getKey(eventInfo, "EventDateStamp") ?? "")) - \(interpretTime(getKey(eventInfo, "EventTimeStamp") ?? ""))")
+                Text(afficheDate
+                     ? "\(interpretDate(getKey(eventInfo, "EventDateStamp") ?? "")) - \(interpretTime(getKey(eventInfo, "EventTimeStamp") ?? ""))"
+                     : interpretTime(getKey(eventInfo, "EventTimeStamp") ?? ""))
                     .font(.caption)
                     .foregroundColor(Color.gray)
             }

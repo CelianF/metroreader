@@ -235,8 +235,13 @@ struct EventView: View {
                         center: center,
                         span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
                     ))) {
-                        Marker(event.location.name, systemImage: getTransitIcon(event.mode, event.transition), coordinate: center)
-                            .tint(TransitionKind(event.transition).color)
+                        if let pictogramme = pictogrammeIDFM(modeDuPictogramme(mode: event.mode, transition: event.transition)) {
+                            Marker(event.location.name, image: pictogramme, coordinate: center)
+                                .tint(TransitionKind(event.transition).color)
+                        } else {
+                            Marker(event.location.name, systemImage: "questionmark", coordinate: center)
+                                .tint(TransitionKind(event.transition).color)
+                        }
                     }
                     .frame(height: 200)
                     // La carte ne relit sa position initiale qu'à sa création :
