@@ -9,9 +9,47 @@ import SwiftUI
 
 struct EnvHolderView: View {
     var envHolderInfo: [String: Any]
+    /// Le numéro de la carte, rien quand la lecture ne l'a pas donné. Il se lit
+    /// ici plutôt que sur le visuel du pass, qu'il masquait.
+    var cardID: UInt64 = 0
+
+    /// La lettre imprimée sur la carte : A pour un Navigo Annuel, I pour un
+    /// Imagine R.
+    private var lettreDeLaCarte: String? {
+        guard let statut = getKey(envHolderInfo, "HolderDataCardStatus") else { return nil }
+        switch interpretNavigoPersonalizationStatusCode(statut) {
+        case "Navigo Annuel":    return "A"
+        case "Navigo Imagine R": return "I"
+        default:                 return nil
+        }
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if cardID != 0 {
+                HStack {
+                    Text("Numéro de carte")
+                        .fontWeight(.semibold)
+                    Spacer()
+                    Text("\(cardID)")
+                        .fontWeight(.semibold)
+                }
+
+                Divider()
+            }
+
+            if let lettre = lettreDeLaCarte {
+                HStack {
+                    Text("Lettre")
+                        .fontWeight(.semibold)
+                    Spacer()
+                    Text(lettre)
+                        .fontWeight(.semibold)
+                }
+
+                Divider()
+            }
+
             HStack {
                 Text("Version de l'app")
                     .fontWeight(.semibold)

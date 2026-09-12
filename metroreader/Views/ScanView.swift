@@ -25,6 +25,7 @@ struct ScanView: View {
     @ObservedObject var historyManager: HistoryManager
     
     @State private var showAllContracts = false
+    @State private var showAllSpecialEvents = false
     @State private var showingRenameAlert = false
     @State private var newNickname = ""
     @State private var showingImagePicker = false
@@ -48,9 +49,15 @@ struct ScanView: View {
     /// à l'autre, les deux largeurs dérivant de celle de l'écran.
     private static let echelleArrivee: CGFloat = 0.36
 
+    /// De combien la carte remonte vers la barre du haut. La liste laisse
+    /// au-dessus de sa première section une marge que `contentMargins` ne
+    /// réduit pas : sans ça, 62 pt la séparaient des boutons.
+    private static let remonteeCarte: CGFloat = 40
+
     /// De combien elle redescend en arrivant, depuis le haut où l'animation
-    /// l'avait emmenée.
-    private static let monteeArrivee: CGFloat = 150
+    /// l'avait emmenée. La carte posée plus haut, le trajet raccourcit d'autant
+    /// pour partir du même point.
+    private static let monteeArrivee: CGFloat = 150 - remonteeCarte
 
     @AppStorage(TimerSettings.control) private var controlTimerEnabled = true
     @AppStorage(TimerSettings.controlOutline) private var controlOutlineEnabled = true
@@ -123,6 +130,12 @@ struct ScanView: View {
         // l'historique des validations.
         Array(Array(0..<tagEvents.count).prefix(3))
     }
+
+    /// Les trois premiers ; déplier ajoute les autres en dessous.
+    private var displayedSpecialEventsIndices: [Int] {
+        let allIndices = Array(tagSpecialEvents.indices)
+        return showAllSpecialEvents ? allIndices : Array(allIndices.prefix(3))
+    }
     
     
     var body: some View {
@@ -145,36 +158,13 @@ struct ScanView: View {
                             .onTapGesture(count: 2) {
                                 if canPersonalize { showingImagePicker = true }
                             }
-                        VStack(alignment: .leading) {
-                            switch interpretNavigoPersonalizationStatusCode(holderCardStatus) {
-                            case "Navigo Annuel":
-                                Text("A")
-                                    .fontWeight(.medium)
-                                    .foregroundColor(Color.black)
-                                    .allowsHitTesting(false)
-                            case "Navigo Imagine R":
-                                Text("I")
-                                    .fontWeight(.medium)
-                                    .foregroundColor(Color.black)
-                                    .allowsHitTesting(false)
-                            default:
-                                Spacer(minLength: 0.0)
-                                    .allowsHitTesting(false)
-                            }
-                            if cardID != 0 {
-                                Text("\(cardID)")
-                                    .fontWeight(.medium)
-                                    .foregroundColor(Color.black)
-                                    .allowsHitTesting(false)
-                            }
-                        }
-                        .padding()
                     }
                 }
                 // La carte reprend la course là où l'écran vide l'a laissée :
                 // elle redescend du haut en grandissant jusqu'à sa taille.
                 .scaleEffect(carteEnPlace ? 1 : Self.echelleArrivee)
                 .offset(y: carteEnPlace ? 0 : -Self.monteeArrivee)
+                .padding(.top, -Self.remonteeCarte)
             ) {}
             .frame(maxWidth: .infinity)
             .listRowBackground(Color.clear)
@@ -247,11 +237,25 @@ struct ScanView: View {
             
             if tagSpecialEvents.count > 0 {
                 Section(header: Text("Evènements spéciaux")) {
-                    ForEach(tagSpecialEvents.indices, id: \.self) { i in
+                    ForEach(displayedSpecialEventsIndices, id: \.self) { i in
                         NavigationLink {
                             EventView(eventInfo: tagSpecialEvents[i], contractsInfos: tagContracts)
                         } label: {
                             EventPreview(eventInfo: tagSpecialEvents[i])
+                        }
+                    }
+
+                    if tagSpecialEvents.count > displayedSpecialEventsIndices.count {
+                        Button(action: {
+                            withAnimation { showAllSpecialEvents = true }
+                        }) {
+                            HStack {
+                                Text("Voir tout...")
+                                Spacer()
+                                Text("\(tagSpecialEvents.count - displayedSpecialEventsIndices.count)")
+                                    .foregroundColor(.gray)
+                                    .font(.caption)
+                            }
                         }
                     }
                 }
@@ -259,7 +263,7 @@ struct ScanView: View {
 
             if !tagEnvHolder.isEmpty {
                 Section(header: Text("Environnement")) {
-                    EnvHolderView(envHolderInfo: tagEnvHolder)
+                    EnvHolderView(envHolderInfo: tagEnvHolder, cardID: cardID)
                 }
             }
         }
