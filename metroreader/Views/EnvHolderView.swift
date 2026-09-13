@@ -13,13 +13,13 @@ struct EnvHolderView: View {
     /// ici plutôt que sur le visuel du pass, qu'il masquait.
     var cardID: UInt64 = 0
 
-    /// La lettre imprimée sur la carte : A pour un Navigo Annuel, I pour un
-    /// Imagine R.
-    private var lettreDeLaCarte: String? {
+    /// Ce que dit la lettre imprimée sur la carte : A pour un Navigo Annuel,
+    /// I pour un Imagine R.
+    private var typeDeLaCarte: String? {
         guard let statut = getKey(envHolderInfo, "HolderDataCardStatus") else { return nil }
         switch interpretNavigoPersonalizationStatusCode(statut) {
-        case "Navigo Annuel":    return "A"
-        case "Navigo Imagine R": return "I"
+        case "Navigo Annuel":    return "Annuel"
+        case "Navigo Imagine R": return "Imagine R"
         default:                 return nil
         }
     }
@@ -38,12 +38,12 @@ struct EnvHolderView: View {
                 Divider()
             }
 
-            if let lettre = lettreDeLaCarte {
+            if let type = typeDeLaCarte {
                 HStack {
-                    Text("Lettre")
+                    Text("Type")
                         .fontWeight(.semibold)
                     Spacer()
-                    Text(lettre)
+                    Text(type)
                         .fontWeight(.semibold)
                 }
 
