@@ -20,20 +20,22 @@ private func bits(_ octets: Data) -> String {
 }
 
 #if os(iOS)
-/// Envoie une commande et rend la réponse en bits, ou lève le mot d'état que la
+/// Un mot d'état autre que 90 00 : la carte a répondu, mais refuse la commande
+/// — application absente, enregistrement inexistant.
+private struct RefusDeLaCarte: Error {
+    let mot: UInt16
+
+    static let applicationAbsente: UInt16 = 0x6A82
+}
+
+/// Envoie une commande et rend la réponse en bits, ou lève le refus que la
 /// carte a opposé.
 private func envoyer(_ tag: NFCISO7816Tag, _ apdu: NFCISO7816APDU) async throws -> String {
     let (response, sw1, sw2) = try await tag.sendCommand(apdu: apdu)
-    switch (sw1, sw2) {
-    case (0x90, 0x00):
-        return bits(response)
-    case (0x6A, 0x82):
-        throw NSError(domain: "Application not found", code: 0x6A82, userInfo: nil)
-    case (0x6A, 0x83):
-        throw NSError(domain: "Record not found", code: 0x6A83, userInfo: nil)
-    default:
-        throw NSError(domain: "Unexpected status word", code: Int(sw1) << 8 | Int(sw2), userInfo: ["sw1": sw1, "sw2": sw2])
+    guard sw1 == 0x90 && sw2 == 0x00 else {
+        throw RefusDeLaCarte(mot: UInt16(sw1) << 8 | UInt16(sw2))
     }
+    return bits(response)
 }
 
 private func selectAID(_ tag: NFCISO7816Tag, _ aidData: Data) async throws -> String {
@@ -42,6 +44,30 @@ private func selectAID(_ tag: NFCISO7816Tag, _ aidData: Data) async throws -> St
 
 private func readRecord(_ tag: NFCISO7816Tag, _ recordId: UInt8, _ sfi: UInt8) async throws -> String {
     try await envoyer(tag, NFCISO7816APDU(data: Data([0x00, 0xB2, recordId, sfi << 3 | 4, 0x00]))!)
+}
+
+/// Lit un enregistrement que la carte peut ne pas porter. Un refus laisse
+/// l'emplacement vide et la lecture continue ; une connexion perdue, elle,
+/// interrompt tout : poursuivre donnerait une carte tronquée, présentée comme
+/// complète.
+private func lireSiPresent(_ tag: NFCISO7816Tag, _ recordId: UInt8, _ sfi: UInt8) async throws -> String? {
+    do {
+        return try await readRecord(tag, recordId, sfi)
+    } catch is RefusDeLaCarte {
+        return nil
+    }
+}
+
+/// Ce que la feuille NFC dit quand la lecture échoue. Elle se fermait jusque-là
+/// comme après un succès, sur un écran resté vide.
+private func messageDEchec(_ erreur: Error) -> String {
+    if let refus = erreur as? RefusDeLaCarte, refus.mot == RefusDeLaCarte.applicationAbsente {
+        return "Cette carte n'est pas un passe Navigo."
+    }
+    if let nfc = erreur as? NFCReaderError, nfc.code == .readerTransceiveErrorTagConnectionLost {
+        return "Passe retiré trop tôt. Réessayez en le laissant sur la cible."
+    }
+    return "Lecture impossible. Réessayez."
 }
 #endif
 
@@ -222,30 +248,21 @@ extension NFCReader: NFCTagReaderSessionDelegate {
     }
 
     func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
-        var nfcIso7816Tag: NFCISO7816Tag? = nil
-        var nfcTag: NFCTag? = nil
-
-        for tag in tags {
-            if nfcTag == nil {
-                nfcTag = tag
-            }
-            if case let .iso7816(cTag) = tag {
-                nfcIso7816Tag = cTag
-                nfcTag = tag
-            }
-        }
-
-        if nfcIso7816Tag == nil {
-            session.invalidate(errorMessage: "Card not supported: \(nfcTag.debugDescription)")
+        // Seule une carte ISO 7816 porte une application Calypso : un ticket
+        // carton ou une carte Mifare n'a rien à lire ici. La feuille l'annonçait
+        // en anglais, description de débogage comprise.
+        guard let tag = tags.first(where: { if case .iso7816 = $0 { return true } else { return false } }),
+              case let .iso7816(carte) = tag else {
+            session.invalidate(errorMessage: "Cette carte n'est pas un passe Navigo.")
             return
         }
 
-        session.connect(to: nfcTag!) { (error) in
+        session.connect(to: tag) { error in
             if error != nil {
-                return
-            }
-
-            guard let nfcIso7816Tag = nfcIso7816Tag else {
+                // La carte a bougé pendant la connexion. Sans relance, la feuille
+                // restait ouverte sans plus rien chercher jusqu'à expirer.
+                session.alertMessage = "Passe perdu. Replacez-le sur la cible."
+                session.restartPolling()
                 return
             }
 
@@ -254,108 +271,99 @@ extension NFCReader: NFCTagReaderSessionDelegate {
             // endroit pour toucher à l'état publié.
             self.isTagDetected = true
 
-            DispatchQueue.main.async {
-                Task {
-                    do {
-                        session.alertMessage = "⚪️⚪️⚪️⚪️⚪️⚪️⚪️"
-                        self.tagIcc = try await selectAID(nfcIso7816Tag, Data([0xA0, 0x00, 0x00, 0x04, 0x04, 0x01, 0x25, 0x09, 0x01, 0x01]))
-                        self.cardID = interpretCardID(self.tagIcc)
+            Task { @MainActor in
+                do {
+                    session.alertMessage = "⚪️⚪️⚪️⚪️⚪️⚪️⚪️"
+                    self.tagIcc = try await selectAID(carte, Data([0xA0, 0x00, 0x00, 0x04, 0x04, 0x01, 0x25, 0x09, 0x01, 0x01]))
+                    self.cardID = interpretCardID(self.tagIcc)
 
-                        session.alertMessage = "🔵⚪️⚪️⚪️⚪️⚪️⚪️"
-                        self.tagEnvHolder = parseStructure(bitstring: try await readRecord(nfcIso7816Tag, 1, 0x07), element: IntercodeEnvHolder).0 as! [String: Any]
+                    session.alertMessage = "🔵⚪️⚪️⚪️⚪️⚪️⚪️"
+                    self.tagEnvHolder = parseStructure(bitstring: try await readRecord(carte, 1, 0x07), element: IntercodeEnvHolder).0 as! [String: Any]
 
-                        // Counters
-                        session.alertMessage = "🔵🔵⚪️⚪️⚪️⚪️⚪️"
-                        let countersBitstring = try await readRecord(nfcIso7816Tag, 1, 0x19)
-                        var countersBitstrings: [String] = []
-                        for i in 0...3 {
-                            countersBitstrings.append(String(countersBitstring.dropFirst(i * 24).prefix(24)))
-                        }
-
-                        // Contract List
-                        session.alertMessage = "🔵🔵🔵⚪️⚪️⚪️⚪️"
-                        let contractListContainer = parseStructure(bitstring: try await readRecord(nfcIso7816Tag, 1, 0x1E), element: IntercodeContractList).0 as! [String: Any]
-                        let contractList = contractListContainer["ContractList"] as! [[String: Any]]
-
-                        // Contracts
-                        session.alertMessage = "🔵🔵🔵🔵⚪️⚪️⚪️"
-                        for i in 1...4 {
-                            do {
-                                var parsedContract = parseStructure(bitstring: try await readRecord(nfcIso7816Tag, UInt8(i), 0x09), element: IntercodeContract).0 as! [String: Any]
-                                if ((getBitmapCount(parsedContract, "ContractBitmap") ?? 0) > 0) {
-                                    if let validityJourneysBitstring = getKey(parsedContract, "ContractValidityJourneys") {
-                                        let isProprietary = validityJourneysBitstring.first == "0"
-                                        if !isProprietary {
-                                            let CounterStructureNumber = String(validityJourneysBitstring.dropFirst(1).prefix(5))
-                                            let CounterLastLoad = String(validityJourneysBitstring.suffix(8))
-
-                                            if let counterStructure = IntercodeCounters[Int(CounterStructureNumber, radix: 2) ?? 0] {
-                                                let parsedCounter = parseStructure(bitstring: countersBitstrings[i - 1], element: counterStructure).0 as! [String: Any]
-
-                                                let counterDict: [String: Any] = [
-                                                    "CounterStructureNumber": CounterStructureNumber,
-                                                    "CounterLastLoad": CounterLastLoad
-                                                ].merging(parsedCounter) { (_, new) in new }
-
-                                                parsedContract["Counter"] = counterDict
-                                            }
-                                        }
-                                    }
-                                    // L'entrée de la liste qui désigne cet emplacement porte la
-                                    // priorité du titre. Son pointeur est rangé sous
-                                    // ContractListBitmap : lu à plat, il ne répondait jamais, et
-                                    // plus aucun contrat n'avait de priorité.
-                                    if let entree = contractList.first(where: { Int(getKey($0, "ContractListPointer") ?? "", radix: 2) == i }) {
-                                        parsedContract["BetterContract"] = entree
-                                    }
-
-                                    self.tagContracts.append(parsedContract)
-                                }
-                            } catch {
-                                // Emplacement absent de la carte
-                            }
-                        }
-
-                        // Events
-                        session.alertMessage = "🔵🔵🔵🔵🔵⚪️⚪️"
-                        for i in 1...3 {
-                            let parsedEvent = parseStructure(bitstring: try await readRecord(nfcIso7816Tag, UInt8(i), 0x08), element: IntercodeEvent).0 as! [String: Any]
-                            if ((getBitmapCount(parsedEvent, "EventBitmap") ?? 0) > 0) && (interpretInt(getKey(parsedEvent, "EventContractPointer") ?? "") > 0) {
-                                self.tagEvents.append(parsedEvent)
-                            }
-                        }
-
-                        // Special Events
-                        session.alertMessage = "🔵🔵🔵🔵🔵🔵⚪️"
-                        for i in 1...3 {
-                            do {
-                                let parsedEvent = parseStructure(bitstring: try await readRecord(nfcIso7816Tag, UInt8(i), 0x1D), element: IntercodeEvent).0 as! [String: Any]
-                                if ((getBitmapCount(parsedEvent, "EventBitmap") ?? 0) > 0) {
-                                    self.tagSpecialEvents.append(parsedEvent)
-                                }
-                            } catch {
-                                // Emplacement absent de la carte
-                            }
-                        }
-                        session.alertMessage = "🔵🔵🔵🔵🔵🔵🔵"
-                        // Seul endroit qui marque la lecture complète : le
-                        // `catch` plus bas invalide aussi la session, mais sans
-                        // passer par ici, et l'abandon par l'utilisateur non plus.
-                        self.isReadComplete = true
-                        session.invalidate()
-
-                        self.historyManager?.saveScan(
-                            cardID: self.cardID,
-                            icc: self.tagIcc,
-                            env: self.tagEnvHolder,
-                            contracts: self.tagContracts,
-                            events: self.tagEvents,
-                            specialEvents: self.tagSpecialEvents
-                        )
-                    } catch {
-                        print("Lecture interrompue : \(error)")
-                        session.invalidate()
+                    // Counters
+                    session.alertMessage = "🔵🔵⚪️⚪️⚪️⚪️⚪️"
+                    let countersBitstring = try await readRecord(carte, 1, 0x19)
+                    var countersBitstrings: [String] = []
+                    for i in 0...3 {
+                        countersBitstrings.append(String(countersBitstring.dropFirst(i * 24).prefix(24)))
                     }
+
+                    // Contract List
+                    session.alertMessage = "🔵🔵🔵⚪️⚪️⚪️⚪️"
+                    let contractListContainer = parseStructure(bitstring: try await readRecord(carte, 1, 0x1E), element: IntercodeContractList).0 as! [String: Any]
+                    let contractList = contractListContainer["ContractList"] as? [[String: Any]] ?? []
+
+                    // Contracts
+                    session.alertMessage = "🔵🔵🔵🔵⚪️⚪️⚪️"
+                    for i in 1...4 {
+                        guard let contractBitstring = try await lireSiPresent(carte, UInt8(i), 0x09) else { continue }
+                        var parsedContract = parseStructure(bitstring: contractBitstring, element: IntercodeContract).0 as! [String: Any]
+                        guard (getBitmapCount(parsedContract, "ContractBitmap") ?? 0) > 0 else { continue }
+
+                        if let validityJourneysBitstring = getKey(parsedContract, "ContractValidityJourneys") {
+                            let isProprietary = validityJourneysBitstring.first == "0"
+                            if !isProprietary {
+                                let CounterStructureNumber = String(validityJourneysBitstring.dropFirst(1).prefix(5))
+                                let CounterLastLoad = String(validityJourneysBitstring.suffix(8))
+
+                                if let counterStructure = IntercodeCounters[Int(CounterStructureNumber, radix: 2) ?? 0] {
+                                    let parsedCounter = parseStructure(bitstring: countersBitstrings[i - 1], element: counterStructure).0 as! [String: Any]
+
+                                    let counterDict: [String: Any] = [
+                                        "CounterStructureNumber": CounterStructureNumber,
+                                        "CounterLastLoad": CounterLastLoad
+                                    ].merging(parsedCounter) { (_, new) in new }
+
+                                    parsedContract["Counter"] = counterDict
+                                }
+                            }
+                        }
+                        // L'entrée de la liste qui désigne cet emplacement porte la
+                        // priorité du titre. Son pointeur est rangé sous
+                        // ContractListBitmap : lu à plat, il ne répondait jamais, et
+                        // plus aucun contrat n'avait de priorité.
+                        if let entree = contractList.first(where: { Int(getKey($0, "ContractListPointer") ?? "", radix: 2) == i }) {
+                            parsedContract["BetterContract"] = entree
+                        }
+                        self.tagContracts.append(parsedContract)
+                    }
+
+                    // Events
+                    session.alertMessage = "🔵🔵🔵🔵🔵⚪️⚪️"
+                    for i in 1...3 {
+                        guard let eventBitstring = try await lireSiPresent(carte, UInt8(i), 0x08) else { continue }
+                        let parsedEvent = parseStructure(bitstring: eventBitstring, element: IntercodeEvent).0 as! [String: Any]
+                        if ((getBitmapCount(parsedEvent, "EventBitmap") ?? 0) > 0) && (interpretInt(getKey(parsedEvent, "EventContractPointer") ?? "") > 0) {
+                            self.tagEvents.append(parsedEvent)
+                        }
+                    }
+
+                    // Special Events
+                    session.alertMessage = "🔵🔵🔵🔵🔵🔵⚪️"
+                    for i in 1...3 {
+                        guard let eventBitstring = try await lireSiPresent(carte, UInt8(i), 0x1D) else { continue }
+                        let parsedEvent = parseStructure(bitstring: eventBitstring, element: IntercodeEvent).0 as! [String: Any]
+                        if ((getBitmapCount(parsedEvent, "EventBitmap") ?? 0) > 0) {
+                            self.tagSpecialEvents.append(parsedEvent)
+                        }
+                    }
+                    session.alertMessage = "🔵🔵🔵🔵🔵🔵🔵"
+                    // Seul endroit qui marque la lecture complète : le
+                    // `catch` plus bas invalide aussi la session, mais sans
+                    // passer par ici, et l'abandon par l'utilisateur non plus.
+                    self.isReadComplete = true
+                    session.invalidate()
+
+                    self.historyManager?.saveScan(
+                        cardID: self.cardID,
+                        icc: self.tagIcc,
+                        env: self.tagEnvHolder,
+                        contracts: self.tagContracts,
+                        events: self.tagEvents,
+                        specialEvents: self.tagSpecialEvents
+                    )
+                } catch {
+                    session.invalidate(errorMessage: messageDEchec(error))
                 }
             }
         }
