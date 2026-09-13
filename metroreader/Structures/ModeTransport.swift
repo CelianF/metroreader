@@ -33,6 +33,7 @@ enum ModeTransport: String, CaseIterable {
     case transilien = "Transilien"
     case ter = "TER"
     case cable = "Câble"
+    case funiculaire = "Funiculaire"
     case noctilien = "Noctilien"
     case navetteFluviale = "Navette fluviale"
 
@@ -44,10 +45,11 @@ enum ModeTransport: String, CaseIterable {
         .ruf, .ruf, .voitureLibreService, .ruf,
     ]
 
-    /// Le rail — métro, RER et trains —, qu'un même titre couvre d'un bloc.
+    /// Le rail — métro, RER et trains —, qu'un même titre couvre d'un bloc. Le
+    /// funiculaire en est : la carte l'écrit en métro, il en garde les règles.
     var estFerre: Bool {
         switch self {
-        case .metro, .rer, .trainRER, .train, .transilien, .ter:
+        case .metro, .funiculaire, .rer, .trainRER, .train, .transilien, .ter:
             return true
         case .nonSpecifie, .busUrbain, .busInterurbain, .tramway, .cable, .noctilien,
              .navetteFluviale, .parking, .consigneVelo, .voitureLibreService, .ruf:
@@ -61,7 +63,7 @@ enum ModeTransport: String, CaseIterable {
         switch self {
         case .busUrbain, .busInterurbain, .tramway, .cable:
             return true
-        case .nonSpecifie, .metro, .rer, .trainRER, .train, .transilien, .ter, .noctilien,
+        case .nonSpecifie, .metro, .funiculaire, .rer, .trainRER, .train, .transilien, .ter, .noctilien,
              .navetteFluviale, .parking, .consigneVelo, .voitureLibreService, .ruf:
             return false
         }
@@ -78,6 +80,7 @@ enum ModeTransport: String, CaseIterable {
         case .trainRER:                   return "mode_train_rer"
         case .tramway:                    return "mode_tram"
         case .metro:                      return "mode_metro"
+        case .funiculaire:                return "mode_funiculaire"
         case .cable:                      return "mode_cable"
         case .navetteFluviale:            return "mode_fluvial"
         case .nonSpecifie, .parking, .consigneVelo, .voitureLibreService, .ruf:
@@ -86,7 +89,8 @@ enum ModeTransport: String, CaseIterable {
     }
 
     /// Le rang du mode parmi les pastilles d'un arrêt : le ferré d'abord, puis
-    /// le métro, le tramway et le câble, la surface en dernier.
+    /// le métro et le funiculaire, le tramway et le câble, la surface en
+    /// dernier.
     var rangDesPastilles: Int {
         switch self {
         case .rer:             return 0
@@ -95,14 +99,15 @@ enum ModeTransport: String, CaseIterable {
         case .train:           return 3
         case .ter:             return 4
         case .metro:           return 5
-        case .tramway:         return 6
-        case .cable:           return 7
-        case .busUrbain:       return 8
-        case .busInterurbain:  return 9
-        case .noctilien:       return 10
-        case .navetteFluviale: return 11
+        case .funiculaire:     return 6
+        case .tramway:         return 7
+        case .cable:           return 8
+        case .busUrbain:       return 9
+        case .busInterurbain:  return 10
+        case .noctilien:       return 11
+        case .navetteFluviale: return 12
         case .nonSpecifie, .parking, .consigneVelo, .voitureLibreService, .ruf:
-            return 12
+            return 13
         }
     }
 
@@ -114,6 +119,7 @@ enum ModeTransport: String, CaseIterable {
         case .busUrbain, .busInterurbain:                return ("en bus", "mode_bus")
         case .noctilien:                                 return ("en Noctilien", "mode_noctilien")
         case .metro:                                     return ("en métro", "mode_metro")
+        case .funiculaire:                               return ("en funiculaire", "mode_funiculaire")
         case .rer, .trainRER, .train, .transilien, .ter: return ("en RER et train", "mode_train_rer")
         case .tramway:                                   return ("en tramway", "mode_tram")
         case .cable:                                     return ("en câble", "mode_cable")
@@ -128,7 +134,7 @@ enum ModeTransport: String, CaseIterable {
         case .busUrbain, .busInterurbain, .noctilien:    return .bus
         case .tramway:                                   return .tram
         case .cable:                                     return .cable
-        case .metro:                                     return .metro
+        case .metro, .funiculaire:                       return .metro
         case .rer, .trainRER, .train, .transilien, .ter: return .rail
         case .navetteFluviale, .nonSpecifie, .parking, .consigneVelo, .voitureLibreService, .ruf:
             return nil

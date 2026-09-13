@@ -198,13 +198,13 @@ struct PastilleDeRepere: View {
 
     /// Le fond, pris sur le dessin des SVG IDFM, 283,46 de côté : l'anneau du
     /// métro touche leurs bords ; le train et le RER sont un carré aux coins de
-    /// 63,78 ; le bus, le tram, le câble, la navette et le Noctilien, deux
-    /// barres aux bouts arrondis de 9,21.
+    /// 63,78, et le funiculaire aussi, à l'échelle près ; le bus, le tram, le
+    /// câble, la navette et le Noctilien, deux barres aux bouts arrondis de 9,21.
     private var fond: AnyShape {
         switch pictogramme {
         case "mode_metro":
             return AnyShape(Circle())
-        case "mode_train", "mode_rer", "mode_train_rer":
+        case "mode_train", "mode_rer", "mode_train_rer", "mode_funiculaire":
             return AnyShape(RoundedRectangle(cornerRadius: Self.cote * 63.78 / 283.46))
         default:
             return AnyShape(RoundedRectangle(cornerRadius: Self.cote * 9.21 / 283.46))

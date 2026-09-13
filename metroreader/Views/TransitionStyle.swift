@@ -70,9 +70,9 @@ let transitionRefus = "Refus"
 func correspondanceVersMetro(transition: String, mode: String) -> Bool {
     // Le métro en est exclu à dessein : à Denfert-Rochereau comme à Gare de
     // Lyon, c'est la borne du RER qui écrit le passage dans les deux sens,
-    // jamais celle du métro.
+    // jamais celle du métro. Le funiculaire, que la carte écrit en métro, aussi.
     guard transition == "Sortie (correspondance)", let rail = ModeTransport(rawValue: mode) else { return false }
-    return rail.estFerre && rail != .metro
+    return rail.estFerre && rail != .metro && rail != .funiculaire
 }
 
 /// La transition d'une porte SNCF relevée comme menant au métro. La borne y

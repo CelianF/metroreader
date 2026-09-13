@@ -29,7 +29,8 @@ struct ResolvedEvent {
     let lineData: NavigoLineInfo?
     let routeName: String?
     /// Le mode à afficher : celui de la carte, précisé par ce qu'on a appris de
-    /// l'arrêt et de la ligne — un train devient RER, un bus devient Noctilien.
+    /// l'arrêt et de la ligne — un train devient RER, un bus devient Noctilien,
+    /// un métro devient funiculaire.
     let mode: String
     /// Le mode tel que la carte l'encode, avant ces précisions.
     ///
@@ -105,6 +106,13 @@ struct ResolvedEvent {
             if self.location.lines.count == 1 {
                 finalRouteName = self.location.lines.first!.name
             }
+        }
+
+        // Le funiculaire de Montmartre se valide en métro : c'est son arrêt, que
+        // lui seul dessert, qui le dit.
+        if self.location.found && finalMode == ModeTransport.metro.rawValue
+            && self.location.lines.contains(where: { $0.mode == ModeTransport.funiculaire.rawValue }) {
+            finalMode = ModeTransport.funiculaire.rawValue
         }
 
         // La ligne qui porte le public_id et l'appartenance au Noctilien :

@@ -56,8 +56,11 @@ struct LineIcons: View {
                         .frame(width: size, height: size)
                         .foregroundStyle(.primary)
 
-                    ForEach(lines(for: mode), id: \.public_id) { line in
-                        PastilleLigne(line, taille: size)
+                    // Le funiculaire n'a qu'une ligne, que son symbole dit déjà.
+                    if ModeTransport(rawValue: mode) != .funiculaire {
+                        ForEach(lines(for: mode), id: \.public_id) { line in
+                            PastilleLigne(line, taille: size)
+                        }
                     }
                 }
                 // Add extra spacing between different mode groups
