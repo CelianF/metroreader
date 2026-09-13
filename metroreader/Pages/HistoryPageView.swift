@@ -73,12 +73,7 @@ struct HistoryPageView: View {
                 }
                 .onDelete { indexSet in
                     // Les index portent sur la liste affichée, pas sur l'historique
-                    let recordsToDelete = indexSet.map { unpinned[$0] }
-                    for record in recordsToDelete {
-                        if let index = historyManager.history.firstIndex(where: { $0.id == record.id }) {
-                            historyManager.deleteItems(at: IndexSet(integer: index))
-                        }
-                    }
+                    historyManager.supprimer(Set(indexSet.map { unpinned[$0].id }))
                 }
             } header: {
                 if !pinned.isEmpty {

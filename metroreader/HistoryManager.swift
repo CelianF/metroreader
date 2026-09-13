@@ -14,63 +14,41 @@ class HistoryManager: ObservableObject {
     /// Clé du réglage qui autorise l'enregistrement des scans
     static let settingKey = "isHistoryEnabled"
 
-    private let fileURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("history.json")
+    private let fileURL: URL
 
-    init() {
-        loadHistory()
+    /// Faux quand le fichier existant n'a pu être ni relu ni mis de côté :
+    /// l'écraser détruirait ce qu'il est seul à contenir.
+    private var ecrasable: Bool
+
+    /// Le fichier n'est un paramètre que pour les essais : l'app n'en a qu'un.
+    init(fileURL: URL = Persistance.documents.appendingPathComponent("history.json")) {
+        self.fileURL = fileURL
+        let lu: Persistance.Lecture<ScanRecord> = Persistance.lire(fileURL)
+        ecrasable = lu.ecrasable
+        history = lu.valeurs
     }
 
     func saveScan(cardID: UInt64, icc: String, env: [String: Any], contracts: [[String: Any]], events: [[String: Any]], specialEvents: [[String: Any]]) {
         guard UserDefaults.standard.bool(forKey: Self.settingKey) else { return }
-        
+
         // 1. Vérifier si la carte existe déjà (si cardID est présent)
         if let index = history.firstIndex(where: { $0.cardID == cardID }) {
-            
+
             // --- LOGIQUE DE FUSION ---
             var existingRecord = history[index]
-            
+
             // Mise à jour des infos de base
             existingRecord.date = Date()
             existingRecord.iccData = icc
             existingRecord.envData = try? JSONSerialization.data(withJSONObject: env)
             existingRecord.contractsData = try? JSONSerialization.data(withJSONObject: contracts)
-            
-            // Fusion des événements (éviter les doublons)
-            let oldEvents = existingRecord.events
-            let newUniqueEvents = events.filter { newEv in
-                !oldEvents.contains(where: {
-                    getKey($0, "EventDateStamp") == getKey(newEv, "EventDateStamp") &&
-                    getKey($0, "EventTimeStamp") == getKey(newEv, "EventTimeStamp") &&
-                    getKey($0, "EventCode") == getKey(newEv, "EventCode")
-                })
-            }
-            existingRecord.eventsData = try? JSONSerialization.data(withJSONObject: newUniqueEvents + oldEvents)
-            
-            let oldSpecialEvents = existingRecord.specialEvents
-            let newUniqueSpecialEvents = specialEvents.filter { newSE in
-                !oldSpecialEvents.contains(where: {
-                    getKey($0, "EventDateStamp") == getKey(newSE, "EventDateStamp") &&
-                    getKey($0, "EventTimeStamp") == getKey(newSE, "EventTimeStamp") &&
-                    getKey($0, "EventCode") == getKey(newSE, "EventCode")
-                })
-            }
-            existingRecord.specialEventsData = try? JSONSerialization.data(withJSONObject: newUniqueSpecialEvents + oldSpecialEvents)
-            
-            /* let oldContracts = existingRecord.contracts
-            let newUniqueContracts = contracts.filter { newC in
-                !oldContracts.contains(where: {
-                    getKey($0, "ContractSerialNumber") == getKey(newC, "ContractSerialNumber") &&
-                    getKey($0, "ContractTariff") == getKey(newC, "ContractTariff") &&
-                    getKey($0, "ContractValiditySaleDate") == getKey(newC, "ContractValiditySaleDate") &&
-                    getKey($0, "ContractProvider") == getKey(newC, "ContractProvider")
-                })
-            }
-            existingRecord.contractsData = try? JSONSerialization.data(withJSONObject: newUniqueContracts + oldContracts) */
-            
+            existingRecord.eventsData = try? JSONSerialization.data(withJSONObject: Self.fusionner(events, dans: existingRecord.events))
+            existingRecord.specialEventsData = try? JSONSerialization.data(withJSONObject: Self.fusionner(specialEvents, dans: existingRecord.specialEvents))
+
             // Remplacer l'ancien record et le remonter en haut de liste
             history.remove(at: index)
             history.insert(existingRecord, at: 0)
-            
+
         } else {
             // --- NOUVEAU RECORD ---
             let newRecord = ScanRecord(
@@ -87,64 +65,61 @@ class HistoryManager: ObservableObject {
             )
             history.insert(newRecord, at: 0)
         }
-        
+
         persistToDisk()
+    }
+
+    /// Les validations d'un nouveau scan, fondues dans celles qu'on avait. La
+    /// carte n'en garde que trois : ce qu'elle a oublié ne vit plus qu'ici. Une
+    /// validation relue remplace sa copie, la lecture récente étant au moins
+    /// aussi complète.
+    private static func fusionner(_ nouveaux: [[String: Any]], dans anciens: [[String: Any]]) -> [[String: Any]] {
+        nouveaux + anciens.filter { ancien in !nouveaux.contains { memeValidation($0, ancien) } }
+    }
+
+    /// Deux copies d'une même validation : même jour, même minute, même code et
+    /// même valideur. Sans le valideur, deux validations de même code passées
+    /// dans la même minute à deux bornes n'en faisaient qu'une.
+    private static func memeValidation(_ a: [String: Any], _ b: [String: Any]) -> Bool {
+        ["EventDateStamp", "EventTimeStamp", "EventCode", "EventDevice"].allSatisfy { getKey(a, $0) == getKey(b, $0) }
     }
 
     func setNickname(for cardID: UInt64, to name: String) {
         if let index = history.firstIndex(where: { $0.cardID == cardID }) {
             history[index].nickname = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            print("Set nickname for cardID \(cardID) to \(name)")
             persistToDisk()
         }
     }
-    
+
     func setImageName(for cardID: UInt64, to imageName: String) {
         if let index = history.firstIndex(where: { $0.cardID == cardID }) {
             history[index].imageName = imageName
             persistToDisk()
         }
     }
-    
+
     private func persistToDisk() {
-        if let data = try? JSONEncoder().encode(history) {
-            try? data.write(to: fileURL)
-        }
+        guard ecrasable else { return }
+        Persistance.ecrire(history, vers: fileURL)
     }
 
-    private func loadHistory() {
-        if let data = try? Data(contentsOf: fileURL),
-           let decoded = try? JSONDecoder().decode([ScanRecord].self, from: data) {
-            self.history = decoded
-        }
-    }
-    
-    func deleteItems(at offsets: IndexSet) {
-        history.remove(atOffsets: offsets)
+    /// Retire les fiches désignées, en une seule écriture.
+    func supprimer(_ ids: Set<UUID>) {
+        history.removeAll { ids.contains($0.id) }
         persistToDisk()
     }
 
     func clearAll() {
-        self.history = []
-        
-        do {
-            if FileManager.default.fileExists(atPath: fileURL.path) {
-                try FileManager.default.removeItem(at: fileURL)
-                print("History file deleted successfully.")
-            }
-        } catch {
-            print("Error deleting history file: \(error.localizedDescription)")
-        }
+        history = []
+        Persistance.effacer(fileURL)
+        // Le fichier parti, plus rien à protéger.
+        ecrasable = true
     }
+
     func togglePin(for record: ScanRecord) {
         guard let index = history.firstIndex(where: { $0.id == record.id }) else { return }
         history[index].isPinned.toggle()
-        // L'écriture disque encode tout l'historique, blobs de contrats et
-        // d'événements compris. La faire ici saccade l'animation de la liste
-        // dès qu'il y a plusieurs passes : on la sort de la transaction.
-        DispatchQueue.main.async { [weak self] in
-            self?.persistToDisk()
-        }
+        persistToDisk()
     }
 
     var sortedHistory: [ScanRecord] {

@@ -5,6 +5,7 @@ struct ContentView: View {
     @StateObject private var historyManager = HistoryManager()
     @State private var selectedTab = 0
     @State private var lastScanTabTap: Date?
+    @Environment(\.scenePhase) private var scenePhase
 
     // Deux touches rapprochées sur l'onglet Scan lancent une lecture. La
     // sélection est passée par un Binding maison parce que SwiftUI rappelle
@@ -41,7 +42,7 @@ struct ContentView: View {
                 Label("Scan", systemImage: "wave.3.forward")
             }
             .tag(0)
-            
+
             // Page 2: History
             NavigationStack {
                 HistoryPageView(historyManager: historyManager)
@@ -50,7 +51,7 @@ struct ContentView: View {
                 Label("Historique", systemImage: "clock.arrow.circlepath")
             }
             .tag(1)
-            
+
             // Page 3: Settings
             NavigationStack {
                 SettingsPageView(historyManager: historyManager)
@@ -68,8 +69,13 @@ struct ContentView: View {
         .onOpenURL { url in
             handleIncomingFile(url: url)
         }
+        .onChange(of: scenePhase) { _, phase in
+            // En arrière-plan, l'app peut être suspendue sans préavis : ce qui
+            // reste à écrire s'écrit avant.
+            if phase == .background { Persistance.attendre() }
+        }
     }
-    
+
     private func handleIncomingFile(url: URL) {
         guard url.pathExtension.lowercased() == "metropass" else { return }
         DispatchQueue.main.async {

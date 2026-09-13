@@ -110,32 +110,42 @@ struct StopReport: Identifiable, Codable, Equatable {
 /// événement, se relisent dans Réglages › Données, et s'exportent de là pour
 /// être versés au jeu de données.
 final class ManualEntries: ObservableObject {
-    static let shared = ManualEntries()
+    static let shared = ManualEntries(dossier: Persistance.documents)
 
     @Published private(set) var providers: [ProviderEntry] = []
     @Published private(set) var lines: [LineEntry] = []
     @Published private(set) var stops: [StopReport] = []
 
-    private static func documents(_ name: String) -> URL {
-        FileManager.default
-            .urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(name)
-    }
-
     // Le nom du fichier des arrêts est celui des versions précédentes : les
     // journaux déjà constitués se relisent sans migration.
-    private let stopsURL = documents("stopreports.json")
-    private let linesURL = documents("manual-lines.json")
-    private let providersURL = documents("manual-providers.json")
+    private let stopsURL: URL
+    private let linesURL: URL
+    private let providersURL: URL
+
+    // Faux pour un fichier qui existait sans pouvoir être ni relu ni mis de
+    // côté : l'écraser détruirait ce qu'il est seul à contenir.
+    private var stopsEcrasables = true
+    private var linesEcrasables = true
+    private var providersEcrasables = true
 
     private var stopIndex: [String: StopReport] = [:]
     private var lineIndex: [String: LineEntry] = [:]
     private var providerIndex: [Int: ProviderEntry] = [:]
 
-    private init() {
-        stops = Self.read(stopsURL) ?? []
-        lines = Self.read(linesURL) ?? []
-        providers = Self.read(providersURL) ?? []
+    /// Le dossier n'est un paramètre que pour les essais : l'app n'en a qu'un.
+    init(dossier: URL) {
+        stopsURL = dossier.appendingPathComponent("stopreports.json")
+        linesURL = dossier.appendingPathComponent("manual-lines.json")
+        providersURL = dossier.appendingPathComponent("manual-providers.json")
+        let arrets: Persistance.Lecture<StopReport> = Persistance.lire(stopsURL, decodeur: .iso)
+        let lignes: Persistance.Lecture<LineEntry> = Persistance.lire(linesURL, decodeur: .iso)
+        let reseaux: Persistance.Lecture<ProviderEntry> = Persistance.lire(providersURL, decodeur: .iso)
+        stopsEcrasables = arrets.ecrasable
+        linesEcrasables = lignes.ecrasable
+        providersEcrasables = reseaux.ecrasable
+        stops = arrets.valeurs
+        lines = lignes.valeurs
+        providers = reseaux.valeurs
         rebuild()
     }
 
@@ -305,19 +315,22 @@ final class ManualEntries: ObservableObject {
     func clearStops() {
         stops = []
         rebuild()
-        try? FileManager.default.removeItem(at: stopsURL)
+        Persistance.effacer(stopsURL)
+        stopsEcrasables = true
     }
 
     func clearLines() {
         lines = []
         rebuild()
-        try? FileManager.default.removeItem(at: linesURL)
+        Persistance.effacer(linesURL)
+        linesEcrasables = true
     }
 
     func clearProviders() {
         providers = []
         rebuild()
-        try? FileManager.default.removeItem(at: providersURL)
+        Persistance.effacer(providersURL)
+        providersEcrasables = true
     }
 
     func clearAll() {
@@ -354,19 +367,17 @@ final class ManualEntries: ObservableObject {
                                    uniquingKeysWith: { first, _ in first })
     }
 
-    private static func read<T: Decodable>(_ url: URL) -> [T]? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder.iso.decode([T].self, from: data)
+    private func persistStops() {
+        if stopsEcrasables { Persistance.ecrire(stops, vers: stopsURL, encodeur: .iso) }
     }
 
-    private static func write<T: Encodable>(_ values: [T], to url: URL) {
-        guard let data = try? JSONEncoder.iso.encode(values) else { return }
-        try? data.write(to: url)
+    private func persistLines() {
+        if linesEcrasables { Persistance.ecrire(lines, vers: linesURL, encodeur: .iso) }
     }
 
-    private func persistStops() { Self.write(stops, to: stopsURL) }
-    private func persistLines() { Self.write(lines, to: linesURL) }
-    private func persistProviders() { Self.write(providers, to: providersURL) }
+    private func persistProviders() {
+        if providersEcrasables { Persistance.ecrire(providers, vers: providersURL, encodeur: .iso) }
+    }
 }
 
 

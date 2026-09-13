@@ -23,6 +23,11 @@ struct ScanRecord: Identifiable, Codable {
     var eventsData: Data?
     var specialEventsData: Data?
 
+    enum CodingKeys: String, CodingKey {
+        case id, date, nickname, imageName, isPinned, cardID
+        case iccData, envData, contractsData, eventsData, specialEventsData
+    }
+
     var icc: String { iccData ?? "" }
     var envHolder: [String: Any] { decode(envData) }
     var contracts: [[String: Any]] { decodeArray(contractsData) }
@@ -36,7 +41,7 @@ struct ScanRecord: Identifiable, Codable {
         }
         return getKey(envHolder, "HolderDataCommercialID") != nil ? "\(interpretNavigoCommercialId(getKey(envHolder, "HolderDataCommercialID") ?? ""))" : "Pass inconnu (\(cardID))"
     }
-    
+
     var image: String {
         if let imageName = imageName, !imageName.isEmpty {
             return imageName
@@ -48,12 +53,12 @@ struct ScanRecord: Identifiable, Codable {
         guard let data = data else { return [:] }
         return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }
-    
+
     private func decodeArray(_ data: Data?) -> [[String: Any]] {
         guard let data = data else { return [] }
         return (try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]) ?? []
     }
-    
+
     var exportDataAsJSON: Data? {
         let dict: [String: Any] = [
             "cardID": cardID,
@@ -66,5 +71,27 @@ struct ScanRecord: Identifiable, Codable {
             "specialEvents": specialEvents
         ]
         return try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted])
+    }
+}
+
+
+extension ScanRecord {
+    /// Un champ ajouté après coup manque aux fiches déjà enregistrées, et le
+    /// décodage synthétisé, qui ignore la valeur par défaut, rejette alors la
+    /// fiche entière : c'est ainsi qu'`isPinned` a vidé les historiques au
+    /// Build 36. Tout champ nouveau se décode donc ici, avec sa valeur de repli.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        date = try c.decode(Date.self, forKey: .date)
+        nickname = try c.decodeIfPresent(String.self, forKey: .nickname)
+        imageName = try c.decodeIfPresent(String.self, forKey: .imageName)
+        isPinned = try c.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
+        cardID = try c.decode(UInt64.self, forKey: .cardID)
+        iccData = try c.decodeIfPresent(String.self, forKey: .iccData)
+        envData = try c.decodeIfPresent(Data.self, forKey: .envData)
+        contractsData = try c.decodeIfPresent(Data.self, forKey: .contractsData)
+        eventsData = try c.decodeIfPresent(Data.self, forKey: .eventsData)
+        specialEventsData = try c.decodeIfPresent(Data.self, forKey: .specialEventsData)
     }
 }
