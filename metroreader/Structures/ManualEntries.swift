@@ -116,6 +116,10 @@ final class ManualEntries: ObservableObject {
     @Published private(set) var lines: [LineEntry] = []
     @Published private(set) var stops: [StopReport] = []
 
+    /// Change à chaque modification du journal, quelle qu'elle soit : un
+    /// renommage ne change pas le nombre de saisies.
+    @Published private(set) var revision = 0
+
     // Le nom du fichier des arrêts est celui des versions précédentes : les
     // journaux déjà constitués se relisent sans migration.
     private let stopsURL: URL
@@ -365,6 +369,7 @@ final class ManualEntries: ObservableObject {
                                uniquingKeysWith: { first, _ in first })
         providerIndex = Dictionary(providers.map { ($0.providerId, $0) },
                                    uniquingKeysWith: { first, _ in first })
+        revision += 1
     }
 
     private func persistStops() {

@@ -43,9 +43,12 @@ struct EventsMapView: View {
     @State private var position: MapCameraPosition = .automatic
 
     /// Ce qui oblige à recalculer les repères : combien s'affichent, et le
-    /// journal des saisies, qui peut nommer un arrêt resté inconnu.
+    /// journal des saisies, qui peut nommer un arrêt resté inconnu. Le journal
+    /// compte par révision et non par nombre de saisies : renommer un arrêt, ou
+    /// en identifier un de nouveau, n'en change pas le nombre, et la carte
+    /// gardait l'ancien nom.
     private var cle: String {
-        "\(affiches)|\(events.count)|\(entries.stops.count)|\(entries.lines.count)|\(entries.providers.count)"
+        "\(affiches)|\(events.count)|\(entries.revision)"
     }
 
     var body: some View {
