@@ -10,6 +10,7 @@ import SwiftUI
 
 struct HistoryPageView: View {
     @ObservedObject var historyManager: HistoryManager
+    @AppStorage(HistoryManager.settingKey) private var isHistoryEnabled = false
 
     // Ligne en cours de déplacement d'une section à l'autre : elle est retirée
     // des deux listes le temps que son retrait s'anime, puis réinsérée à sa
@@ -82,6 +83,30 @@ struct HistoryPageView: View {
             } header: {
                 if !pinned.isEmpty {
                     Text("Récents")
+                }
+            }
+        }
+        .overlay {
+            // L'historique est éteint d'origine : sans ce mot, la page vide
+            // ne dit ni pourquoi elle l'est, ni ce qu'on gagnerait à l'allumer.
+            if historyManager.history.isEmpty {
+                if isHistoryEnabled {
+                    ContentUnavailableView {
+                        Label("Aucun scan", systemImage: "clock.arrow.circlepath")
+                    } description: {
+                        Text("Les cartes que tu scannes ou importes s'enregistreront ici.")
+                    }
+                } else {
+                    ContentUnavailableView {
+                        Label("Historique désactivé", systemImage: "clock.arrow.circlepath")
+                    } description: {
+                        Text("En activant l'historique, tu gardes la mémoire de tes déplacements passés et tu peux consulter tes anciens scans.")
+                    } actions: {
+                        Button("Activer l'historique") {
+                            withAnimation { isHistoryEnabled = true }
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
                 }
             }
         }

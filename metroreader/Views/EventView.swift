@@ -20,9 +20,14 @@ struct EventView: View {
     // qu'on vient d'identifier s'affiche sans quitter l'écran.
     @ObservedObject private var entries = ManualEntries.shared
     @ObservedObject private var gps = LocationProvider.shared
+    @AppStorage(LocationProvider.settingKey) private var locateOnScan = false
+    @Environment(\.openURL) private var openURL
 
     @State private var cityName: String = "Loading..."
     @State private var identifying: Identification?
+    /// La localisation vient d'être activée depuis cette fiche : la carte
+    /// reste pour le confirmer, plutôt que de disparaître sans un mot.
+    @State private var vientDActiver = false
 
     private enum Identification: Int, Identifiable {
         case stop, line, provider
@@ -119,8 +124,12 @@ struct EventView: View {
                                 // l'arrêt le plus proche est presque toujours le
                                 // bon : on le propose d'un bouton, et la liste
                                 // reste à côté pour les cas où il ne l'est pas.
+                                // Quand aucun relevé ne peut avoir lieu, la même
+                                // carte le dit et propose de l'activer.
                                 if let voisin = suggestion(pour: event) {
                                     suggestionCard(voisin, locationId: locationId, event: event)
+                                } else if localisationAActiver || vientDActiver {
+                                    activationCard(locationId: locationId)
                                 } else {
                                     identifyButton("Arrêt inconnu (\(locationId))", icon: "mappin.slash") {
                                         identifying = .stop
@@ -339,6 +348,97 @@ struct EventView: View {
         .background(RoundedRectangle(cornerRadius: 16).fill(Color.accentColor.opacity(0.10)))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.accentColor.opacity(0.35)))
         .padding(.top, 6)
+    }
+
+    /// Réglage éteint, ou refusé par iOS : aucun relevé ne viendra désigner
+    /// l'arrêt. Allumé et permis, un scan sans relevé utilisable est un scan
+    /// fait trop tard après la validation — il n'y a alors rien à activer.
+    private var localisationAActiver: Bool {
+        #if os(iOS)
+        return !locateOnScan || gps.isDeniedBySystem
+        #else
+        // Sur Mac, les cartes arrivent par import : aucun scan à localiser.
+        return false
+        #endif
+    }
+
+    /// Le pendant de la carte de suggestion quand aucune position ne désigne
+    /// l'arrêt : même encadré, mêmes deux boutons. Le relevé a lieu au scan,
+    /// pas ici — activer ne retrouve pas l'arrêt de cette validation-ci, et la
+    /// note le dit.
+    private func activationCard(locationId: Int) -> some View {
+        let refusee = gps.isDeniedBySystem
+        let activee = locateOnScan && !refusee
+        let note = if refusee {
+            "Le code \(locationId) ne figure pas au référentiel. L'accès à la position est refusé : il se rétablit dans les réglages de l'iPhone."
+        } else if activee {
+            "Localisation activée pour les prochains scans. Scanne ta carte juste après avoir validé : l'arrêt le plus proche sera proposé."
+        } else {
+            "Le code \(locationId) ne figure pas au référentiel. Avec la localisation, un scan fait juste après la validation propose l'arrêt le plus proche."
+        }
+
+        return VStack(spacing: 14) {
+            VStack(spacing: 2) {
+                Text("Arrêt inconnu")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Label("Détectable avec la localisation", systemImage: "location")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    activerLocalisation()
+                } label: {
+                    Group {
+                        if activee {
+                            Label("Activée", systemImage: "checkmark")
+                        } else {
+                            Text("Activer")
+                        }
+                    }
+                    .fontWeight(.semibold)
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(activee)
+
+                Button {
+                    identifying = .stop
+                } label: {
+                    Text("Voir la liste")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
+            .controlSize(.large)
+
+            Text(note)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.accentColor.opacity(0.10)))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.accentColor.opacity(0.35)))
+        .padding(.top, 6)
+    }
+
+    /// Allume le réglage comme le ferait Réglages › Position, invite d'iOS
+    /// comprise.
+    private func activerLocalisation() {
+        #if os(iOS)
+        // Refusée par iOS, l'app ne peut plus la redemander : seuls les
+        // réglages de l'iPhone la rétablissent.
+        if gps.isDeniedBySystem, let reglages = URL(string: UIApplication.openSettingsURLString) {
+            openURL(reglages)
+        }
+        locateOnScan = true
+        vientDActiver = true
+        gps.requestPermission()
+        #endif
     }
 
     /// L'arrêt le plus proche du relevé fait pendant le scan, quand ce relevé

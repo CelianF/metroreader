@@ -14,7 +14,7 @@ struct SettingsPageView: View {
     @AppStorage("autoLaunchScan") private var autoLaunchScan = false
     @AppStorage(ScanSettings.sansAnimation) private var sansAnimation = false
     #endif
-    @AppStorage("isHistoryEnabled") private var isHistoryEnabled = false
+    @AppStorage(HistoryManager.settingKey) private var isHistoryEnabled = false
     #if os(iOS)
     // Éteint par défaut : la valeur par défaut d'un @AppStorage n'écrit rien
     // dans UserDefaults, si bien qu'un interrupteur allumé d'origine se lisait

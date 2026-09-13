@@ -10,7 +10,10 @@ import Foundation
 
 class HistoryManager: ObservableObject {
     @Published var history: [ScanRecord] = []
-    private let isHistoryEnabledKey = "isHistoryEnabled"
+
+    /// Clé du réglage qui autorise l'enregistrement des scans
+    static let settingKey = "isHistoryEnabled"
+
     private let fileURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("history.json")
 
     init() {
@@ -18,7 +21,7 @@ class HistoryManager: ObservableObject {
     }
 
     func saveScan(cardID: UInt64, icc: String, env: [String: Any], contracts: [[String: Any]], events: [[String: Any]], specialEvents: [[String: Any]]) {
-        guard UserDefaults.standard.bool(forKey: isHistoryEnabledKey) else { return }
+        guard UserDefaults.standard.bool(forKey: Self.settingKey) else { return }
         
         // 1. Vérifier si la carte existe déjà (si cardID est présent)
         if let index = history.firstIndex(where: { $0.cardID == cardID }) {
