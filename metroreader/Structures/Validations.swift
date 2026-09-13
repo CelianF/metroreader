@@ -17,8 +17,8 @@ struct LectureValidation {
     /// La même, lue comme aux portes relevées qui mènent au métro.
     let transition: String
     let refus: Bool
-    /// L'exploitant et la course, pour reconnaître une ligne reprise. Rien quand
-    /// la carte ne les écrit pas, comme aux portes SNCF.
+    /// L'exploitant, la course et le mode, pour reconnaître une ligne reprise.
+    /// Rien quand la carte ne les écrit pas, comme aux portes SNCF.
     let ligne: LigneEmpruntee?
     /// Le titre que la validation désigne.
     let contrat: [String: Any]?
@@ -39,7 +39,7 @@ struct LectureValidation {
         self.transition = transitionAuxPortes(brute, evenement)
         self.refus = isRefus(evenement)
         if let course, let exploitant {
-            self.ligne = LigneEmpruntee(exploitant: exploitant, course: course)
+            self.ligne = LigneEmpruntee(exploitant: exploitant, course: course, mode: mode)
         } else {
             self.ligne = nil
         }
@@ -50,10 +50,19 @@ struct LectureValidation {
 }
 
 
-/// Une ligne, telle qu'un trajet la reconnaît : l'exploitant et la course.
+/// Une ligne, telle qu'un trajet la reconnaît : l'exploitant, la course et le
+/// mode.
+///
+/// La course seule ne suffit pas : la RATP numérote chaque mode à part. Le
+/// métro 13 et le T3a s'écrivent tous deux en course 13 — prendre le tram à
+/// Didot après le métro à Malakoff se lisait comme un aller-retour sur la même
+/// ligne, et non comme une correspondance. Le mode est celui que la carte
+/// encode, une fois lu par `interpretEventCode` : la course 16 écrite en métro
+/// ou en train reste le même RER A.
 struct LigneEmpruntee: Hashable {
     let exploitant: Int
     let course: Int
+    let mode: String
 }
 
 
