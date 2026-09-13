@@ -8,11 +8,6 @@ import SwiftUI
 import UIKit
 #endif
 
-/// Clé de l'interrupteur de Réglages qui fige l'écran de scan.
-enum ScanSettings {
-    static let sansAnimation = "scanSansAnimation"
-}
-
 
 struct EmptyScanView: View {
     var isScanning: Bool = false
@@ -22,9 +17,10 @@ struct EmptyScanView: View {
     let onScan: () -> Void
     let onImport: () -> Void
 
-    /// Écran figé : la cible se tient d'emblée à sa place haute, sans monter,
-    /// sans battre, et sans carte qui défile. Rien ne bouge.
-    @AppStorage(ScanSettings.sansAnimation) private var sansAnimation = false
+    /// Écran figé quand l'iPhone demande de réduire les animations
+    /// (Accessibilité › Mouvement) : la cible se tient d'emblée à sa place
+    /// haute, sans monter, sans battre, et sans carte qui défile. Rien ne bouge.
+    @Environment(\.accessibilityReduceMotion) private var sansAnimation
 
     @State private var pulse = false
 

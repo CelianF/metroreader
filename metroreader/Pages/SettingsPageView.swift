@@ -12,7 +12,6 @@ struct SettingsPageView: View {
     // This stores the preference in the phone's memory automatically
     #if os(iOS)
     @AppStorage("autoLaunchScan") private var autoLaunchScan = false
-    @AppStorage(ScanSettings.sansAnimation) private var sansAnimation = false
     #endif
     @AppStorage(HistoryManager.settingKey) private var isHistoryEnabled = false
     #if os(iOS)
@@ -51,10 +50,6 @@ struct SettingsPageView: View {
                 #if os(iOS)
                 Toggle(isOn: $autoLaunchScan) {
                     Label("Scan au démarrage", systemImage: "bolt.fill")
-                }
-
-                Toggle(isOn: $sansAnimation) {
-                    Label("Sans animation", systemImage: "livephoto.slash")
                 }
                 #endif
 
