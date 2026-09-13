@@ -301,16 +301,12 @@ extension NFCReader: NFCTagReaderSessionDelegate {
                                             }
                                         }
                                     }
-                                    let BetterContract = contractList.first(where: { contract in
-                                        if let pointerBitString = contract["ContractListPointer"] as? String,
-                                           let pointerValue = Int(pointerBitString, radix: 2) {
-                                            return pointerValue == i
-                                        }
-                                        return false
-                                    })
-                                    if let foundContract = BetterContract {
-                                        parsedContract["BetterContract"] = foundContract
-                                        self.tagContracts.append(parsedContract)
+                                    // L'entrée de la liste qui désigne cet emplacement porte la
+                                    // priorité du titre. Son pointeur est rangé sous
+                                    // ContractListBitmap : lu à plat, il ne répondait jamais, et
+                                    // plus aucun contrat n'avait de priorité.
+                                    if let entree = contractList.first(where: { Int(getKey($0, "ContractListPointer") ?? "", radix: 2) == i }) {
+                                        parsedContract["BetterContract"] = entree
                                     }
 
                                     self.tagContracts.append(parsedContract)
