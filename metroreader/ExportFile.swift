@@ -18,13 +18,16 @@ extension UTType {
 }
 
 struct ExportFile: Transferable {
-    let data: Data
     let fileName: String
+    /// Le contenu, sérialisé seulement au moment du partage. Le préparer à
+    /// chaque rendu recopiait toute la fiche en JSON indenté, pour un bouton
+    /// qu'on touche rarement.
+    let contenu: () -> Data?
 
     static var transferRepresentation: some TransferRepresentation {
-        // We use DataRepresentation because your export is in memory as 'Data'
         DataRepresentation(exportedContentType: .metropass) { item in
-            item.data
+            guard let data = item.contenu() else { throw CocoaError(.fileWriteUnknown) }
+            return data
         }
         .suggestedFileName { item in
             item.fileName.hasSuffix(".metropass") ? item.fileName : "\(item.fileName).metropass"

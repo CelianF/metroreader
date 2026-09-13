@@ -18,21 +18,71 @@ struct ScanRecord: Identifiable, Codable {
     var isPinned: Bool = false
     let cardID: UInt64
     var iccData: String?
-    var envData: Data?
-    var contractsData: Data?
-    var eventsData: Data?
-    var specialEventsData: Data?
+    var envData: Data? { didSet { decodes = Decodes() } }
+    var contractsData: Data? { didSet { decodes = Decodes() } }
+    var eventsData: Data? { didSet { decodes = Decodes() } }
+    var specialEventsData: Data? { didSet { decodes = Decodes() } }
+
+    /// Les blobs déjà décodés.
+    ///
+    /// envHolder, contracts et events repassaient par JSONSerialization à chaque
+    /// lecture, et une ligne de l'historique les lisait une dizaine de fois par
+    /// rendu : pour son titre, son image, et la fiche qu'elle prépare. Une
+    /// classe, pour qu'une lecture remplisse le cache sans muter la fiche ; un
+    /// cache neuf dès qu'un blob change, pour qu'une copie modifiée ne relise
+    /// pas l'ancien.
+    private var decodes = Decodes()
 
     enum CodingKeys: String, CodingKey {
         case id, date, nickname, imageName, isPinned, cardID
         case iccData, envData, contractsData, eventsData, specialEventsData
     }
 
+    init(id: UUID, date: Date, nickname: String?, imageName: String?, isPinned: Bool = false,
+         cardID: UInt64, iccData: String?, envData: Data?, contractsData: Data?,
+         eventsData: Data?, specialEventsData: Data?) {
+        self.id = id
+        self.date = date
+        self.nickname = nickname
+        self.imageName = imageName
+        self.isPinned = isPinned
+        self.cardID = cardID
+        self.iccData = iccData
+        self.envData = envData
+        self.contractsData = contractsData
+        self.eventsData = eventsData
+        self.specialEventsData = specialEventsData
+    }
+
     var icc: String { iccData ?? "" }
-    var envHolder: [String: Any] { decode(envData) }
-    var contracts: [[String: Any]] { decodeArray(contractsData) }
-    var events: [[String: Any]] { decodeArray(eventsData) }
-    var specialEvents: [[String: Any]] { decodeArray(specialEventsData) }
+
+    var envHolder: [String: Any] {
+        if let deja = decodes.env { return deja }
+        let lu = Self.objet(envData)
+        decodes.env = lu
+        return lu
+    }
+
+    var contracts: [[String: Any]] {
+        if let deja = decodes.contracts { return deja }
+        let lus = Self.tableau(contractsData)
+        decodes.contracts = lus
+        return lus
+    }
+
+    var events: [[String: Any]] {
+        if let deja = decodes.events { return deja }
+        let lus = Self.tableau(eventsData)
+        decodes.events = lus
+        return lus
+    }
+
+    var specialEvents: [[String: Any]] {
+        if let deja = decodes.specialEvents { return deja }
+        let lus = Self.tableau(specialEventsData)
+        decodes.specialEvents = lus
+        return lus
+    }
 
     // Titre d'affichage intelligent
     var displayTitle: String {
@@ -49,12 +99,12 @@ struct ScanRecord: Identifiable, Codable {
         return interpretNavigoImage(getKey(envHolder, "HolderDataCardStatus") ?? "", getKey(envHolder, "EnvApplicationIssuerId") ?? "", getKey(envHolder, "HolderDataCommercialID") ?? "", contracts)
     }
 
-    private func decode(_ data: Data?) -> [String: Any] {
+    private static func objet(_ data: Data?) -> [String: Any] {
         guard let data = data else { return [:] }
         return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }
 
-    private func decodeArray(_ data: Data?) -> [[String: Any]] {
+    private static func tableau(_ data: Data?) -> [[String: Any]] {
         guard let data = data else { return [] }
         return (try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]) ?? []
     }
@@ -71,6 +121,12 @@ struct ScanRecord: Identifiable, Codable {
             "specialEvents": specialEvents
         ]
         return try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted])
+    }
+
+    /// Le contenu du fichier .metropass de cette fiche, sérialisé seulement au
+    /// moment du partage.
+    var export: () -> Data? {
+        { [self] in exportDataAsJSON }
     }
 }
 
@@ -94,4 +150,13 @@ extension ScanRecord {
         eventsData = try c.decodeIfPresent(Data.self, forKey: .eventsData)
         specialEventsData = try c.decodeIfPresent(Data.self, forKey: .specialEventsData)
     }
+}
+
+
+/// Ce qu'une fiche a déjà décodé de ses blobs.
+private final class Decodes {
+    var env: [String: Any]?
+    var contracts: [[String: Any]]?
+    var events: [[String: Any]]?
+    var specialEvents: [[String: Any]]?
 }

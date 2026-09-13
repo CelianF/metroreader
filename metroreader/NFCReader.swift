@@ -136,7 +136,9 @@ class NFCReader: NSObject, ObservableObject {
     private var session: NFCTagReaderSession?
     #endif
 
-    var exportDataAsJSON: Data? {
+    /// Le fichier .metropass de la carte lue, sérialisé seulement au moment du
+    /// partage. Rien tant qu'aucune carte n'est lue.
+    var export: (() -> Data?)? {
         if tagContracts.isEmpty && tagEvents.isEmpty && tagSpecialEvents.isEmpty && cardID == 0 {
             return nil
         }
@@ -148,14 +150,10 @@ class NFCReader: NSObject, ObservableObject {
             "events": tagEvents,
             "specialEvents": tagSpecialEvents
         ]
-
-        // Safety check to ensure the dictionary can actually be made into JSON
-        guard JSONSerialization.isValidJSONObject(dict) else {
-            print("Error: Dictionary contains types that are not JSON compatible.")
-            return nil
+        return {
+            guard JSONSerialization.isValidJSONObject(dict) else { return nil }
+            return try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted])
         }
-
-        return try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted])
     }
 
     /// Ouvre un fichier .metropass, qu'il vienne du sélecteur ou d'une autre app.

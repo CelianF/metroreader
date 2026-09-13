@@ -26,7 +26,7 @@ struct ScanPageView: View {
     var body: some View {
         Group {
             if hasCard {
-                ScanView(cardID: nfcReader.cardID, tagIcc: nfcReader.tagIcc, tagEnvHolder: nfcReader.tagEnvHolder, tagContracts: nfcReader.tagContracts, tagEvents: nfcReader.tagEvents, tagSpecialEvents: nfcReader.tagSpecialEvents, exportDataAsJSON: nfcReader.exportDataAsJSON, historyManager: historyManager)
+                ScanView(cardID: nfcReader.cardID, tagIcc: nfcReader.tagIcc, tagEnvHolder: nfcReader.tagEnvHolder, tagContracts: nfcReader.tagContracts, tagEvents: nfcReader.tagEvents, tagSpecialEvents: nfcReader.tagSpecialEvents, export: nfcReader.export, historyManager: historyManager)
             } else {
                 EmptyScanView(
                     isScanning: nfcReader.isScanning,

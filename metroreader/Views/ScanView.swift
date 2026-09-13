@@ -14,7 +14,8 @@ struct ScanView: View {
     let tagContracts: [[String: Any]]
     let tagEvents: [[String: Any]]
     let tagSpecialEvents: [[String: Any]]
-    var exportDataAsJSON: Data?
+    /// Le contenu du fichier .metropass, préparé seulement au partage.
+    var export: (() -> Data?)?
 
     /// Vrai quand la fiche vient de l'historique. Le contrôle se juge à
     /// l'instant où l'on est devant l'agent : sur un scan d'il y a trois jours,
@@ -153,6 +154,23 @@ struct ScanView: View {
     }
     
     
+    /// Le coin droit sur iPhone ; ailleurs, le système place.
+    private static var placementDesActions: ToolbarItemPlacement {
+        #if os(iOS)
+        return .topBarTrailing
+        #else
+        return .automatic
+        #endif
+    }
+
+    /// Le jour qui nomme le fichier exporté, formaté par un seul formateur plutôt
+    /// que par un neuf à chaque rendu.
+    private static let jourDExport: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate]
+        return formatter
+    }()
+
     var body: some View {
         List {
             Section(header:
@@ -298,7 +316,7 @@ struct ScanView: View {
                     tagContracts: fiche.contracts,
                     tagEvents: fiche.events,
                     tagSpecialEvents: fiche.specialEvents,
-                    exportDataAsJSON: fiche.exportDataAsJSON,
+                    export: fiche.export,
                     depuisHistorique: true,
                     historyManager: historyManager
                 )
@@ -315,8 +333,8 @@ struct ScanView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 if cardID != 0 {
-                    let record = historyManager.history.first(where: { $0.cardID == Int(cardID) })
-                    
+                    let record = historyManager.history.first(where: { $0.cardID == cardID })
+
                     Text(record?.displayTitle ?? "")
                         .font(.headline)
                         // Détection du double-clic sur le titre
@@ -326,16 +344,17 @@ struct ScanView: View {
                             let impactMed = UIImpactFeedbackGenerator(style: .medium)
                             impactMed.impactOccurred()
                             #endif
-                            
+
                             newNickname = record?.nickname ?? ""
                             showingRenameAlert = true
                         }
                         .help(canPersonalize ? "Double-cliquez pour renommer" : "")
                 }
             }
-            
-            #if os(iOS)
-            ToolbarItemGroup(placement: .topBarTrailing) {
+
+            // Les mêmes actions sur iPhone et sur Mac, recopiées jusque-là pour
+            // un seul emplacement qui change.
+            ToolbarItemGroup(placement: Self.placementDesActions) {
                 if canPersonalize {
                     Menu {
                         Button(action: {
@@ -352,46 +371,10 @@ struct ScanView: View {
                         Label("Modifier le pass", systemImage: "square.and.pencil")
                     }
                 }
-                
-                if !tagEnvHolder.isEmpty, let jsonData = exportDataAsJSON {
-                    let dateStr = ISO8601DateFormatter().string(from: Date()).prefix(10)
-                    let fileName = "\(cardID)_\(dateStr).metropass"
-                    
-                    ShareLink(
-                        item: ExportFile(data: jsonData, fileName: fileName),
-                        preview: SharePreview("Données Navigo \(cardID)")
-                    )
-                } else {
-                    // Optional: Disabled placeholder so the UI doesn't "jump"
-                    Label("Exporter", systemImage: "square.and.arrow.up")
-                        .opacity(0.5)
-                }
-            }
-            #else
-            ToolbarItemGroup {
-                if canPersonalize {
-                    Menu {
-                        Button(action: {
-                            newNickname = historyManager.history.first(where: { $0.cardID == cardID })?.nickname ?? ""
-                            showingRenameAlert = true
-                        }) {
-                            Label("Renommer le pass", systemImage: "pencil")
-                        }
 
-                        Button(action: { showingImagePicker = true }) {
-                            Label("Changer l'image", systemImage: "photo.on.rectangle")
-                        }
-                    } label: {
-                        Label("Modifier le pass", systemImage: "square.and.pencil")
-                    }
-                }
-                
-                if !tagEnvHolder.isEmpty, let jsonData = exportDataAsJSON {
-                    let dateStr = ISO8601DateFormatter().string(from: Date()).prefix(10)
-                    let fileName = "\(cardID)_\(dateStr).metropass"
-                    
+                if !tagEnvHolder.isEmpty, let export {
                     ShareLink(
-                        item: ExportFile(data: jsonData, fileName: fileName),
+                        item: ExportFile(fileName: "\(cardID)_\(Self.jourDExport.string(from: Date())).metropass", contenu: export),
                         preview: SharePreview("Données Navigo \(cardID)")
                     )
                 } else {
@@ -400,7 +383,6 @@ struct ScanView: View {
                         .opacity(0.5)
                 }
             }
-            #endif
         }
         .sheet(isPresented: $showingImagePicker) {
             ImagePickerSheet(cardID: cardID, historyManager: historyManager)

@@ -26,7 +26,7 @@ struct HistoryRowButton: View {
                 tagContracts: record.contracts,
                 tagEvents: record.events,
                 tagSpecialEvents: record.specialEvents,
-                exportDataAsJSON: record.exportDataAsJSON,
+                export: record.export,
                 depuisHistorique: true,
                 historyManager: historyManager
             )
