@@ -203,8 +203,7 @@ struct PassTimers {
             // de correspondance : en sortir, c'est entrer dans le métro.
             let transition = transitionAuxPortes(brute, event)
 
-            let pointer = interpretInt(getKey(event, "EventContractPointer") ?? "")
-            let contract = (pointer > 0 && pointer <= contracts.count) ? contracts[pointer - 1] : nil
+            let contract = contratDesigne(par: event, parmi: contracts)
 
             return TimedEvent(date: date, mode: mode, kind: Kind(transition: transition),
                               transition: transition, contract: contract)

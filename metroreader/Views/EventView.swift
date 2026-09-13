@@ -168,8 +168,8 @@ struct EventView: View {
             
             Section {
                 VStack(alignment: .leading, spacing: 10) {
-                    if interpretInt(getKey(eventInfo, "EventContractPointer") ?? "") <= contractsInfos.count && interpretInt(getKey(eventInfo, "EventContractPointer") ?? "") > 0 {
-                        Text("Payé avec \(interpretTariff(getKey(contractsInfos[interpretInt(getKey(eventInfo, "EventContractPointer") ?? "") - 1], "ContractTariff") ?? "", getKey(contractsInfos[interpretInt(getKey(eventInfo, "EventContractPointer") ?? "") - 1], "ContractValidityEndDate") ?? ""))")
+                    if let contrat = contratDesigne(par: eventInfo, parmi: contractsInfos) {
+                        Text("Payé avec \(interpretTariff(getKey(contrat, "ContractTariff") ?? "", getKey(contrat, "ContractValidityEndDate") ?? ""))")
                             .fontWeight(.semibold)
                     }
                     else {

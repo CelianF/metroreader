@@ -269,9 +269,8 @@ private func cleDeLigne(_ evenement: [String: Any]) -> String? {
 /// Le titre payé n'est pas un ticket à l'unité : un forfait, ou Liberté+, qui
 /// ne porte pas de compteur. Faute de titre désigné, on ne se prononce pas.
 private func estForfait(_ evenement: [String: Any], _ contrats: [[String: Any]]) -> Bool {
-    guard let pointeur = getKey(evenement, "EventContractPointer").flatMap({ Int($0, radix: 2) }),
-          pointeur > 0, pointeur <= contrats.count else { return false }
-    return getKey(contrats[pointeur - 1], "CounterContractCount") == nil
+    guard let contrat = contratDesigne(par: evenement, parmi: contrats) else { return false }
+    return getKey(contrat, "CounterContractCount") == nil
 }
 
 /// La transition telle que le trajet la raconte, et non telle que la borne l'a

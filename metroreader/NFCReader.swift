@@ -318,6 +318,7 @@ extension NFCReader: NFCTagReaderSessionDelegate {
                                 }
                             }
                         }
+                        parsedContract[cleEmplacementContrat] = String(i, radix: 2)
                         // L'entrée de la liste qui désigne cet emplacement porte la
                         // priorité du titre. Son pointeur est rangé sous
                         // ContractListBitmap : lu à plat, il ne répondait jamais, et
@@ -347,6 +348,11 @@ extension NFCReader: NFCTagReaderSessionDelegate {
                             self.tagSpecialEvents.append(parsedEvent)
                         }
                     }
+                    // Chaque validation garde une copie du titre qu'elle désigne, tel que
+                    // la carte le porte maintenant : relue plus tard dans une fiche
+                    // d'historique, elle ne dépendra plus des contrats d'un scan suivant.
+                    self.tagEvents = self.tagEvents.map { figerContratPaye($0, parmi: self.tagContracts) }
+                    self.tagSpecialEvents = self.tagSpecialEvents.map { figerContratPaye($0, parmi: self.tagContracts) }
                     session.alertMessage = "🔵🔵🔵🔵🔵🔵🔵"
                     // Seul endroit qui marque la lecture complète : le
                     // `catch` plus bas invalide aussi la session, mais sans
