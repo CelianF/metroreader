@@ -186,24 +186,14 @@ struct PassTimers {
 
     init(contracts: [[String: Any]], events: [[String: Any]]) {
         // Les événements arrivent de la carte du plus récent au plus ancien.
-        let parsed: [TimedEvent] = events.compactMap { event in
-            guard let dateBits = getKey(event, "EventDateStamp") else { return nil }
-            let date = interpretEventInstant(dateBits, getKey(event, "EventTimeStamp") ?? "")
-
-            let routeNumber = getKey(event, "EventRouteNumber").flatMap { Int($0, radix: 2) }
-            let provider = getKey(event, "EventServiceProvider").flatMap { Int($0, radix: 2) }
-            let (mode, brute) = interpretEventCode(getKey(event, "EventCode") ?? "",
-                                                   isRouteNumberPresent: routeNumber != nil,
-                                                   routeNumber: routeNumber,
-                                                   serviceProvider: provider)
+        let validations = Validations(events, contrats: contracts)
+        let parsed: [TimedEvent] = events.indices.compactMap { i in
+            let lue = validations[i]
+            guard let date = lue.instant else { return nil }
             // Une porte SNCF relevée comme menant au métro vaut une porte RATP
             // de correspondance : en sortir, c'est entrer dans le métro.
-            let transition = transitionAuxPortes(brute, event)
-
-            let contract = contratDesigne(par: event, parmi: contracts)
-
-            return TimedEvent(date: date, mode: mode, kind: Kind(transition: transition),
-                              transition: transition, contract: contract)
+            return TimedEvent(date: date, mode: lue.mode, kind: Kind(transition: lue.transition),
+                              transition: lue.transition, contract: lue.contrat)
         }
 
         alreadyValidated = Self.alreadyValidatedTimer(parsed)

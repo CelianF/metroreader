@@ -47,12 +47,11 @@ struct ResolvedEvent {
     /// qui prolonge un trajet sous forfait se dit « Entrée (correspondance) ».
     let transition: String
 
-    /// `suivants` et `precedents` : les validations écrites après et avant
-    /// celle-ci, telles que la carte les range — de la plus récente à la plus
-    /// ancienne. Sans elles, une sortie « voie publique » reste une sortie, et
-    /// l'entrée une entrée. `contrats` : les titres de la carte, qui disent si
-    /// l'entrée a été payée sous forfait.
-    init(_ eventInfo: [String: Any], suivants: [[String: Any]] = [], precedents: [[String: Any]] = [], contrats: [[String: Any]] = []) {
+    /// `transition` : ce que le trajet raconte de cette validation, que seules
+    /// ses voisines permettent de dire — la liste qui les connaît la tire de
+    /// `Validations`. Sans elle, c'est celle d'une validation lue seule : une
+    /// sortie « voie publique » y reste une sortie.
+    init(_ eventInfo: [String: Any], transition: String? = nil) {
         let routeBits = getKey(eventInfo, "EventRouteNumber")
         let codeBits = getKey(eventInfo, "EventCode") ?? ""
         var providerBits = getKey(eventInfo, "EventServiceProvider") ?? ""
@@ -77,7 +76,7 @@ struct ResolvedEvent {
                                            serviceProvider: self.providerId)
         var finalMode = eventCode.0
         self.lookupMode = eventCode.0
-        self.transition = transitionRacontee(eventInfo, suivants: suivants, precedents: precedents, contrats: contrats)
+        self.transition = transition ?? Validations([eventInfo], contrats: []).transition(de: 0)
 
         // Une seule résolution de ligne pour tout l'écran. Le nom affiché, la
         // pastille et le public_id venaient de trois chemins — une table codée

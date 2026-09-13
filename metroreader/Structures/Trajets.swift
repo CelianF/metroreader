@@ -79,12 +79,10 @@ func trajetsParJour(_ events: [[String: Any]], contrats: [[String: Any]]) -> [Jo
     var trajets: [(debut: Date, dernier: Date, indices: [Int])] = []
     // La carte range ses événements du plus récent au plus ancien : on la lit
     // à rebours pour les prendre dans l'ordre.
+    let validations = Validations(events, contrats: contrats)
     for i in events.indices.reversed() {
-        guard let date = ResolvedEvent.instant(events[i]) else { continue }
-        let transition = transitionRacontee(events[i],
-                                            suivants: Array(events[..<i]),
-                                            precedents: Array(events[(i + 1)...]),
-                                            contrats: contrats)
+        guard let date = validations[i].instant else { continue }
+        let transition = validations.transition(de: i)
         let ouvre = TransitionKind(transition) == .entree || transition == "Validation"
         if !ouvre, let courant = trajets.last, date.timeIntervalSince(courant.dernier) <= ecartMaximal {
             trajets[trajets.count - 1].indices.append(i)

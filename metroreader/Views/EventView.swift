@@ -10,10 +10,9 @@ import MapKit
 
 struct EventView: View {
     var eventInfo: [String: Any] = [:]
-    /// Les validations écrites après et avant celle-ci : elles disent si une
-    /// sortie ou une entrée « voie publique » formaient une correspondance.
-    var suivants: [[String: Any]] = []
-    var precedents: [[String: Any]] = []
+    /// La transition que le trajet raconte, tirée par la liste de `Validations`,
+    /// qui connaît les voisines ; rien pour une validation lue seule.
+    var transition: String?
     var contractsInfos: [[String: Any]] = []
 
     // La résolution est refaite à chaque rendu et le journal est observé : ce
@@ -34,14 +33,13 @@ struct EventView: View {
         var id: Int { rawValue }
     }
 
-    init(eventInfo: [String: Any] = [:], suivants: [[String: Any]] = [], precedents: [[String: Any]] = [], contractsInfos: [[String: Any]] = []) {
+    init(eventInfo: [String: Any] = [:], transition: String? = nil, contractsInfos: [[String: Any]] = []) {
         self.eventInfo = eventInfo
-        self.suivants = suivants
-        self.precedents = precedents
+        self.transition = transition
         self.contractsInfos = contractsInfos
     }
 
-    private var event: ResolvedEvent { ResolvedEvent(eventInfo, suivants: suivants, precedents: precedents, contrats: contractsInfos) }
+    private var event: ResolvedEvent { ResolvedEvent(eventInfo, transition: transition) }
 
     private var eventInstant: Date? { ResolvedEvent.instant(eventInfo) }
 

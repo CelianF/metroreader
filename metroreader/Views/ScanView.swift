@@ -172,6 +172,9 @@ struct ScanView: View {
     }()
 
     var body: some View {
+        // Une lecture des validations pour toute la fiche : chaque ligne y puise
+        // sa transition sans relire les autres.
+        let validations = Validations(tagEvents, contrats: tagContracts)
         List {
             Section(header:
                 ZStack(alignment: .bottomLeading) {
@@ -242,13 +245,10 @@ struct ScanView: View {
             if tagEvents.count > 0 {
                 Section(header: Text("Derniers évènements")) {
                     ForEach(displayedEventsIndices, id: \.self) { i in
-                        // La carte range ses événements du plus récent au plus
-                        // ancien : ceux qui précèdent dans la liste ont suivi,
-                        // ceux qui viennent après ont précédé.
                         NavigationLink {
-                            EventView(eventInfo: tagEvents[i], suivants: Array(tagEvents[..<i]), precedents: Array(tagEvents[(i + 1)...]), contractsInfos: tagContracts)
+                            EventView(eventInfo: tagEvents[i], transition: validations.transition(de: i), contractsInfos: tagContracts)
                         } label: {
-                            EventPreview(eventInfo: tagEvents[i], suivants: Array(tagEvents[..<i]), precedents: Array(tagEvents[(i + 1)...]), contrats: tagContracts)
+                            EventPreview(eventInfo: tagEvents[i], transition: validations.transition(de: i))
                         }
                     }
                     

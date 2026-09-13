@@ -9,12 +9,9 @@ import SwiftUI
 
 struct EventPreview: View {
     var eventInfo: [String: Any]
-    /// Les validations écrites après et avant celle-ci : elles disent si une
-    /// sortie ou une entrée « voie publique » formaient une correspondance.
-    var suivants: [[String: Any]]
-    var precedents: [[String: Any]]
-    /// Les titres de la carte : une entrée sous forfait peut prolonger un trajet.
-    var contrats: [[String: Any]]
+    /// La transition que le trajet raconte, tirée par la liste de `Validations`,
+    /// qui connaît les voisines ; rien pour une validation lue seule.
+    var transition: String?
     /// Faux dans l'historique rangé par jour, où la date coiffe déjà le trajet.
     var afficheDate: Bool
 
@@ -22,15 +19,13 @@ struct EventPreview: View {
     // jour la liste sans qu'il faille quitter l'écran.
     @ObservedObject private var entries = ManualEntries.shared
 
-    init(eventInfo: [String : Any] = [:], suivants: [[String: Any]] = [], precedents: [[String: Any]] = [], contrats: [[String: Any]] = [], afficheDate: Bool = true) {
+    init(eventInfo: [String : Any] = [:], transition: String? = nil, afficheDate: Bool = true) {
         self.eventInfo = eventInfo
-        self.suivants = suivants
-        self.precedents = precedents
-        self.contrats = contrats
+        self.transition = transition
         self.afficheDate = afficheDate
     }
 
-    private var event: ResolvedEvent { ResolvedEvent(eventInfo, suivants: suivants, precedents: precedents, contrats: contrats) }
+    private var event: ResolvedEvent { ResolvedEvent(eventInfo, transition: transition) }
 
     var body: some View {
         let event = self.event
@@ -40,7 +35,7 @@ struct EventPreview: View {
                 if event.location.found {
                     Text("\(event.location.name)")
                         .fontWeight(.bold)
-                    
+
                     HStack(spacing: 0) {
                         Text("\(event.mode)")
                             .font(.caption)
@@ -88,10 +83,10 @@ struct EventPreview: View {
                     .font(.caption)
                     .foregroundColor(Color.gray)
             }
-            
+
             Spacer()
         }
-        
+
     }
 }
 

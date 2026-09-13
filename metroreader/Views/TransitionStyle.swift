@@ -117,12 +117,12 @@ let correspondanceVoiePublique = "Correspondance (voie publique)"
 /// est souvent la première validation du trajet : elle ne se lit comme
 /// correspondance que si une telle sortie la précède — voir
 /// `entreeApresCorrespondance`.
-func sortieVersCorrespondance(transition: String, instant: Date?, suivants: [[String: Any]]) -> Bool {
-    guard transition == "Sortie (voie publique)", let instant else { return false }
+func sortieVersCorrespondance(_ lue: LectureValidation, suivants: some Collection<LectureValidation>) -> Bool {
+    guard lue.brute == "Sortie (voie publique)", let instant = lue.instant else { return false }
     return suivants.contains { suivant in
-        guard let date = ResolvedEvent.instant(suivant) else { return false }
+        guard let date = suivant.instant else { return false }
         let ecart = date.timeIntervalSince(instant)
-        return ecart >= 0 && ecart <= delaiCorrespondance && estEntreeFerree(lecture(suivant))
+        return ecart >= 0 && ecart <= delaiCorrespondance && estEntreeFerree(suivant.mode, suivant.transition)
     }
 }
 
@@ -134,31 +134,20 @@ func sortieVersCorrespondance(transition: String, instant: Date?, suivants: [[St
 /// ancienne comme la carte les range. La sortie doit venir avant toute autre
 /// entrée ferrée : une entrée intermédiaire aurait déjà formé la paire, et
 /// celle-ci recommence un trajet.
-func entreeApresCorrespondance(transition: String, mode: String, instant: Date?, precedents: [[String: Any]]) -> Bool {
-    guard let instant, estEntreeFerree((mode, transition)) else { return false }
+func entreeApresCorrespondance(transition: String, mode: String, instant: Date?,
+                               precedents: some Collection<LectureValidation>) -> Bool {
+    guard let instant, estEntreeFerree(mode, transition) else { return false }
     for precedent in precedents {
-        guard let date = ResolvedEvent.instant(precedent),
+        guard let date = precedent.instant,
               instant.timeIntervalSince(date) <= delaiCorrespondance else { return false }
-        let lu = lecture(precedent)
-        if lu.transition == "Sortie (voie publique)" { return true }
-        if estEntreeFerree(lu) { return false }
+        if precedent.transition == "Sortie (voie publique)" { return true }
+        if estEntreeFerree(precedent.mode, precedent.transition) { return false }
     }
     return false
 }
 
-/// Le mode et la transition d'un événement voisin, tels que la carte les encode.
-private func lecture(_ evenement: [String: Any]) -> (mode: String, transition: String) {
-    let route = getKey(evenement, "EventRouteNumber").flatMap { Int($0, radix: 2) }
-    let provider = getKey(evenement, "EventServiceProvider").flatMap { Int($0, radix: 2) }
-    let (mode, transition) = interpretEventCode(getKey(evenement, "EventCode") ?? "",
-                                                isRouteNumberPresent: route != nil,
-                                                routeNumber: route,
-                                                serviceProvider: provider)
-    return (mode, transitionAuxPortes(transition, evenement))
-}
-
-private func estEntreeFerree(_ lu: (mode: String, transition: String)) -> Bool {
-    ferre(lu.mode) && (lu.transition.hasPrefix("Entrée") || lu.transition == "Validation")
+private func estEntreeFerree(_ mode: String, _ transition: String) -> Bool {
+    ferre(mode) && (transition.hasPrefix("Entrée") || transition == "Validation")
 }
 
 /// Les modes de surface, ceux du ticket Bus-Tram.
@@ -190,16 +179,15 @@ private let delaiSurface: TimeInterval = 90 * 60
 /// l'aller-retour n'est pas une correspondance. Les tickets à l'unité — ceux
 /// qui portent un compteur — en sont exclus, puisqu'un changement de réseau y
 /// réclame un autre ticket.
-func entreeDansLeDelai(_ eventInfo: [String: Any], precedents: [[String: Any]], contrats: [[String: Any]]) -> Bool {
-    guard !isRefus(eventInfo), entreeDeVoyage(eventInfo) != nil,
-          let instant = ResolvedEvent.instant(eventInfo) else { return false }
+func entreeDansLeDelai(_ lue: LectureValidation, precedents: some Collection<LectureValidation>) -> Bool {
+    guard !lue.refus, entreeDeVoyage(lue), let instant = lue.instant else { return false }
 
     // Deux validations séparées de plus de 2 h ne tiennent dans aucun trajet :
     // on ne remonte pas au-delà du premier écart de cette taille.
-    var fenetre = [eventInfo]
+    var fenetre = [lue]
     var plusRecente = instant
     for precedent in precedents {
-        guard let date = ResolvedEvent.instant(precedent),
+        guard let date = precedent.instant,
               plusRecente.timeIntervalSince(date) <= delaiRail else { break }
         fenetre.append(precedent)
         plusRecente = date
@@ -208,28 +196,26 @@ func entreeDansLeDelai(_ eventInfo: [String: Any], precedents: [[String: Any]], 
     // Puis on rejoue les entrées dans l'ordre, trajet par trajet. La dernière
     // est celle qu'on juge.
     let chrono = Array(fenetre.reversed())
-    var trajet: (debut: Date, depuisLeRail: Bool, forfait: Bool, lignes: Set<String>,
+    var trajet: (debut: Date, depuisLeRail: Bool, forfait: Bool, lignes: Set<LigneEmpruntee>,
                  changements: Int, dansLeRail: Bool)?
     var prolongee = false
     for (k, evenement) in chrono.enumerated() {
-        guard !isRefus(evenement), let date = ResolvedEvent.instant(evenement),
-              let lu = entreeDeVoyage(evenement) else { continue }
-        let rail = ferre(lu.mode)
-        let ligne = cleDeLigne(evenement)
-        let forfait = estForfait(evenement, contrats)
+        guard !evenement.refus, let date = evenement.instant, entreeDeVoyage(evenement) else { continue }
+        let rail = ferre(evenement.mode)
+        let ligne = evenement.ligne
         // Ce que les portes ou la voie publique disent déjà correspondance est
         // un passage dans le rail : il prolonge le trajet sans compter pour un
         // changement.
-        let dejaDite = lu.transition.localizedCaseInsensitiveContains("correspondance")
-            || entreeApresCorrespondance(transition: lu.transition, mode: lu.mode, instant: date,
-                                         precedents: Array(chrono[..<k].reversed()))
+        let dejaDite = evenement.transition.localizedCaseInsensitiveContains("correspondance")
+            || entreeApresCorrespondance(transition: evenement.transition, mode: evenement.mode, instant: date,
+                                         precedents: chrono[..<k].reversed())
         var prolonge = false
         var change = false
         if let t = trajet, date.timeIntervalSince(t.debut) <= (t.depuisLeRail ? delaiRail : delaiSurface) {
             if dejaDite {
                 prolonge = true
-            } else if t.forfait, forfait, !(ligne.map { t.lignes.contains($0) } ?? false) {
-                if t.dansLeRail && ModeTransport(rawValue: lu.mode) == .train {
+            } else if t.forfait, evenement.forfait, !(ligne.map { t.lignes.contains($0) } ?? false) {
+                if t.dansLeRail && ModeTransport(rawValue: evenement.mode) == .train {
                     prolonge = true
                 } else if !(t.dansLeRail && rail) {
                     change = true
@@ -242,36 +228,18 @@ func entreeDansLeDelai(_ eventInfo: [String: Any], precedents: [[String: Any]], 
             if change { trajet?.changements += 1 }
             trajet?.dansLeRail = rail
         } else {
-            trajet = (debut: date, depuisLeRail: rail, forfait: forfait, lignes: Set([ligne].compactMap { $0 }),
-                      changements: 0, dansLeRail: rail)
+            trajet = (debut: date, depuisLeRail: rail, forfait: evenement.forfait,
+                      lignes: Set([ligne].compactMap { $0 }), changements: 0, dansLeRail: rail)
         }
         prolongee = prolonge && !dejaDite
     }
     return prolongee
 }
 
-/// Le mode et la transition d'une entrée en voyage — métro, RER, train, bus,
-/// tram ou câble —, rien pour le reste.
-private func entreeDeVoyage(_ evenement: [String: Any]) -> (mode: String, transition: String)? {
-    let lu = lecture(evenement)
-    guard lu.transition.hasPrefix("Entrée") || lu.transition == "Validation",
-          ferre(lu.mode) || surface(lu.mode) else { return nil }
-    return lu
-}
-
-/// L'exploitant et la course, pour reconnaître une ligne reprise. Rien quand la
-/// carte ne les écrit pas, comme aux portes SNCF.
-private func cleDeLigne(_ evenement: [String: Any]) -> String? {
-    guard let course = getKey(evenement, "EventRouteNumber").flatMap({ Int($0, radix: 2) }),
-          let exploitant = getKey(evenement, "EventServiceProvider").flatMap({ Int($0, radix: 2) }) else { return nil }
-    return "\(exploitant)|\(course)"
-}
-
-/// Le titre payé n'est pas un ticket à l'unité : un forfait, ou Liberté+, qui
-/// ne porte pas de compteur. Faute de titre désigné, on ne se prononce pas.
-private func estForfait(_ evenement: [String: Any], _ contrats: [[String: Any]]) -> Bool {
-    guard let contrat = contratDesigne(par: evenement, parmi: contrats) else { return false }
-    return getKey(contrat, "CounterContractCount") == nil
+/// Une entrée en voyage — métro, RER, train, bus, tram ou câble.
+private func entreeDeVoyage(_ lue: LectureValidation) -> Bool {
+    (lue.transition.hasPrefix("Entrée") || lue.transition == "Validation")
+        && (ferre(lue.mode) || surface(lue.mode))
 }
 
 /// La transition telle que le trajet la raconte, et non telle que la borne l'a
@@ -283,26 +251,18 @@ private func estForfait(_ evenement: [String: Any], _ contrats: [[String: Any]])
 /// Les pastilles et le rangement de l'historique en trajets s'en remettent
 /// tous deux à elle : une validation ne peut pas se peindre en correspondance
 /// et ouvrir un trajet à la fois.
-func transitionRacontee(_ eventInfo: [String: Any], suivants: [[String: Any]],
-                        precedents: [[String: Any]], contrats: [[String: Any]]) -> String {
-    let route = getKey(eventInfo, "EventRouteNumber").flatMap { Int($0, radix: 2) }
-    let provider = getKey(eventInfo, "EventServiceProvider").flatMap { Int($0, radix: 2) }
-    let (mode, brute) = interpretEventCode(getKey(eventInfo, "EventCode") ?? "",
-                                           isRouteNumberPresent: route != nil,
-                                           routeNumber: route,
-                                           serviceProvider: provider)
-    if isRefus(eventInfo) { return transitionRefus }
-    let parLaPorte = transitionAuxPortes(brute, eventInfo)
-    if parLaPorte != brute { return parLaPorte }
-    let instant = ResolvedEvent.instant(eventInfo)
-    if sortieVersCorrespondance(transition: brute, instant: instant, suivants: suivants)
-        || entreeApresCorrespondance(transition: brute, mode: mode, instant: instant, precedents: precedents) {
+func transitionRacontee(_ lue: LectureValidation, suivants: some Collection<LectureValidation>,
+                        precedents: some Collection<LectureValidation>) -> String {
+    if lue.refus { return transitionRefus }
+    if lue.transition != lue.brute { return lue.transition }
+    if sortieVersCorrespondance(lue, suivants: suivants)
+        || entreeApresCorrespondance(transition: lue.brute, mode: lue.mode, instant: lue.instant, precedents: precedents) {
         return correspondanceVoiePublique
     }
-    if entreeDansLeDelai(eventInfo, precedents: precedents, contrats: contrats) {
+    if entreeDansLeDelai(lue, precedents: precedents) {
         return "Entrée (correspondance)"
     }
-    return brute
+    return lue.brute
 }
 
 /// Le libellé à afficher. Les deux correspondances se disent d'un même mot :

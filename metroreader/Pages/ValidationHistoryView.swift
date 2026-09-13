@@ -102,21 +102,18 @@ struct ValidationHistoryView: View {
             }
 
             if let journees {
+                // Une lecture des validations pour toute la liste : chaque ligne
+                // y puise sa transition, au lieu de recopier et relire la carte.
+                let validations = Validations(events, contrats: contracts)
                 ForEach(journees) { journee in
                     ForEach(Array(journee.trajets.enumerated()), id: \.element.id) { rang, trajet in
                         Section {
                             ForEach(trajet.indices, id: \.self) { i in
+                                let transition = validations.transition(de: i)
                                 NavigationLink {
-                                    EventView(eventInfo: events[i],
-                                              suivants: Array(events[..<i]),
-                                              precedents: Array(events[(i + 1)...]),
-                                              contractsInfos: contracts)
+                                    EventView(eventInfo: events[i], transition: transition, contractsInfos: contracts)
                                 } label: {
-                                    EventPreview(eventInfo: events[i],
-                                                 suivants: Array(events[..<i]),
-                                                 precedents: Array(events[(i + 1)...]),
-                                                 contrats: contracts,
-                                                 afficheDate: false)
+                                    EventPreview(eventInfo: events[i], transition: transition, afficheDate: false)
                                 }
                             }
                         } header: {

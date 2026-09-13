@@ -107,14 +107,10 @@ struct EventsMapView: View {
     nonisolated private static func reperes(events: [[String: Any]], affiches: Int,
                                             contrats: [[String: Any]]) async -> [EventAnnotation] {
         var reperes: [EventAnnotation] = []
+        let validations = Validations(events, contrats: contrats)
         for (index, eventInfo) in events.prefix(affiches).enumerated() {
             if Task.isCancelled { break }
-            // Du plus récent au plus ancien : ce qui précède a suivi, ce qui
-            // vient après a précédé.
-            let event = ResolvedEvent(eventInfo,
-                                      suivants: Array(events[..<index]),
-                                      precedents: Array(events[(index + 1)...]),
-                                      contrats: contrats)
+            let event = ResolvedEvent(eventInfo, transition: validations.transition(de: index))
             guard event.location.isLocatable else { continue }
             reperes.append(EventAnnotation(
                 name: event.location.name,
