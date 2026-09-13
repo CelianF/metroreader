@@ -35,7 +35,9 @@ struct PastilleLigne: View {
     /// Ce que la pastille écrit. Un TER porte le nom de sa région — « TER Centre
     /// - Val de Loire » — qui ne tient pas dans une pastille : il s'y dit TER, et
     /// le nom complet reste pour VoiceOver.
-    private var libelle: String { mode == "TER" ? "TER" : nom }
+    private var libelle: String { modeTransport == .ter ? "TER" : nom }
+
+    private var modeTransport: ModeTransport? { mode.flatMap(ModeTransport.init(rawValue:)) }
 
     var body: some View {
         let indices = IndicesLignes.images(nom: nom, mode: mode)
@@ -48,7 +50,7 @@ struct PastilleLigne: View {
                 .frame(width: libelle.count == 1 ? taille : nil, height: taille)
                 .padding(.horizontal, libelle.count > 1 ? taille / 5 : 0)
                 .background(Color(hex: fond))
-                .cornerRadius(mode == "Métro" ? taille / 2 : 4)
+                .cornerRadius(modeTransport == .metro ? taille / 2 : 4)
                 .foregroundColor(Color(hex: texte))
                 .accessibilityLabel(nom)
         } else {

@@ -102,6 +102,27 @@ func interpretPersonalizationStatusCode(_ bitstring: String) -> (String, Bool, B
     }
 }
 
+/// Les seize transitions de l'EN 1545, par code. Déclarées une fois : la table
+/// se reconstruisait à chaque événement interprété.
+private let transitionsParCode = [
+    "Non spécifié",
+    "Entrée",
+    "Sortie",
+    "Validation",
+    "Contrôle",
+    "Validation de test",
+    "Entrée (correspondance)",
+    "Sortie (correspondance)",
+    "RUF",
+    "Annulation de validation",
+    "Entrée (voie publique)",
+    "Sortie (voie publique)",
+    "RUF",
+    "Distribution",
+    "RUF",
+    "Invalidation"
+]
+
 func interpretEventCode(_ bitstring: String, isRouteNumberPresent: Bool = false, routeNumber: Int? = nil, serviceProvider: Int? = nil) -> (String, String) {
     /**
      Interprets the event code from a binary string
@@ -112,45 +133,7 @@ func interpretEventCode(_ bitstring: String, isRouteNumberPresent: Bool = false,
     let transportMode = Int(String(bitstring.prefix(4)), radix: 2) ?? 0      // First 4 bits
     let transitionType = Int(String(bitstring.dropFirst(4)), radix: 2) ?? 0  // Last 4 bits
     
-    let transportModes = [
-        "Non spécifié",
-        "Bus urbain",
-        "Bus interurbain",
-        "Métro",
-        "Tramway",
-        "Train",
-        "RUF",
-        "RUF",
-        "Parking",
-        "RUF",
-        "RUF",
-        "Consigne à vélo",
-        "RUF",
-        "RUF",
-        "Voiture libre-service",
-        "RUF"
-    ]
-    
-    let transitionModes = [
-        "Non spécifié",
-        "Entrée",
-        "Sortie",
-        "Validation",
-        "Contrôle",
-        "Validation de test",
-        "Entrée (correspondance)",
-        "Sortie (correspondance)",
-        "RUF",
-        "Annulation de validation",
-        "Entrée (voie publique)",
-        "Sortie (voie publique)",
-        "RUF",
-        "Distribution",
-        "RUF",
-        "Invalidation"
-    ]
-    
-    var transportModeStr = transportModes[transportMode]
+    var transportModeStr = ModeTransport.parCode[transportMode].rawValue
     if isRouteNumberPresent && transportModeStr == "Métro" {
         // La RATP encode le RER A en mode métro sur la course 16. Chez un autre
         // exploitant, la course 16 est bien un métro : c'est la ligne du Grand
@@ -178,7 +161,9 @@ func interpretEventCode(_ bitstring: String, isRouteNumberPresent: Bool = false,
         transportModeStr = "Câble"
     }
     
-    return (transportModeStr, transitionModes[transitionType])
+    // Un code plus long que ses huit bits ne doit pas sortir de la table.
+    let transition = transitionsParCode.indices.contains(transitionType) ? transitionsParCode[transitionType] : "RUF"
+    return (transportModeStr, transition)
 }
 
 func interpretEventResult(_ bitstring: String) -> String {

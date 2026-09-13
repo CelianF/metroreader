@@ -153,9 +153,6 @@ struct PassTimers {
         }
     }
 
-    private static let railModes: Set<String> = ["Métro", "RER", "Train", "Transilien"]
-    private static let surfaceModes: Set<String> = ["Bus urbain", "Bus interurbain", "Tramway", "Câble"]
-
     private struct TimedEvent {
         let date: Date
         let mode: String
@@ -165,8 +162,8 @@ struct PassTimers {
         let transition: String
         let contract: [String: Any]?
 
-        var isRail: Bool { PassTimers.railModes.contains(mode) }
-        var isSurface: Bool { PassTimers.surfaceModes.contains(mode) }
+        var isRail: Bool { ModeTransport(rawValue: mode)?.estFerre ?? false }
+        var isSurface: Bool { ModeTransport(rawValue: mode)?.estSurface ?? false }
         var isTransit: Bool { isRail || isSurface }
     }
 

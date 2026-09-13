@@ -90,14 +90,7 @@ enum ControlMode: String, CaseIterable, Identifiable {
 
     /// Le mode couvert par une validation, ramené aux mêmes termes.
     static func couvrant(_ mode: String) -> ControlMode? {
-        switch mode {
-        case "Bus urbain", "Bus interurbain", "Noctilien": return .bus
-        case "Tramway":                                    return .tram
-        case "Câble":                                      return .cable
-        case "Métro":                                      return .metro
-        case "RER", "Train", "Transilien":                 return .rail
-        default:                                           return nil
-        }
+        ModeTransport(rawValue: mode)?.modeDeControle
     }
 
     enum Accord {

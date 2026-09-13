@@ -241,33 +241,8 @@ struct TimersView: View {
     }
 
     private static func portee(_ coverage: PassTimers.Coverage) -> String? {
-        guard let mode = modeLabel(coverage.mode) else { return nil }
+        guard let mode = ModeTransport(rawValue: coverage.mode)?.couverture?.libelle else { return nil }
         return coverage.airport ? "\(mode), aéroports compris" : mode
-    }
-
-    private static func modeLabel(_ mode: String) -> String? {
-        switch mode {
-        case "Bus urbain", "Bus interurbain": return "en bus"
-        case "Noctilien":                     return "en Noctilien"
-        case "Métro":                         return "en métro"
-        case "RER", "Train", "Transilien":    return "en RER et train"
-        case "Tramway":                       return "en tramway"
-        case "Câble":                         return "en câble"
-        default:                              return nil
-        }
-    }
-
-    /// Le pictogramme du mode, celui-là même qui est affiché sur les quais.
-    static func modeIcon(_ mode: String) -> String? {
-        switch mode {
-        case "Bus urbain", "Bus interurbain": return "mode_bus"
-        case "Noctilien":                     return "mode_noctilien"
-        case "Métro":                         return "mode_metro"
-        case "RER", "Train", "Transilien":    return "mode_train_rer"
-        case "Tramway":                       return "mode_tram"
-        case "Câble":                         return "mode_cable"
-        default:                              return nil
-        }
     }
 
     // MARK: - Mise en forme
@@ -300,7 +275,7 @@ private struct ModeBadges: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            if let mode = TimersView.modeIcon(coverage.mode) {
+            if let mode = ModeTransport(rawValue: coverage.mode)?.couverture?.pictogramme {
                 badge(mode)
             }
             if coverage.airport {

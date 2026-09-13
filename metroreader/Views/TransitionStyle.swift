@@ -60,13 +60,6 @@ extension Color {
 let transitionRefus = "Refus"
 
 
-/// Les modes ferrés dont on sort par une porte de correspondance. Le métro en
-/// est exclu à dessein : à Denfert-Rochereau comme à Gare de Lyon, c'est la
-/// borne du RER qui écrit le passage dans les deux sens, jamais celle du métro.
-private let modesFerresCorrespondance: Set<String> = [
-    "RER", "Train", "Transilien", "Train / RER",
-]
-
 /// Une correspondance qui fait entrer dans le métro.
 ///
 /// Quitter le RER à Gare de Lyon ou à Denfert-Rochereau pour prendre le métro
@@ -75,7 +68,11 @@ private let modesFerresCorrespondance: Set<String> = [
 /// « Entrée (correspondance) » sur cette même borne : la sortie, elle, ne peut
 /// mener qu'au métro.
 func correspondanceVersMetro(transition: String, mode: String) -> Bool {
-    transition == "Sortie (correspondance)" && modesFerresCorrespondance.contains(mode)
+    // Le métro en est exclu à dessein : à Denfert-Rochereau comme à Gare de
+    // Lyon, c'est la borne du RER qui écrit le passage dans les deux sens,
+    // jamais celle du métro.
+    guard transition == "Sortie (correspondance)", let rail = ModeTransport(rawValue: mode) else { return false }
+    return rail.estFerre && rail != .metro
 }
 
 /// La transition d'une porte SNCF relevée comme menant au métro. La borne y
@@ -89,7 +86,9 @@ func transitionAuxPortes(_ transition: String, _ eventInfo: [String: Any]) -> St
 }
 
 /// Les modes dont une entrée prolonge le trajet, tels que la carte les encode.
-private let modesFerres: Set<String> = ["Métro", "RER", "Train"]
+private func ferre(_ mode: String) -> Bool {
+    ModeTransport(rawValue: mode)?.estFerre ?? false
+}
 
 /// Au-delà, une sortie « voie publique » ne se lit plus comme une correspondance.
 private let delaiCorrespondance: TimeInterval = 15 * 60
@@ -159,11 +158,13 @@ private func lecture(_ evenement: [String: Any]) -> (mode: String, transition: S
 }
 
 private func estEntreeFerree(_ lu: (mode: String, transition: String)) -> Bool {
-    modesFerres.contains(lu.mode) && (lu.transition.hasPrefix("Entrée") || lu.transition == "Validation")
+    ferre(lu.mode) && (lu.transition.hasPrefix("Entrée") || lu.transition == "Validation")
 }
 
 /// Les modes de surface, ceux du ticket Bus-Tram.
-private let modesSurface: Set<String> = ["Bus urbain", "Bus interurbain", "Tramway", "Câble"]
+private func surface(_ mode: String) -> Bool {
+    ModeTransport(rawValue: mode)?.estSurface ?? false
+}
 
 /// Ce que dure un trajet, compté depuis l'entrée qui l'ouvre.
 private let delaiRail: TimeInterval = 2 * 3600
@@ -213,7 +214,7 @@ func entreeDansLeDelai(_ eventInfo: [String: Any], precedents: [[String: Any]], 
     for (k, evenement) in chrono.enumerated() {
         guard !isRefus(evenement), let date = ResolvedEvent.instant(evenement),
               let lu = entreeDeVoyage(evenement) else { continue }
-        let rail = modesFerres.contains(lu.mode)
+        let rail = ferre(lu.mode)
         let ligne = cleDeLigne(evenement)
         let forfait = estForfait(evenement, contrats)
         // Ce que les portes ou la voie publique disent déjà correspondance est
@@ -228,7 +229,7 @@ func entreeDansLeDelai(_ eventInfo: [String: Any], precedents: [[String: Any]], 
             if dejaDite {
                 prolonge = true
             } else if t.forfait, forfait, !(ligne.map { t.lignes.contains($0) } ?? false) {
-                if t.dansLeRail && lu.mode == "Train" {
+                if t.dansLeRail && ModeTransport(rawValue: lu.mode) == .train {
                     prolonge = true
                 } else if !(t.dansLeRail && rail) {
                     change = true
@@ -254,7 +255,7 @@ func entreeDansLeDelai(_ eventInfo: [String: Any], precedents: [[String: Any]], 
 private func entreeDeVoyage(_ evenement: [String: Any]) -> (mode: String, transition: String)? {
     let lu = lecture(evenement)
     guard lu.transition.hasPrefix("Entrée") || lu.transition == "Validation",
-          modesFerres.contains(lu.mode) || modesSurface.contains(lu.mode) else { return nil }
+          ferre(lu.mode) || surface(lu.mode) else { return nil }
     return lu
 }
 

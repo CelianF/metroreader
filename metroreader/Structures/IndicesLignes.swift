@@ -35,14 +35,15 @@ enum IndicesLignes {
     /// comme « 16/17 ». Vide quand la ligne n'en a pas — bus, Noctilien, TER,
     /// funiculaire, ou nom saisi autrement qu'IDFM ne l'écrit.
     static func images(nom: String, mode: String?) -> [String] {
+        guard let mode = mode.flatMap(ModeTransport.init(rawValue:)) else { return [] }
         let famille: String
         switch mode {
-        case "Métro":      famille = "metro"
-        case "RER":        famille = "RER"
-        case "Transilien": famille = "train"
-        case "Tramway":    famille = "tram"
-        case "Câble":      famille = "cable"
-        default:           return []
+        case .metro:      famille = "metro"
+        case .rer:        famille = "RER"
+        case .transilien: famille = "train"
+        case .tramway:    famille = "tram"
+        case .cable:      famille = "cable"
+        default:          return []
         }
         let noms = nom.split(separator: "/").map { "indice_\(famille)_\(suffixe(String($0), mode: mode))" }
         return !noms.isEmpty && noms.allSatisfy(livres.contains) ? noms : []
@@ -50,11 +51,11 @@ enum IndicesLignes {
 
     /// Le nom de la ligne tel que le fichier l'écrit : « 3B » y est « 3bis »,
     /// « T3a » y est « 3a », « C1 » y est « 1 ».
-    private static func suffixe(_ nom: String, mode: String?) -> String {
+    private static func suffixe(_ nom: String, mode: ModeTransport) -> String {
         switch mode {
-        case "Métro" where nom.hasSuffix("B"):
+        case .metro where nom.hasSuffix("B"):
             return nom.dropLast() + "bis"
-        case "Tramway", "Câble":
+        case .tramway, .cable:
             return String(nom.dropFirst())
         default:
             return nom

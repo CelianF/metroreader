@@ -11,23 +11,13 @@ import SwiftUI
 /// quitte. Sortir du RER par une porte de correspondance, c'est entrer dans le
 /// métro — le libellé, lui, garde la ligne d'où l'on vient.
 func modeDuPictogramme(mode: String, transition: String) -> String {
-    correspondanceVersMetro(transition: transition, mode: mode) ? "Métro" : mode
+    correspondanceVersMetro(transition: transition, mode: mode) ? ModeTransport.metro.rawValue : mode
 }
 
 /// Le pictogramme IDFM d'un mode, tel qu'il figure au catalogue ; rien pour un
 /// mode qui n'en a pas.
 func pictogrammeIDFM(_ mode: String) -> String? {
-    switch mode {
-    case "Bus urbain", "Bus interurbain": return "mode_bus"
-    case "Noctilien":                     return "mode_noctilien"
-    case "Train":                         return "mode_train"
-    case "RER":                           return "mode_rer"
-    case "Train / RER":                   return "mode_train_rer"
-    case "Tramway":                       return "mode_tram"
-    case "Métro":                         return "mode_metro"
-    case "Câble":                         return "mode_cable"
-    default:                              return nil
-    }
+    ModeTransport(rawValue: mode)?.pictogramme
 }
 
 struct EventIcon: View {
@@ -43,7 +33,7 @@ struct EventIcon: View {
             if let pictogramme = pictogrammeIDFM(mode) {
                 // Le Noctilien a son propre dessin, qu'on éclaircit plutôt que
                 // d'inverser.
-                if mode == "Noctilien" {
+                if ModeTransport(rawValue: mode) == .noctilien {
                     Image(pictogramme)
                         .resizable(resizingMode: .stretch)
                         .padding(.all, 8.0)
