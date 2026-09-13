@@ -69,14 +69,7 @@ struct ScanPageView: View {
             switch result {
             case .success(let urls):
                 guard let url = urls.first else { return }
-                
-                // Security: Gain access to the file
-                if url.startAccessingSecurityScopedResource() {
-                    defer { url.stopAccessingSecurityScopedResource() }
-                    if let data = try? Data(contentsOf: url) {
-                        nfcReader.importJSON(from: data, historyManager: historyManager)
-                    }
-                }
+                nfcReader.importFile(at: url, historyManager: historyManager)
             case .failure(let error):
                 print("Error picking file: \(error.localizedDescription)")
             }
