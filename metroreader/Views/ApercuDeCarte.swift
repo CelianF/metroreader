@@ -194,7 +194,7 @@ struct PastilleDeRepere: View {
     /// Combien de validations la pastille porte : son ombre s'épaissit avec.
     var poids: Int = 1
 
-    static let cote: CGFloat = 18
+    nonisolated static let cote: CGFloat = 18
 
     /// Le fond, pris sur le dessin des SVG IDFM, 283,46 de côté : l'anneau du
     /// métro touche leurs bords ; le train et le RER sont un carré aux coins de

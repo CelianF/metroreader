@@ -54,8 +54,8 @@ struct ValidationHistoryView: View {
     }
 
     /// Ce que la page montre d'emblée.
-    private static let joursAffiches = 7
-    private static let validationsAffichees = 50
+    nonisolated private static let joursAffiches = 7
+    nonisolated private static let validationsAffichees = 50
 
     /// La moitié de l'écart ordinaire entre deux sections.
     private static let ecartEntreTrajets: CGFloat = 17.5
