@@ -53,16 +53,12 @@ struct SettingsPageView: View {
                 }
                 #endif
 
-                
+
                 Toggle(isOn: $isHistoryEnabled) {
                     Label("Conserver l'historique", systemImage: "clock.arrow.circlepath")
                 }
-            } header: {
-                Text("Comportement")
-            }
 
-            #if os(iOS)
-            Section {
+                #if os(iOS)
                 Toggle(isOn: $locateOnScan) {
                     Label("Relever la position au scan", systemImage: "location")
                 }
@@ -77,13 +73,15 @@ struct SettingsPageView: View {
                             .foregroundStyle(.orange)
                     }
                 }
+                #endif
             } header: {
-                Text("Position")
+                Text("Comportement")
             } footer: {
-                Text("Sert à proposer les arrêts proches d'un arrêt inconnu. Jamais enregistrée ni transmise.")
+                #if os(iOS)
+                Text("La position sert à proposer les arrêts proches d'un arrêt inconnu. Jamais enregistrée ni transmise.")
+                #endif
             }
-            #endif
-            
+
             Section(header: Text("Timers")) {
                 Toggle(isOn: $alreadyValidatedTimer) {
                     Label("Pass déjà validé", systemImage: "arrow.uturn.backward.circle")
@@ -107,6 +105,19 @@ struct SettingsPageView: View {
 
             Section {
                 NavigationLink {
+                    ShippedCorrectionsView()
+                } label: {
+                    Label("Corrections livrées", systemImage: "checkmark.seal")
+                }
+                .eteint(quand: LineCorrections.all.isEmpty && StopCorrections.all.isEmpty && GateCorrections.all.isEmpty)
+            } header: {
+                Text("Données")
+            } footer: {
+                Text("Corrections fournies avec l'app, en lecture seule. Tes saisies passent devant.")
+            }
+
+            Section {
+                NavigationLink {
                     ManualDataView()
                 } label: {
                     Label("Données saisies", systemImage: "tablecells")
@@ -126,21 +137,8 @@ struct SettingsPageView: View {
                     Label("Supprimer", systemImage: "trash")
                 }
                 .destructrice(vide: journal.isEmpty)
-            } header: {
-                Text("Données")
             } footer: {
                 Text("Les réseaux, lignes et arrêts que tu as identifiés. Partage-les pour enrichir l'app.")
-            }
-
-            Section {
-                NavigationLink {
-                    ShippedCorrectionsView()
-                } label: {
-                    Label("Corrections livrées", systemImage: "checkmark.seal")
-                }
-                .eteint(quand: LineCorrections.all.isEmpty && StopCorrections.all.isEmpty && GateCorrections.all.isEmpty)
-            } footer: {
-                Text("Corrections fournies avec l'app, en lecture seule. Tes saisies passent devant.")
             }
 
             Section {
@@ -153,7 +151,7 @@ struct SettingsPageView: View {
             } header: {
                 Text("Confidentialité")
             }
-            
+
             Section(header: Text("Fait avec ❤️ par")) {
                 CreditRow(nom: "DocSystem",
                           role: "Recherche, rétro-ingénierie et développement",
@@ -161,7 +159,7 @@ struct SettingsPageView: View {
                           compte: URL(string: "https://twitter.com/TheDocSystem")!)
 
                 CreditRow(nom: "Stitch",
-                          role: "Interface de l'application, design des cartes",
+                          role: "Développement, jeu de données et interface",
                           photo: "Stitch",
                           compte: URL(string: "https://twitter.com/TweetingStitch")!)
             }
