@@ -84,12 +84,6 @@ public class LineCorrections {
         _ = index
     }
 
-    /// Les corrections livrées, du plus récent constat au plus ancien, pour
-    /// l'écran qui les donne à lire.
-    static var lisibles: [LineCorrection] {
-        all.sorted { ($0.jour ?? .distantPast) > ($1.jour ?? .distantPast) }
-    }
-
     /// Rangées par exploitant, puis par course — comme le journal des saisies
     /// se parcourt, et comme un réseau se lit.
     static var parExploitant: [(providerId: Int, corrections: [LineCorrection])] {

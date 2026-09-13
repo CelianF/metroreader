@@ -31,13 +31,7 @@ struct ProviderEntry: Identifiable, Codable, Equatable {
     /// Même règle d'affichage que le catalogue, pour qu'une saisie se lise
     /// comme une entrée du référentiel.
     var displayName: String {
-        guard let network, !network.isEmpty else {
-            if let name, !name.isEmpty { return name }
-            return "Exploitant \(providerId)"
-        }
-        let exploitant = (operatorName?.isEmpty == false) ? operatorName! : "Exploitant inconnu"
-        guard let dsp else { return "\(network) — \(exploitant)" }
-        return "\(network) — \(exploitant) (DSP \(dsp))"
+        libelleDeDelegation ?? name?.nilIfEmpty ?? "Exploitant \(providerId)"
     }
 }
 
@@ -167,12 +161,11 @@ final class ManualEntries: ObservableObject {
     /// aucun arrêt en base : leur nom ne peut être que saisi au clavier, sans
     /// coordonnées. Il s'affiche quand même — c'est isLocatable, et non found,
     /// qui décide de la mise en carte.
-    func station(provider: Int, location: Int, mode: String, lines: [NavigoLineInfo] = []) -> NavigoStationInfo? {
+    func station(provider: Int, location: Int, mode: String) -> NavigoStationInfo? {
         guard let r = stopIndex[Self.stopKey(provider, location, mode)] else { return nil }
         return NavigoStationInfo(name: r.stationName, provider_id: provider, line_id: nil,
                                  location_id: location, mode: mode,
-                                 lat: r.lat ?? 0, lon: r.lon ?? 0,
-                                 lines: lines, found: true)
+                                 lat: r.lat ?? 0, lon: r.lon ?? 0)
     }
 
     func lineEntry(provider: Int, route: Int, mode: String) -> LineEntry? {
@@ -475,3 +468,6 @@ struct ManualEntriesFile: Transferable {
             .suggestedFileName { $0.fileName }
     }
 }
+
+
+extension ProviderEntry: LibelleExploitant {}

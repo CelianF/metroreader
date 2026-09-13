@@ -14,7 +14,6 @@ struct EventAnnotation: Identifiable {
     let id = UUID()
     let name: String
     let coordinate: CLLocationCoordinate2D
-    let eventNumber: Int
     /// Le pictogramme IDFM du mode, rien quand le mode n'en a pas.
     let pictogramme: String?
     let eventTransition: String
@@ -115,7 +114,6 @@ struct EventsMapView: View {
             reperes.append(EventAnnotation(
                 name: event.location.name,
                 coordinate: CLLocationCoordinate2D(latitude: event.location.lat, longitude: event.location.lon),
-                eventNumber: index + 1,
                 pictogramme: pictogrammeIDFM(modeDuPictogramme(mode: event.mode, transition: event.transition)),
                 eventTransition: event.transition
             ))

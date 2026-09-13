@@ -6,7 +6,45 @@
 import Foundation
 
 
-struct ServiceProviderInfo: Decodable {
+/// Ce qui nomme un exploitant, qu'il vienne du référentiel ou d'une saisie.
+///
+/// Les deux portent les mêmes champs, et les mêmes règles d'affichage étaient
+/// écrites deux fois pour eux — trois pour le nom court et le détail.
+protocol LibelleExploitant {
+    var network: String? { get }
+    var operatorName: String? { get }
+    var dsp: Int? { get }
+    var name: String? { get }
+}
+
+extension LibelleExploitant {
+    /// Le réseau, quand l'exploitant en exploite une délégation.
+    private var reseau: String? { network?.nilIfEmpty }
+
+    /// La société qui fait rouler la délégation, ou l'aveu qu'on l'ignore.
+    private var societe: String { operatorName?.nilIfEmpty ?? "Exploitant inconnu" }
+
+    /// Le libellé complet d'une délégation — réseau, société, numéro de lot —,
+    /// rien hors délégation : SNCF et la RATP n'en sont pas.
+    var libelleDeDelegation: String? {
+        guard let reseau else { return nil }
+        guard let dsp else { return "\(reseau) — \(societe)" }
+        return "\(reseau) — \(societe) (DSP \(dsp))"
+    }
+
+    /// Le nom court : le réseau, ou le libellé libre.
+    var nomCourt: String? { reseau ?? name?.nilIfEmpty }
+
+    /// Ce que le nom court laisse de côté : la société et son lot. Rien hors
+    /// délégation.
+    var detail: String? {
+        guard reseau != nil else { return nil }
+        return dsp.map { "\(societe) (DSP \($0))" } ?? societe
+    }
+}
+
+
+struct ServiceProviderInfo: Decodable, LibelleExploitant {
     let id: Int
     let name: String? // Libellé libre, pour les exploitants hors DSP
     let dsp: Int? // Numéro de lot de la délégation de service public
@@ -20,13 +58,16 @@ struct ServiceProviderInfo: Decodable {
 
     /// SNCF et la RATP ne sont pas des DSP : elles gardent leur libellé simple.
     var displayName: String {
-        guard let network, !network.isEmpty else {
-            return name ?? "Unknown (\(id))"
-        }
-        let exploitant = (operatorName?.isEmpty == false) ? operatorName! : "Exploitant inconnu"
-        guard let dsp else { return "\(network) — \(exploitant)" }
-        return "\(network) — \(exploitant) (DSP \(dsp))"
+        libelleDeDelegation ?? name ?? "Unknown (\(id))"
     }
+}
+
+/// Un réseau billettique, identifié par le couple pays / réseau que la carte
+/// écrit en hexadécimal.
+public struct NetworkInfo: Decodable {
+    let name: String
+    let countryId: String
+    let networkId: String
 }
 
 private struct ProvidersFile: Decodable {

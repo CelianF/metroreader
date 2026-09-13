@@ -27,7 +27,7 @@ func interpretNetworkId(_ bitstring: String) -> (String, String) {
     let countryHex = String(format: "%03X", Int(countryBitstring, radix: 2) ?? 0)
     let networkHex = String(format: "%03X", Int(networkBitstring, radix: 2) ?? 0)
     let countryString = IsoCountryCodes.find(key: countryHex)?.name ?? "Unknown"
-    let networkString = Networks.find(countryId: countryHex, networkId: networkHex)?.name ?? "Unknown (\(networkHex))"
+    let networkString = ProviderCatalog.findNetwork(countryId: countryHex, networkId: networkHex)?.name ?? "Unknown (\(networkHex))"
     return (countryString, networkString)
 }
 

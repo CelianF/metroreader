@@ -134,30 +134,6 @@ func interpretZoneSet(_ bitstring: String) -> Set<Int> {
     return zones
 }
 
-func interpretZones(_ bitstring: String) -> String {
-    /**
-     Interprets the zone information from a binary string.
-     - Parameter bitstring: The binary string representing zones.
-     - Returns: A string describing the interpreted zones.
-     */
-    
-    let zones = interpretZoneSet(bitstring)
-    
-    guard let minZone = zones.min(), let maxZone = zones.max() else {
-        return "No zones"
-    }
-    
-    if minZone == maxZone {
-        return "Zone \(minZone)"
-    }
-    
-    if minZone == 1 && maxZone == 5 {
-        return "Toutes zones (1-5)"
-    }
-    
-    return "Zones \(minZone)-\(maxZone)"
-}
-
 func interpretZonesShort(_ bitstring: String) -> String {
     /**
      Interprets the zone information from a binary string.
@@ -241,33 +217,15 @@ func interpretServiceProviderName(_ id: Int) -> String {
 /// a pas. Le libellé complet — réseau, exploitant et numéro de lot — ne tient
 /// pas sur la ligne d'une liste.
 func interpretServiceProviderShortName(_ id: Int) -> String {
-    if let catalogue = ProviderCatalog.findProvider(id) {
-        if let reseau = catalogue.network, !reseau.isEmpty { return reseau }
-        if let nom = catalogue.name, !nom.isEmpty { return nom }
-    }
-    if let saisie = ManualEntries.shared.provider(id) {
-        if let reseau = saisie.network, !reseau.isEmpty { return reseau }
-        if let nom = saisie.name, !nom.isEmpty { return nom }
-    }
-    return "Exploitant \(id)"
+    ProviderCatalog.findProvider(id)?.nomCourt
+        ?? ManualEntries.shared.provider(id)?.nomCourt
+        ?? "Exploitant \(id)"
 }
 
 /// Ce que le nom court laisse de côté : l'exploitant et son numéro de lot.
 /// Nil pour ce qui n'est pas une délégation — SNCF, RATP.
 func interpretServiceProviderDetail(_ id: Int) -> String? {
-    let exploitant: String?
-    let dsp: Int?
-    if let catalogue = ProviderCatalog.findProvider(id), catalogue.network?.isEmpty == false {
-        exploitant = catalogue.operatorName
-        dsp = catalogue.dsp
-    } else if let saisie = ManualEntries.shared.provider(id), saisie.network?.isEmpty == false {
-        exploitant = saisie.operatorName
-        dsp = saisie.dsp
-    } else {
-        return nil
-    }
-    let societe = (exploitant?.isEmpty == false) ? exploitant! : "Exploitant inconnu"
-    return dsp.map { "\(societe) (DSP \($0))" } ?? societe
+    ProviderCatalog.findProvider(id)?.detail ?? ManualEntries.shared.provider(id)?.detail
 }
 
 /// Vrai quand le nom affiché vient du journal et non du référentiel. Une

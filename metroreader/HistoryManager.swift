@@ -122,15 +122,6 @@ class HistoryManager: ObservableObject {
         persistToDisk()
     }
 
-    var sortedHistory: [ScanRecord] {
-        history.sorted { record1, record2 in
-            if record1.isPinned == record2.isPinned {
-                return record1.date > record2.date
-            }
-            return record1.isPinned && !record2.isPinned
-        }
-    }
-
     var pinnedRecords: [ScanRecord] {
         history.filter { $0.isPinned }.sorted { $0.date > $1.date }
     }
