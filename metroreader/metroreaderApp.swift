@@ -65,6 +65,9 @@ struct ContentView: View {
             // Au lancement, et là seulement : c'est le moment où une
             // autorisation accordée « cette fois seulement » a expiré.
             LocationProvider.shared.forgetLapsedPermission()
+            // Les tables d'arrêts et de lignes se décodent tout de suite, hors du
+            // fil principal : la première carte lue les trouve prêtes.
+            await Task.detached(priority: .userInitiated) { DonneesLivrees.prechauffer() }.value
         }
         .onOpenURL { url in
             handleIncomingFile(url: url)

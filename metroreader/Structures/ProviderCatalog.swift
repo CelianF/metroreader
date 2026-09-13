@@ -76,18 +76,7 @@ public class ProviderCatalog {
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
-    private static let file: ProvidersFile? = {
-        guard let url = Bundle.main.url(forResource: "Providers", withExtension: "json"),
-              let data = try? Data(contentsOf: url) else {
-            return nil
-        }
-        do {
-            return try JSONDecoder().decode(ProvidersFile.self, from: data)
-        } catch {
-            print("Error loading providers: \(error)")
-            return nil
-        }
-    }()
+    private static let file: ProvidersFile? = DonneesLivrees.charger("Providers", comme: ProvidersFile.self)
 
     private static let providersById: [Int: ServiceProviderInfo] = {
         guard let providers = file?.serviceProviders else { return [:] }

@@ -34,27 +34,31 @@ struct ShippedGate: Decodable, Identifiable {
 
 
 public class GateCorrections {
-    static let all: [ShippedGate] = {
-        guard let url = Bundle.main.url(forResource: "GateCorrections", withExtension: "json"),
-              let data = try? Data(contentsOf: url) else {
-            return []
-        }
-        do {
-            return try JSONDecoder().decode([ShippedGate].self, from: data)
-        } catch {
-            print("Error loading gate corrections: \(error)")
-            return []
-        }
-    }()
+    static let all: [ShippedGate] = DonneesLivrees.charger("GateCorrections", comme: [ShippedGate].self) ?? []
 
-    private static let index: Set<String> = Set(all.map(\.id))
+    /// Une porte relevée : exploitant, lieu et numéro de porte. Chaque
+    /// validation affichée la cherche, parfois plusieurs fois.
+    private struct Porte: Hashable {
+        let exploitant: Int
+        let lieu: Int
+        let numero: Int
+    }
+
+    private static let index: Set<Porte> = Set(all.map {
+        Porte(exploitant: $0.provider_id, lieu: $0.location_id, numero: $0.gate)
+    })
+
+    /// Décode la table et bâtit son index.
+    static func prechauffer() {
+        _ = index
+    }
 
     /// Vrai quand la validation a franchi une de ces portes.
     static func contains(_ eventInfo: [String: Any]) -> Bool {
         guard let provider = entier(eventInfo, "EventServiceProvider"),
               let location = entier(eventInfo, "EventLocationId"),
               let gate = entier(eventInfo, "EventLocationGate") else { return false }
-        return index.contains("\(provider)|\(location)|\(gate)")
+        return index.contains(Porte(exploitant: provider, lieu: location, numero: gate))
     }
 
     /// La porte d'un refus sans titre, quand elle est relevée.

@@ -21,17 +21,7 @@ private struct PassCategoriesFile: Decodable {
 
 public class PassCatalog {
     // L'ordre des catégories et des images vient de PassCategories.json
-    static let categories: [PassCategory] = {
-        guard let url = Bundle.main.url(forResource: "PassCategories", withExtension: "json"),
-              let data = try? Data(contentsOf: url) else {
-            return []
-        }
-        do {
-            return try JSONDecoder().decode(PassCategoriesFile.self, from: data)
-                .categories.filter { !$0.images.isEmpty }
-        } catch {
-            print("Error loading pass categories: \(error)")
-            return []
-        }
-    }()
+    static let categories: [PassCategory] =
+        (DonneesLivrees.charger("PassCategories", comme: PassCategoriesFile.self)?.categories ?? [])
+            .filter { !$0.images.isEmpty }
 }

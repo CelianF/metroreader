@@ -45,18 +45,7 @@ public class TariffCatalog {
         return Int(trimmed)
     }
 
-    private static let file: TariffsFile? = {
-        guard let url = Bundle.main.url(forResource: "Tariffs", withExtension: "json"),
-              let data = try? Data(contentsOf: url) else {
-            return nil
-        }
-        do {
-            return try JSONDecoder().decode(TariffsFile.self, from: data)
-        } catch {
-            print("Error loading tariffs: \(error)")
-            return nil
-        }
-    }()
+    private static let file: TariffsFile? = DonneesLivrees.charger("Tariffs", comme: TariffsFile.self)
 
     private static let byCode: [Int: TariffInfo] = {
         guard let tariffs = file?.tariffs else { return [:] }

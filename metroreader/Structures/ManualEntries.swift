@@ -132,8 +132,8 @@ final class ManualEntries: ObservableObject {
     private var linesEcrasables = true
     private var providersEcrasables = true
 
-    private var stopIndex: [String: StopReport] = [:]
-    private var lineIndex: [String: LineEntry] = [:]
+    private var stopIndex: [CleReseau: StopReport] = [:]
+    private var lineIndex: [CleReseau: LineEntry] = [:]
     private var providerIndex: [Int: ProviderEntry] = [:]
 
     /// Le dossier n'est un paramètre que pour les essais : l'app n'en a qu'un.
@@ -155,12 +155,12 @@ final class ManualEntries: ObservableObject {
 
     // MARK: Consultation
 
-    private static func stopKey(_ provider: Int, _ location: Int, _ mode: String) -> String {
-        "\(provider)|\(location)|\(mode)"
+    private static func stopKey(_ provider: Int, _ location: Int, _ mode: String) -> CleReseau {
+        CleReseau(exploitant: provider, numero: location, mode: mode)
     }
 
-    private static func lineKey(_ provider: Int, _ route: Int, _ mode: String) -> String {
-        "\(provider)|\(route)|\(mode)"
+    private static func lineKey(_ provider: Int, _ route: Int, _ mode: String) -> CleReseau {
+        CleReseau(exploitant: provider, numero: route, mode: mode)
     }
 
     /// L'arrêt identifié pour ce couple. Dix des treize réseaux concernés n'ont

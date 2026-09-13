@@ -20,18 +20,8 @@ struct LineStop: Decodable {
 }
 
 public class LineStops {
-    private static let table: [String: [LineStop]] = {
-        guard let url = Bundle.main.url(forResource: "LineStops", withExtension: "json"),
-              let data = try? Data(contentsOf: url) else {
-            return [:]
-        }
-        do {
-            return try JSONDecoder().decode([String: [LineStop]].self, from: data)
-        } catch {
-            print("Error loading line stops: \(error)")
-            return [:]
-        }
-    }()
+    private static let table: [String: [LineStop]] =
+        DonneesLivrees.charger("LineStops", comme: [String: [LineStop]].self) ?? [:]
 
     static func stops(forLine publicId: String?) -> [LineStop] {
         guard let publicId, !publicId.isEmpty else { return [] }

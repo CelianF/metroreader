@@ -20,12 +20,12 @@ public struct NavigoLineInfo: Codable {
     /// Faux quand la ligne n'a pas été trouvée et qu'on affiche le numéro de
     /// course brut. Absent du JSON : ce qui vient du référentiel est trouvé.
     let found: Bool
-    
+
     enum CodingKeys: String, CodingKey {
         case name, mode, direction, public_id, provider_id, line_id, background_color, text_color, is_noctilien
         // omit 'found' if it's not in the JSON file
     }
-    
+
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.name = try container.decode(String.self, forKey: .name)
@@ -39,7 +39,7 @@ public struct NavigoLineInfo: Codable {
         self.is_noctilien = try container.decodeIfPresent(Bool.self, forKey: .is_noctilien) ?? false
         self.found = true
     }
-    
+
     init(name: String, mode: String, direction: String? = nil, public_id: String, provider_id: Int?, line_id: Int?, background_color: String, text_color: String, is_noctilien: Bool = false, found: Bool = true) {
         self.name = name
         self.mode = mode
@@ -55,18 +55,8 @@ public struct NavigoLineInfo: Codable {
 }
 
 public class NavigoLines {
-    public static let allLines: [NavigoLineInfo] = {
-        guard let url = Bundle.main.url(forResource: "NavigoLines", withExtension: "json"),
-              let data = try? Data(contentsOf: url) else {
-            return []
-        }
-        do {
-            return try JSONDecoder().decode([NavigoLineInfo].self, from: data)
-        } catch {
-            print("Error loading Navigo data: \(error)")
-            return []
-        }
-    }()
+    public static let allLines: [NavigoLineInfo] =
+        DonneesLivrees.charger("NavigoLines", comme: [NavigoLineInfo].self) ?? []
 
     /// La ligne du référentiel portant cet identifiant IDFM.
     public class func byPublicId(_ public_id: String) -> NavigoLineInfo? {
@@ -102,7 +92,7 @@ public class NavigoLines {
             if let corrigee = LineCorrections.corrected(provider, course, mode, parmi: allLines) {
                 return [corrigee]
             }
-            let trouvees = distinctes(parCle["\(provider)|\(course)|\(mode)"] ?? [])
+            let trouvees = distinctes(parCle[CleReseau(exploitant: provider, numero: course, mode: mode)] ?? [])
             if !trouvees.isEmpty { return trouvees }
         }
         return []
@@ -111,14 +101,20 @@ public class NavigoLines {
     /// Les lignes rangées par exploitant, course et mode, dans l'ordre du
     /// fichier : les parcourir toutes à chaque validation ralentissait les
     /// cartes chargées.
-    private static let parCle: [String: [NavigoLineInfo]] = {
-        var index: [String: [NavigoLineInfo]] = [:]
+    private static let parCle: [CleReseau: [NavigoLineInfo]] = {
+        var index: [CleReseau: [NavigoLineInfo]] = [:]
         for ligne in allLines {
             guard let provider = ligne.provider_id, let course = ligne.line_id else { continue }
-            index["\(provider)|\(course)|\(ligne.mode)", default: []].append(ligne)
+            index[CleReseau(exploitant: provider, numero: course, mode: ligne.mode), default: []].append(ligne)
         }
         return index
     }()
+
+    /// Décode la table et bâtit son index : la première recherche n'a plus rien
+    /// à attendre.
+    static func prechauffer() {
+        _ = parCle
+    }
 
     /// Une même ligne figure sous plusieurs numéros de course : on ne la compte
     /// qu'une fois, sans quoi la moindre recherche paraîtrait ambiguë.

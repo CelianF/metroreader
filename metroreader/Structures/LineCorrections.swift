@@ -65,26 +65,20 @@ struct LineCorrection: Decodable, Identifiable {
 
 
 public class LineCorrections {
-    static let all: [LineCorrection] = {
-        guard let url = Bundle.main.url(forResource: "LineCorrections", withExtension: "json"),
-              let data = try? Data(contentsOf: url) else {
-            return []
-        }
-        do {
-            return try JSONDecoder().decode([LineCorrection].self, from: data)
-        } catch {
-            print("Error loading line corrections: \(error)")
-            return []
-        }
-    }()
+    static let all: [LineCorrection] = DonneesLivrees.charger("LineCorrections", comme: [LineCorrection].self) ?? []
 
-    private static let index: [String: LineCorrection] = {
+    private static let index: [CleReseau: LineCorrection] = {
         Dictionary(all.map { (cle($0.provider_id, $0.line_id, $0.mode), $0) },
                    uniquingKeysWith: { first, _ in first })
     }()
 
-    private static func cle(_ provider: Int, _ line_id: Int, _ mode: String) -> String {
-        "\(provider)|\(line_id)|\(mode)"
+    private static func cle(_ provider: Int, _ line_id: Int, _ mode: String) -> CleReseau {
+        CleReseau(exploitant: provider, numero: line_id, mode: mode)
+    }
+
+    /// Décode la table et bâtit son index.
+    static func prechauffer() {
+        _ = index
     }
 
     /// Les corrections livrées, du plus récent constat au plus ancien, pour

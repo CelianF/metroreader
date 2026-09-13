@@ -21,18 +21,7 @@ struct NearbyStop: Decodable {
 }
 
 public class NearbyStops {
-    static let all: [NearbyStop] = {
-        guard let url = Bundle.main.url(forResource: "NearbyStops", withExtension: "json"),
-              let data = try? Data(contentsOf: url) else {
-            return []
-        }
-        do {
-            return try JSONDecoder().decode([NearbyStop].self, from: data)
-        } catch {
-            print("Error loading nearby stops: \(error)")
-            return []
-        }
-    }()
+    static let all: [NearbyStop] = DonneesLivrees.charger("NearbyStops", comme: [NearbyStop].self) ?? []
 
     /// Les arrêts d'un mode autour d'une position, du plus proche au plus
     /// éloigné et dédoublonnés par nom : un même arrêt physique porte autant

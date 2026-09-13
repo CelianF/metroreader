@@ -30,23 +30,17 @@ struct ShippedStop: Decodable {
 
 
 public class StopCorrections {
-    static let all: [ShippedStop] = {
-        guard let url = Bundle.main.url(forResource: "StopCorrections", withExtension: "json"),
-              let data = try? Data(contentsOf: url) else {
-            return []
-        }
-        do {
-            return try JSONDecoder().decode([ShippedStop].self, from: data)
-        } catch {
-            print("Error loading stop corrections: \(error)")
-            return []
-        }
-    }()
+    static let all: [ShippedStop] = DonneesLivrees.charger("StopCorrections", comme: [ShippedStop].self) ?? []
 
-    private static let index: [String: ShippedStop] = {
-        Dictionary(all.map { ("\($0.provider_id)|\($0.location_id)|\($0.mode)", $0) },
+    private static let index: [CleReseau: ShippedStop] = {
+        Dictionary(all.map { (CleReseau(exploitant: $0.provider_id, numero: $0.location_id, mode: $0.mode), $0) },
                    uniquingKeysWith: { first, _ in first })
     }()
+
+    /// Décode la table et bâtit son index.
+    static func prechauffer() {
+        _ = index
+    }
 
     /// Les exploitants couverts, et combien d'arrêts pour chacun.
     static var parExploitant: [(providerId: Int, arrets: Int)] {
@@ -60,7 +54,7 @@ public class StopCorrections {
     }
 
     static func find(_ provider: Int, _ location_id: Int, _ mode: String) -> NavigoStationInfo? {
-        guard let arret = index["\(provider)|\(location_id)|\(mode)"] else { return nil }
+        guard let arret = index[CleReseau(exploitant: provider, numero: location_id, mode: mode)] else { return nil }
         return NavigoStationInfo(name: arret.name,
                                  provider_id: provider,
                                  line_id: nil,
