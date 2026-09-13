@@ -55,12 +55,15 @@ struct LineCorrection: Decodable, Identifiable {
 
     /// Le jour du constat, quand il se laisse lire.
     var jour: Date? {
-        guard let constate else { return nil }
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f.date(from: constate)
+        constate.flatMap { Self.formatConstat.date(from: $0) }
     }
+
+    private static let formatConstat: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
 }
 
 

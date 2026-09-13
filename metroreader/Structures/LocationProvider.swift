@@ -227,6 +227,31 @@ extension CLLocationCoordinate2D {
 }
 
 
+/// Le carré de coordonnées qui contient un cercle.
+///
+/// Mesurer la distance à chacun des quarante mille arrêts de bus, deux
+/// CLLocation à chaque fois, prenait une vingtaine de millisecondes par
+/// recherche, relancée à chaque frappe. Une comparaison de coordonnées écarte
+/// d'abord ce qui est hors du carré ; la distance ne se mesure que pour ce qui
+/// reste. Le carré est pris un dixième plus large, pour ne rien perdre au bord.
+struct CarreAutour {
+    let latitudes: ClosedRange<Double>
+    let longitudes: ClosedRange<Double>
+
+    init(_ centre: CLLocationCoordinate2D, rayon: CLLocationDistance) {
+        let metresParDegre = 111_320.0
+        let dLat = 1.1 * rayon / metresParDegre
+        let dLon = 1.1 * rayon / (metresParDegre * max(cos(centre.latitude * .pi / 180), 0.01))
+        latitudes = (centre.latitude - dLat)...(centre.latitude + dLat)
+        longitudes = (centre.longitude - dLon)...(centre.longitude + dLon)
+    }
+
+    func contient(latitude: Double, longitude: Double) -> Bool {
+        latitudes.contains(latitude) && longitudes.contains(longitude)
+    }
+}
+
+
 extension CLLocationDistance {
     /// Dite en mètres tant que ça reste marchable.
     var courte: String {

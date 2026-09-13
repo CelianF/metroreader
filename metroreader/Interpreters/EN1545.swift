@@ -51,11 +51,31 @@ private func intercodeDay(_ daysSince1997: Int) -> Date {
         ?? intercodeEpoch.addingTimeInterval(TimeInterval(daysSince1997 * 86400))
 }
 
+/// Les formateurs des dates et heures de la carte, créés une fois : un
+/// DateFormatter neuf coûtait une quarantaine de fois le formatage lui-même, et
+/// chaque ligne d'événement ou de contrat en demande plusieurs par rendu. Leur
+/// format est figé, donc lu en grégorien et en POSIX quels que soient la région
+/// et le calendrier de l'iPhone : un calendrier bouddhiste changeait l'année, et
+/// les libellés datés ne retrouvaient plus leur variante.
+private let formatDate: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.dateFormat = "dd/MM/yyyy"
+    formatter.timeZone = intercodeTimeZone
+    return formatter
+}()
+
+private let formatHeure: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.dateFormat = "HH:mm"
+    formatter.timeZone = TimeZone(identifier: "UTC")
+    return formatter
+}()
+
 func interpretDate(_ bitstring: String) -> String {
-    let dateFormatter = DateFormatter()
-    dateFormatter.dateFormat = "dd/MM/yyyy"
-    dateFormatter.timeZone = intercodeTimeZone
-    return dateFormatter.string(from: interpretDateAsDate(bitstring))
+    formatDate.string(from: interpretDateAsDate(bitstring))
 }
 
 func interpretDateAsDate(_ bitstring: String) -> Date {
@@ -64,11 +84,7 @@ func interpretDateAsDate(_ bitstring: String) -> Date {
 
 func interpretTime(_ bitstring: String) -> String {
     let minutesSinceMidnight = Int(bitstring, radix: 2) ?? 0
-    let date = Date(timeIntervalSince1970: TimeInterval(minutesSinceMidnight * 60))
-    let dateFormatter = DateFormatter()
-    dateFormatter.dateFormat = "HH:mm"
-    dateFormatter.timeZone = TimeZone(identifier: "UTC")
-    return dateFormatter.string(from: date)
+    return formatHeure.string(from: Date(timeIntervalSince1970: TimeInterval(minutesSinceMidnight * 60)))
 }
 
 /// Instant exact d'un événement, du couple date + heure de la carte. Ajouter

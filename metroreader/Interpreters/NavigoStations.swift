@@ -106,6 +106,23 @@ public class NavigoStations {
         _ = parCle
     }
 
+    /// Un réseau : un exploitant, un mode.
+    private struct Reseau: Hashable {
+        let exploitant: Int
+        let mode: String
+    }
+
+    /// Les arrêts rangés par réseau, pour la liste où l'on choisit un arrêt : la
+    /// filtrer parmi les quarante mille, deux fois par rendu et à chaque frappe
+    /// dans la recherche, coûtait une quinzaine de millisecondes.
+    private static let parReseau: [Reseau: [NavigoStationInfo]] =
+        Dictionary(grouping: allStations, by: { Reseau(exploitant: $0.provider_id, mode: $0.mode) })
+
+    /// Les arrêts d'un exploitant pour un mode, dans l'ordre du fichier.
+    static func arrets(exploitant: Int, mode: String) -> [NavigoStationInfo] {
+        parReseau[Reseau(exploitant: exploitant, mode: mode)] ?? []
+    }
+
     /// Le premier arrêt du fichier à répondre, comme le rendrait un parcours.
     private static func premier(_ provider: Int, _ location: Int, _ mode: String) -> NavigoStationInfo? {
         parCle[cle(provider, location, mode)]?.first

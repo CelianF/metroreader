@@ -47,8 +47,7 @@ struct IdentifyStopSheet: View {
     /// portent des identifiants différents mais le même libellé.
     private var candidats: [NavigoStationInfo] {
         var vus = Set<String>()
-        return NavigoStations.allStations
-            .filter { $0.provider_id == providerId && $0.mode == mode }
+        return NavigoStations.arrets(exploitant: providerId, mode: mode)
             .filter { station in
                 if toutLeReseau { return true }
                 guard let lineName else { return true }
@@ -108,6 +107,8 @@ struct IdentifyStopSheet: View {
     }
 
     var body: some View {
+        // Une fois par rendu : le corps la lisait deux fois.
+        let arretsDuReseau = candidats
         NavigationStack {
             List {
                 Section {
@@ -236,9 +237,9 @@ struct IdentifyStopSheet: View {
                     }
                 }
 
-                if !candidats.isEmpty {
+                if !arretsDuReseau.isEmpty {
                     Section(surLaLigne ? "Arrêts de la ligne \(lineName ?? "")" : "Tous les arrêts du réseau") {
-                        ForEach(candidats, id: \.location_id) { station in
+                        ForEach(arretsDuReseau, id: \.location_id) { station in
                             Button {
                                 enregistrer(nom: station.name, reference: station.location_id,
                                             lat: station.lat, lon: station.lon)

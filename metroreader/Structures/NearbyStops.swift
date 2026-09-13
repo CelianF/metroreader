@@ -23,6 +23,9 @@ struct NearbyStop: Decodable {
 public class NearbyStops {
     static let all: [NearbyStop] = DonneesLivrees.charger("NearbyStops", comme: [NearbyStop].self) ?? []
 
+    /// Les arrêts rangés par mode : une recherche n'en vise jamais qu'un.
+    private static let parMode: [String: [NearbyStop]] = Dictionary(grouping: all, by: \.mode)
+
     /// Les arrêts d'un mode autour d'une position, du plus proche au plus
     /// éloigné et dédoublonnés par nom : un même arrêt physique porte autant
     /// d'entrées que d'exploitants qui le desservent.
@@ -31,8 +34,9 @@ public class NearbyStops {
                        within radius: CLLocationDistance = 400,
                        limit: Int = 8) -> [(stop: NearbyStop, distance: CLLocationDistance)] {
         var vus = Set<String>()
-        return all
-            .filter { $0.mode == mode }
+        let carre = CarreAutour(position, rayon: radius)
+        return (parMode[mode] ?? [])
+            .filter { carre.contient(latitude: $0.lat, longitude: $0.lon) }
             .map { (stop: $0, distance: position.distance(toLatitude: $0.lat, longitude: $0.lon)) }
             .filter { $0.distance < radius }
             .sorted { $0.distance < $1.distance }
