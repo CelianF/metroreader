@@ -77,7 +77,7 @@ final class SecondTicker: ObservableObject {
 struct TimersView: View {
     let timers: PassTimers
 
-    /// Tait l'encart Contrôle, sans toucher au réglage : il ne se juge que sur
+    /// Tait l'encart Titre valable, sans toucher au réglage : il ne se juge que sur
     /// une carte qu'on vient de lire.
     var sansControle: Bool = false
 
@@ -146,7 +146,7 @@ struct TimersView: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     if let coverage = timers.coverage { ModeBadges(coverage: coverage) }
-                    Text("Validé \(validated?.enPhrase ?? "ailleurs"), contrôlé \(mode.enPhrase)")
+                    Text("Validé \(validated?.enPhrase ?? "ailleurs"), pas \(mode.enPhrase)")
                         .fontWeight(.semibold)
                 }
                 Text("Correspondance non revalidée · restant \(TimersView.clock(countdown.remaining))")

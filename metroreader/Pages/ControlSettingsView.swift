@@ -6,9 +6,9 @@
 import SwiftUI
 
 
-/// Les options du timer « Contrôle ».
+/// Les options du timer « Titre valable ».
 ///
-/// Le contrôle ne se juge pas qu'au temps écoulé : il se juge dans un mode.
+/// Un titre ne se juge pas qu'au temps écoulé : il se juge là où l'on voyage.
 /// La carte ne sait que ce qu'on a validé, pas où l'on se trouve maintenant —
 /// c'est ici qu'on le lui dit.
 struct ControlSettingsView: View {
@@ -47,7 +47,7 @@ struct ControlSettingsView: View {
                         .tag(mode.rawValue)
                     }
                 } label: {
-                    Label("Mode contrôlé", systemImage: "figure.stand")
+                    Label("Zone de validité", systemImage: "figure.stand")
                 }
                 .pickerStyle(.navigationLink)
             }
@@ -80,8 +80,19 @@ struct ControlSettingsView: View {
             } header: {
                 Text("Tolérance")
             }
+
+            // Dernier mot de l'écran : ce que l'encart est, et surtout ce qu'il
+            // n'est pas. Sa couleur se lit comme un verdict ; il n'en rend aucun.
+            Section {
+            } footer: {
+                Text("""
+                L'encart Titre valable n'est pas un outil de contrôle, ni un vérificateur officiel. Il lit ce que contient la carte et en tire une indication, qui ne remplace ni les valideurs, ni l'appréciation d'un agent assermenté.
+
+                La tolérance est un réglage personnel : elle n'engage en rien un contrôleur.
+                """)
+            }
         }
-        .navigationTitle("Contrôle")
+        .navigationTitle("Titre valable")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
