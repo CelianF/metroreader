@@ -155,46 +155,15 @@ struct SettingsPageView: View {
             }
             
             Section(header: Text("Fait avec ❤️ par")) {
-                // Lien pour DocSystem, précédé du logo de son compte Twitter
-                // comme GitHub et Discord le sont du leur.
-                Link(destination: URL(string: "https://twitter.com/TheDocSystem")!) {
-                    Label {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("DocSystem")
-                                .font(.headline)
-                    
-                            Text("Recherche, rétro-ingénierie et développement")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    } icon: {
-                        Image("Twitter")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: coteLogo, height: coteLogo)
-                    }
-                }
-                .padding(.vertical, 4)
-                
-                // Lien pour Stitch
-                Link(destination: URL(string: "https://twitter.com/TweetingStitch")!) {
-                    Label {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Stitch")
-                                .font(.headline)
-                    
-                            Text("Interface de l'application, design des cartes")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    } icon: {
-                        Image("Twitter")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: coteLogo, height: coteLogo)
-                    }
-                }
-                .padding(.vertical, 4)
+                CreditRow(nom: "DocSystem",
+                          role: "Recherche, rétro-ingénierie et développement",
+                          photo: "DocSystem",
+                          compte: URL(string: "https://twitter.com/TheDocSystem")!)
+
+                CreditRow(nom: "Stitch",
+                          role: "Interface de l'application, design des cartes",
+                          photo: "Stitch",
+                          compte: URL(string: "https://twitter.com/TweetingStitch")!)
             }
             
             Section {
