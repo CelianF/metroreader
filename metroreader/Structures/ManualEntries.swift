@@ -405,6 +405,12 @@ struct ManualLine: Identifiable {
 
     var id: String { "\(providerId)|\(name ?? "")" }
     var stopCount: Int { stops.count }
+
+    /// Le mode de la ligne, pour lui trouver son indice : celui de la saisie, du
+    /// référentiel, ou à défaut des arrêts relevés.
+    var mode: String? {
+        entry?.mode ?? reference?.mode ?? stops.first?.reports.first?.mode
+    }
     var codeCount: Int { stops.reduce(0) { $0 + $1.reports.count } }
 
     // Les couleurs de la saisie d'abord — elle n'existe que là où le

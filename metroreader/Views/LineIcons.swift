@@ -11,56 +11,60 @@ import SwiftUI
 struct LineIcons: View {
     let lines: [NavigoLineInfo]
     let size: CGFloat
-    
+
     init(lines: [NavigoLineInfo], size: CGFloat = 25) {
         self.lines = lines
         self.size = size
     }
-    
-    // Ordered list of modes to ensure RER always appears before Transilien
-    let modeOrder = ["RER", "Transilien", "Métro", "Tramway", "Bus urbain", "Noctilien"]
-    
+
+    /// L'ordre des groupes : le ferré d'abord, puis le métro, le tramway et le
+    /// câble, la surface en dernier. Un mode que la liste ignore passe après les
+    /// autres au lieu de disparaître : c'est ainsi qu'une validation en câble
+    /// n'affichait aucune ligne.
+    private static let modeOrder = [
+        "RER", "Train / RER", "Transilien", "Train", "TER",
+        "Métro", "Tramway", "Câble",
+        "Bus urbain", "Bus interurbain", "Noctilien", "Navette fluviale",
+    ]
+
+    /// Les modes présents, dans cet ordre, les inconnus dans l'ordre où ils
+    /// viennent.
+    private var presentModes: [String] {
+        var vus = Set<String>()
+        return lines.map(\.mode)
+            .filter { vus.insert($0).inserted }
+            .enumerated()
+            .sorted { a, b in
+                let rangA = Self.modeOrder.firstIndex(of: a.element) ?? Self.modeOrder.count
+                let rangB = Self.modeOrder.firstIndex(of: b.element) ?? Self.modeOrder.count
+                return (rangA, a.offset) < (rangB, b.offset)
+            }
+            .map(\.element)
+    }
+
     func lines(for mode: String) -> [NavigoLineInfo] {
         var seenIDs = Set<String>()
-        
         return lines
-            .filter { $0.mode == mode }
-            .filter { line in
-                if seenIDs.contains(line.public_id) {
-                    return false
-                } else {
-                    seenIDs.insert(line.public_id)
-                    return true
-                }
-            }
-            .sorted { $0.name < $1.name }
+            // Les TER ne se distinguent que par leur région, que la pastille
+            // tait : un seul suffit.
+            .filter { $0.mode == mode && seenIDs.insert(mode == "TER" ? "TER" : $0.public_id).inserted }
+            // « 2 » avant « 10 », comme sur un plan
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
-    
+
     var body: some View {
         HStack(spacing: 8) {
-            // 1. Get unique modes present in this list, sorted by our preferred order
-            let presentModes = modeOrder.filter { mode in
-                lines.contains(where: { $0.mode == mode })
-            }
-            
             ForEach(presentModes, id: \.self) { mode in
                 HStack(spacing: 4) {
-                    // 2. Display the Mode Icon
-                    Image(modeIconName(for: mode))
+                    Image(Self.modeIconName(for: mode))
                         .renderingMode(.template)
                         .resizable()
                         .scaledToFit()
                         .frame(width: size, height: size)
                         .foregroundStyle(.primary)
-                    
-                    ForEach(lines(for: mode), id: \.name) { line in
-                        Text(line.name)
-                            .font(.system(size: 16 * (size / 25), weight: .bold))
-                            .frame(width: line.name.count == 1 ? size : nil, height: size)
-                            .padding(.horizontal, line.name.count > 1 ? (size / 5) : 0)
-                            .background(Color(hex: line.background_color))
-                            .cornerRadius(line.mode == "Métro" ? size / 2 : 4)
-                            .foregroundColor(Color(hex: line.text_color))
+
+                    ForEach(lines(for: mode), id: \.public_id) { line in
+                        PastilleLigne(line, taille: size)
                     }
                 }
                 // Add extra spacing between different mode groups
@@ -68,16 +72,18 @@ struct LineIcons: View {
             }
         }
     }
-    
-    // Helper to map mode strings to your asset names
-    func modeIconName(for mode: String) -> String {
+
+    /// Le symbole du mode, celui des plans IDFM.
+    private static func modeIconName(for mode: String) -> String {
         switch mode {
         case "RER": return "mode_rer"
-        case "Transilien", "Train": return "mode_train"
+        case "Train / RER": return "mode_train_rer"
+        case "Transilien", "Train", "TER": return "mode_train"
         case "Métro": return "mode_metro"
         case "Tramway": return "mode_tram"
-        case "Bus urbain": return "mode_bus"
+        case "Câble": return "mode_cable"
         case "Noctilien": return "mode_noctilien"
+        case "Navette fluviale": return "mode_fluvial"
         default: return "mode_bus"
         }
     }
@@ -103,7 +109,7 @@ extension Color {
         default:
             (a, r, g, b) = (1, 1, 1, 0)
         }
-        
+
         self.init(
             .sRGB,
             red: Double(r) / 255,

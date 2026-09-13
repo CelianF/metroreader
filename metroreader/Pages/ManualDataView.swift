@@ -96,6 +96,7 @@ struct ManualNetworkView: View {
                     } label: {
                         HStack(spacing: 10) {
                             PastilleLigne(nom: ligne.name ?? "?",
+                                          mode: ligne.mode,
                                           fond: ligne.backgroundColor,
                                           texte: ligne.textColor)
                             VStack(alignment: .leading, spacing: 2) {
@@ -262,22 +263,6 @@ private struct EtiquetteSaisie: View {
             .background(Color.accentColor.opacity(0.15))
             .foregroundStyle(Color.accentColor)
             .clipShape(Capsule())
-    }
-}
-
-private struct PastilleLigne: View {
-    let nom: String
-    let fond: String
-    let texte: String
-
-    var body: some View {
-        Text(nom)
-            .font(.system(size: 15, weight: .bold))
-            .frame(minWidth: 25, minHeight: 25)
-            .padding(.horizontal, nom.count > 1 ? 6 : 0)
-            .background(Color(hex: fond))
-            .foregroundColor(Color(hex: texte))
-            .cornerRadius(4)
     }
 }
 

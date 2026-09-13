@@ -71,7 +71,8 @@ struct IdentifyLineSheet: View {
                                             fond: entry.backgroundColor, texte: entry.textColor)
                             } label: {
                                 HStack {
-                                    pastille(nom: entry.name, fond: entry.backgroundColor, texte: entry.textColor)
+                                    PastilleLigne(nom: entry.name, mode: entry.mode,
+                                                  fond: entry.backgroundColor, texte: entry.textColor)
                                     Text(interpretServiceProviderName(entry.providerId))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
@@ -92,7 +93,7 @@ struct IdentifyLineSheet: View {
                                         fond: ligne.background_color, texte: ligne.text_color)
                         } label: {
                             HStack {
-                                pastille(nom: ligne.name, fond: ligne.background_color, texte: ligne.text_color)
+                                PastilleLigne(ligne)
                                 Text(ligne.mode)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -136,16 +137,6 @@ struct IdentifyLineSheet: View {
                 }
             }
         }
-    }
-
-    private func pastille(nom: String, fond: String, texte: String) -> some View {
-        Text(nom)
-            .font(.system(size: 15, weight: .bold))
-            .frame(minWidth: 25, minHeight: 25)
-            .padding(.horizontal, nom.count > 1 ? 6 : 0)
-            .background(Color(hex: fond))
-            .foregroundColor(Color(hex: texte))
-            .cornerRadius(4)
     }
 
     private func enregistrer(nom: String, publicId: String? = nil,
