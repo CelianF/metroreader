@@ -36,7 +36,9 @@ func interpretNetworkId(_ bitstring: String) -> (String, String) {
 /// fixe de +1 h, est ce qui évite de décaler tout l'été d'une heure.
 let intercodeTimeZone = TimeZone(identifier: "Europe/Paris") ?? TimeZone(secondsFromGMT: 3600)!
 
-private let intercodeCalendar: Calendar = {
+/// Le calendrier des cartes : un jour s'y découpe à l'heure de Paris, où
+/// que l'on lise la carte.
+let intercodeCalendar: Calendar = {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = intercodeTimeZone
     return calendar

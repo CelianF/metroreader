@@ -54,7 +54,10 @@ func isContractDisabled(_ contractInfo: [String: Any]) -> Bool {
         // La date de fin Intercode est inclusive : le contrat reste valable
         // toute cette journée. On la compare donc au début du jour courant et
         // non à l'instant présent, sans quoi il expirait dès sa première heure.
-        if interpretDateAsDate(contractValidityEndDate) < Calendar.current.startOfDay(for: Date()) {
+        // Le jour courant est celui de Paris, comme la date de fin : pris dans
+        // le fuseau de l'iPhone, il éteignait un titre avant la fin de son
+        // dernier jour dès qu'on lisait la carte ailleurs.
+        if interpretDateAsDate(contractValidityEndDate) < intercodeCalendar.startOfDay(for: Date()) {
             return true
         }
     }

@@ -25,13 +25,6 @@ struct JourneeDeTrajets: Identifiable {
 /// il manque ce qui s'est passé entre les deux.
 private let ecartMaximal: TimeInterval = 3 * 3600
 
-/// Le calendrier des cartes : un jour s'y découpe à l'heure de Paris.
-private let calendrierDeParis: Calendar = {
-    var calendrier = Calendar(identifier: .gregorian)
-    calendrier.timeZone = intercodeTimeZone
-    return calendrier
-}()
-
 /// Le premier des `jours` derniers jours de la carte, à minuit. Comptés depuis
 /// sa validation la plus récente, et non depuis aujourd'hui : un vieux relevé
 /// ne s'ouvre pas sur une page vide.
@@ -42,8 +35,8 @@ func debutDesDerniersJours(_ events: [[String: Any]], jours: Int) -> Date? {
 
 /// Le premier des `jours` derniers jours comptés depuis `recente`, à minuit.
 func debutDesDerniersJours(depuis recente: Date, jours: Int) -> Date {
-    calendrierDeParis.date(byAdding: .day, value: -(max(jours, 1) - 1),
-                           to: calendrierDeParis.startOfDay(for: recente)) ?? recente
+    intercodeCalendar.date(byAdding: .day, value: -(max(jours, 1) - 1),
+                           to: intercodeCalendar.startOfDay(for: recente)) ?? recente
 }
 
 /// Combien de validations, en tête de la carte, datent de `limite` ou d'après.
@@ -61,9 +54,9 @@ func joursCouverts(_ events: [[String: Any]]) -> Int {
 /// Le même, sur des dates déjà lues.
 func joursCouverts(_ dates: [Date]) -> Int {
     guard let recente = dates.max(), let ancienne = dates.min() else { return 0 }
-    let ecart = calendrierDeParis.dateComponents([.day],
-                                                 from: calendrierDeParis.startOfDay(for: ancienne),
-                                                 to: calendrierDeParis.startOfDay(for: recente)).day ?? 0
+    let ecart = intercodeCalendar.dateComponents([.day],
+                                                 from: intercodeCalendar.startOfDay(for: ancienne),
+                                                 to: intercodeCalendar.startOfDay(for: recente)).day ?? 0
     return ecart + 1
 }
 
@@ -94,7 +87,7 @@ func trajetsParJour(_ events: [[String: Any]], contrats: [[String: Any]]) -> [Jo
 
     var parJour: [Date: [Trajet]] = [:]
     for trajet in trajets {
-        parJour[calendrierDeParis.startOfDay(for: trajet.debut), default: []].append(Trajet(indices: trajet.indices.reversed()))
+        parJour[intercodeCalendar.startOfDay(for: trajet.debut), default: []].append(Trajet(indices: trajet.indices.reversed()))
     }
     return parJour
         .map { JourneeDeTrajets(jour: $0.key, trajets: $0.value.reversed()) }
