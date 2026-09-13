@@ -7,7 +7,8 @@ import Foundation
 
 
 /// Les indices de ligne qu'Île-de-France Mobilités publie, livrés dans
-/// Assets.xcassets › Indices lignes avec leur variante pour fond sombre.
+/// Assets.xcassets › Indices lignes avec leur variante pour fond sombre — sauf
+/// Orlyval, d'un seul dessin.
 ///
 /// Leurs noms sont tenus ici plutôt que demandés au catalogue d'images : la
 /// liste se relit d'un coup d'œil, et une ligne sans indice se sait sans tenter
@@ -36,6 +37,12 @@ enum IndicesLignes {
     /// funiculaire, ou nom saisi autrement qu'IDFM ne l'écrit.
     static func images(nom: String, mode: String?) -> [String] {
         guard let mode = mode.flatMap(ModeTransport.init(rawValue:)) else { return [] }
+        // Orlyval n'a pas de numéro : on le reconnaît à son nom, en train au
+        // référentiel mais en métro quand la course 29 le désigne. L'ORLYVAL en
+        // bus, sans arrêt, reste une pastille.
+        if nom.uppercased() == "ORLYVAL" && (mode == .train || mode == .metro) {
+            return ["indice_orlyval"]
+        }
         let famille: String
         switch mode {
         case .metro:      famille = "metro"
@@ -47,6 +54,12 @@ enum IndicesLignes {
         }
         let noms = nom.split(separator: "/").map { "indice_\(famille)_\(suffixe(String($0), mode: mode))" }
         return !noms.isEmpty && noms.allSatisfy(livres.contains) ? noms : []
+    }
+
+    /// La largeur d'un indice à cette hauteur. Tous sont carrés, sauf Orlyval,
+    /// dont le logo s'étire en bandeau de 766 sur 190.
+    static func largeur(_ indice: String, hauteur: CGFloat) -> CGFloat {
+        indice == "indice_orlyval" ? hauteur * 766 / 190 : hauteur
     }
 
     /// Le nom de la ligne tel que le fichier l'écrit : « 3B » y est « 3bis »,

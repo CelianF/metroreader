@@ -98,7 +98,8 @@ struct ManualNetworkView: View {
                             PastilleLigne(nom: ligne.name ?? "?",
                                           mode: ligne.mode,
                                           fond: ligne.backgroundColor,
-                                          texte: ligne.textColor)
+                                          texte: ligne.textColor,
+                                          noctilien: ligne.reference?.is_noctilien ?? false)
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 6) {
                                     Text(ligne.name ?? "Sans ligne")
