@@ -18,6 +18,9 @@ import SwiftUI
 struct ValidationHistoryView: View {
     let events: [[String: Any]]
     let contracts: [[String: Any]]
+    /// Ce qui a été calculé avant d'ouvrir la page ; rien, et elle le calcule
+    /// en s'affichant.
+    private let preparation: Preparation?
 
     // Un arrêt identifié depuis une fiche se renomme ici sans quitter l'écran.
     @ObservedObject private var entries = ManualEntries.shared
@@ -30,6 +33,25 @@ struct ValidationHistoryView: View {
     /// La carte s'ouvre en grand d'un toucher, sur l'étendue de la liste.
     @State private var carteEnGrand = false
     @State private var joursALOuverture = 7
+
+    /// Vrai pendant que tout l'historique se range en trajets : ceux déjà
+    /// montrés restent, et le bas de la liste dit qu'il en vient d'autres.
+    @State private var chargementDeTout = false
+
+    /// Ce que la page affiche en s'ouvrant, calculé d'avance hors du fil
+    /// principal : ouverte avec, elle n'a ni sablier à montrer ni second rendu
+    /// à faire.
+    struct Preparation {
+        let journees: [JourneeDeTrajets]
+        let reperes: [EventAnnotation]
+    }
+
+    init(events: [[String: Any]], contracts: [[String: Any]], preparation: Preparation? = nil) {
+        self.events = events
+        self.contracts = contracts
+        self.preparation = preparation
+        _journees = State(initialValue: preparation?.journees)
+    }
 
     /// Ce que la page montre d'emblée.
     private static let joursAffiches = 7
@@ -53,10 +75,14 @@ struct ValidationHistoryView: View {
 
     /// Combien de validations, en tête de la carte, la page montre.
     private var montrees: Int {
-        guard !toutVoir else { return events.count }
-        let semaine = debutDesDerniersJours(events, jours: Self.joursAffiches)
+        toutVoir ? events.count : Self.montreesALOuverture(events)
+    }
+
+    /// Celles qu'elle montre en s'ouvrant : la dernière semaine, cinquante au plus.
+    nonisolated private static func montreesALOuverture(_ events: [[String: Any]]) -> Int {
+        let semaine = debutDesDerniersJours(events, jours: joursAffiches)
             .map { nombreDeValidations(events, depuis: $0) } ?? events.count
-        return min(semaine, Self.validationsAffichees)
+        return min(semaine, validationsAffichees)
     }
 
     /// Au moins une des `n` premières validations se place sur une carte :
@@ -85,8 +111,10 @@ struct ValidationHistoryView: View {
                         joursALOuverture = toutVoir ? max(joursCouverts(events), 1) : Self.joursAffiches
                         carteEnGrand = true
                     } label: {
-                        EventsMapView(events: events, affiches: montrees, contrats: contracts)
-                            .allowsHitTesting(false)
+                        ApercuDeCarte(events: events, affiches: montrees, contrats: contracts,
+                                      reperesInitiaux: preparation?.reperes)
+                            // Toute la carte se touche, pas seulement son bouton.
+                            .contentShape(Rectangle())
                             .overlay(alignment: .topTrailing) {
                                 Image(systemName: "arrow.up.left.and.arrow.down.right")
                                     .font(.footnote.weight(.semibold))
@@ -133,9 +161,18 @@ struct ValidationHistoryView: View {
                 }
             }
 
-            if !toutVoir && montrees < events.count {
+            if chargementDeTout {
+                Section {
+                    HStack(spacing: 12) {
+                        ProgressView()
+                        Text("Chargement de l'historique…")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else if !toutVoir && montrees < events.count {
                 Section {
                     Button {
+                        chargementDeTout = true
                         toutVoir = true
                     } label: {
                         HStack {
@@ -155,9 +192,16 @@ struct ValidationHistoryView: View {
         .contentMargins(.top, Self.margeDuHaut, for: .scrollContent)
         .navigationTitle("Validations")
         .task(id: toutVoir) {
-            journees = nil
+            // Ouverte avec ses trajets, la page n'a rien à calculer tant qu'on ne
+            // demande pas tout l'historique.
+            if !toutVoir, journees != nil { return }
+            // Les trajets déjà montrés restent pendant le calcul : vidée, la liste
+            // se repliait, et qui avait défilé jusqu'en bas pour tout voir se
+            // retrouvait en haut.
             let calculees = await Self.calculerJournees(events, contrats: contracts, n: montrees)
-            if !Task.isCancelled { journees = calculees }
+            guard !Task.isCancelled else { return }
+            journees = calculees
+            chargementDeTout = false
         }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -165,6 +209,14 @@ struct ValidationHistoryView: View {
             CarteEnGrand(events: events, contrats: contracts, joursInitiaux: joursALOuverture)
         }
         #endif
+    }
+
+    /// Ce que la page affiche en s'ouvrant, calculé hors du fil principal.
+    nonisolated static func preparer(events: [[String: Any]], contrats: [[String: Any]]) async -> Preparation {
+        let montrees = montreesALOuverture(events)
+        let journees = await calculerJournees(events, contrats: contrats, n: montrees)
+        let reperes = await EventsMapView.reperes(events: events, affiches: montrees, contrats: contrats)
+        return Preparation(journees: journees, reperes: reperes)
     }
 
     /// Les trajets des `n` premières validations, hors du fil principal.

@@ -30,6 +30,12 @@ struct ScanView: View {
     /// Vrai quand la fiche du pass, telle que l'historique la garde, est
     /// ouverte par-dessus la carte lue.
     @State private var ficheOuverte = false
+    /// La préparation des voyages quand elle court : la ligne montre alors un
+    /// sablier à la place de sa flèche.
+    @State private var preparationDesVoyages: Task<Void, Never>?
+    /// Les voyages préparés, et la page qui les montre.
+    @State private var voyages: ValidationHistoryView.Preparation?
+    @State private var voyagesOuverts = false
     @State private var showingRenameAlert = false
     @State private var newNickname = ""
     @State private var showingImagePicker = false
@@ -120,6 +126,21 @@ struct ScanView: View {
         }
     }
     
+    /// Range les voyages hors du fil principal, puis ouvre la page, liste
+    /// remplie. Poussée d'un coup, elle figeait l'écran à sa première
+    /// ouverture : le toucher ne s'animait pas, et rien ne disait qu'on
+    /// attendait.
+    private func reconstituerLesVoyages() {
+        guard preparationDesVoyages == nil else { return }
+        let events = tagEvents, contrats = tagContracts
+        preparationDesVoyages = Task {
+            let preparation = await ValidationHistoryView.preparer(events: events, contrats: contrats)
+            guard !Task.isCancelled else { return }
+            voyages = preparation
+            voyagesOuverts = true
+        }
+    }
+
     private var preferredContractIndex: Int? {
         Array(0..<tagContracts.count).first { isContractBest(tagContracts[$0], tagContracts) }
     }
@@ -142,8 +163,8 @@ struct ScanView: View {
     }
     
     private var displayedEventsIndices: [Int] {
-        // Les trois dernières ; le reste se lit trajet par trajet, dans
-        // l'historique des validations.
+        // Les trois dernières ; le reste se lit trajet par trajet, en
+        // reconstituant les voyages depuis l'historique.
         Array(Array(0..<tagEvents.count).prefix(3))
     }
 
@@ -211,7 +232,46 @@ struct ScanView: View {
             // Sans contrat ni événement non plus : un pass neuf n'ouvre aucun
             // droit, et le dire est le seul renseignement qu'on ait à donner.
             TimersView(timers: timers, sansControle: depuisHistorique)
-            
+
+            // Dans l'historique seulement : sur une carte qu'on vient de lire,
+            // on regarde son titre, pas ses voyages. La vignette ne montre pas
+            // ces voyages, seulement qu'une carte attend derrière : une image
+            // fixe, rien à calculer.
+            if depuisHistorique, !tagEvents.isEmpty {
+                Section {
+                    // Un bouton plutôt qu'un lien : la page ne s'ouvre qu'une
+                    // fois prête, et le sablier prend la place de la flèche en
+                    // attendant.
+                    Button(action: reconstituerLesVoyages) {
+                        HStack {
+                            Text("Reconstituer les voyages")
+                            Spacer()
+                            Image("CarteParis")
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 44, height: 44)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .accessibilityHidden(true)
+                            // La flèche d'un lien, qu'un bouton n'a pas, à la
+                            // taille et à la place de celle des contrats. Le
+                            // sablier se pose dessus sans rien décaler.
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.tertiary)
+                                .padding(.trailing, 1.5)
+                                .opacity(preparationDesVoyages == nil ? 1 : 0)
+                                .overlay {
+                                    if preparationDesVoyages != nil {
+                                        ProgressView()
+                                    }
+                                }
+                        }
+                    }
+                    // Les couleurs d'une ligne, pas le bleu d'un bouton.
+                    .tint(.primary)
+                }
+            }
+
             if tagContracts.count > 0 {
                 Section(header: Text("Contrats")) {
                     ForEach(displayedContractsIndices, id: \.self) { i in
@@ -249,20 +309,6 @@ struct ScanView: View {
                             EventView(eventInfo: tagEvents[i], transition: validations.transition(de: i), contractsInfos: tagContracts)
                         } label: {
                             EventPreview(eventInfo: tagEvents[i], transition: validations.transition(de: i))
-                        }
-                    }
-                    
-                    if tagEvents.count > displayedEventsIndices.count {
-                        NavigationLink {
-                            ValidationHistoryView(events: tagEvents, contracts: tagContracts)
-                        } label: {
-                            HStack {
-                                Text("Voir l'historique des validations")
-                                Spacer()
-                                Text("\(tagEvents.count)")
-                                    .foregroundColor(.gray)
-                                    .font(.caption)
-                            }
                         }
                     }
                 }
@@ -321,6 +367,16 @@ struct ScanView: View {
                     historyManager: historyManager
                 )
             }
+        }
+        .navigationDestination(isPresented: $voyagesOuverts) {
+            ValidationHistoryView(events: tagEvents, contracts: tagContracts, preparation: voyages)
+        }
+        // Couverte par la page des voyages, la fiche rend sa flèche à la ligne :
+        // au retour, plus de sablier. Quittée en pleine préparation, elle
+        // n'ouvre plus rien.
+        .onDisappear {
+            preparationDesVoyages?.cancel()
+            preparationDesVoyages = nil
         }
         .task {
             withAnimation(.spring(duration: 0.65, bounce: 0.22)) { carteEnPlace = true }
