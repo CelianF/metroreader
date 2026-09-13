@@ -48,9 +48,10 @@ struct ResolvedEvent {
     let transition: String
 
     /// `suivants` et `precedents` : les validations écrites après et avant
-    /// celle-ci, de la plus proche à la plus lointaine. Sans elles, une sortie
-    /// « voie publique » reste une sortie, et l'entrée une entrée. `contrats` :
-    /// les titres de la carte, qui disent si l'entrée a été payée sous forfait.
+    /// celle-ci, telles que la carte les range — de la plus récente à la plus
+    /// ancienne. Sans elles, une sortie « voie publique » reste une sortie, et
+    /// l'entrée une entrée. `contrats` : les titres de la carte, qui disent si
+    /// l'entrée a été payée sous forfait.
     init(_ eventInfo: [String: Any], suivants: [[String: Any]] = [], precedents: [[String: Any]] = [], contrats: [[String: Any]] = []) {
         let routeBits = getKey(eventInfo, "EventRouteNumber")
         let codeBits = getKey(eventInfo, "EventCode") ?? ""
@@ -68,11 +69,6 @@ struct ResolvedEvent {
         self.locationId = Int(locationBits, radix: 2)
         self.routeNumber = Int(routeBits ?? "", radix: 2)
 
-        var finalRouteName: String? = nil
-        if self.routeNumber != nil {
-            finalRouteName = interpretRouteNumber(routeBits ?? "", codeBits, providerBits)
-        }
-
         self.location = interpretLocationId(locationBits, codeBits, providerBits, routeBits)
 
         let eventCode = interpretEventCode(codeBits,
@@ -82,6 +78,16 @@ struct ResolvedEvent {
         var finalMode = eventCode.0
         self.lookupMode = eventCode.0
         self.transition = transitionRacontee(eventInfo, suivants: suivants, precedents: precedents, contrats: contrats)
+
+        // Une seule résolution de ligne pour tout l'écran. Le nom affiché, la
+        // pastille et le public_id venaient de trois chemins — une table codée
+        // en dur, le référentiel, et le référentiel interrogé sous le mode
+        // affiché — qui ne s'accordaient pas : la course 103 de la RATP se
+        // lisait « Métro 3 bis » dans la liste et « 3B » dans la fiche.
+        let candidats = routeBits.map { interpretRouteCandidates($0, codeBits, providerBits) } ?? []
+        self.routeCandidates = candidats
+        self.route = candidats.first
+        var finalRouteName = self.route?.name
 
         if self.location.found && finalMode == "Train" {
             let stationModes = Set(self.location.lines.map { $0.mode })
@@ -102,15 +108,10 @@ struct ResolvedEvent {
             }
         }
 
-        // Le journal d'abord, comme dans `interpretRouteCandidates` : les deux
-        // chemins cherchaient dans l'ordre inverse l'un de l'autre, si bien
-        // qu'une ligne nommée à la main s'affichait en pastille pendant que le
-        // `public_id` restait celui du référentiel — et c'est ce `public_id`
-        // qui filtre les arrêts proposés. Même événement, deux réponses.
-        self.lineData = ManualEntries.shared.line(provider: self.providerId,
-                                                  route: self.routeNumber ?? -1,
-                                                  mode: self.lookupMode)
-            ?? NavigoLines.find(self.providerId, self.routeNumber ?? 0, finalMode)
+        // La ligne qui porte le public_id et l'appartenance au Noctilien :
+        // celle qu'on retient, pourvu qu'on l'ait trouvée. Un repli qui ne porte
+        // que le numéro de course n'a pas d'identifiant à donner.
+        self.lineData = (self.route?.found == true) ? self.route : nil
 
         if self.lineData?.is_noctilien == true {
             finalMode = "Noctilien"
@@ -118,9 +119,6 @@ struct ResolvedEvent {
 
         self.mode = finalMode
         self.routeName = finalRouteName
-        let candidats = routeBits.map { interpretRouteCandidates($0, codeBits, providerBits) } ?? []
-        self.routeCandidates = candidats
-        self.route = candidats.first
     }
 
     /// Jour et heure de la validation, pour juger la fraîcheur d'une position.

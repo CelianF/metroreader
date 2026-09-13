@@ -178,92 +178,6 @@ func interpretZonesShort(_ bitstring: String) -> String {
     return "\(minZone)-\(maxZone)"
 }
 
-func interpretRouteNumber(_ routeNumberBitstring: String, _ eventCodeBitstring: String, _ eventServiceProviderBitstring: String) -> String {
-    let routeNumber = Int(routeNumberBitstring, radix: 2)!
-    
-    let serviceProviderCode = Int(eventServiceProviderBitstring, radix: 2)!
-
-    let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: true, routeNumber: routeNumber, serviceProvider: serviceProviderCode).0
-    
-    // Une ligne ne se saisit que si le référentiel n'a pas su la nommer : la
-    // saisie passe donc devant, elle ne peut rien recouvrir.
-    if let saisie = ManualEntries.shared.lineEntry(provider: serviceProviderCode, route: routeNumber, mode: eventTransport) {
-        return saisie.name
-    }
-    
-    if (eventTransport == "RER") {
-        if (routeNumber == 16) || (routeNumber == 17) || (routeNumber == 26) {
-            return "A"
-        }
-        else if routeNumber == 18 {
-            return "B"
-        }
-    }
-    if (eventTransport == "Métro") {
-        // Chez la RATP le numéro de course vaut le numéro de ligne, ce que les
-        // cas ci-dessous supposent. Ce n'est pas vrai des autres exploitants :
-        // la desserte de l'aéroport d'Orly porte la course 12, qui entrerait en
-        // collision avec la ligne 12. On interroge donc la table pour eux.
-        if serviceProviderCode != 3,
-           let route = NavigoLines.find(serviceProviderCode, routeNumber, eventTransport) {
-            return route.name
-        }
-        switch routeNumber {
-        case 29:
-            return "Orlyval"
-        case 103:
-            return "3 bis"
-        case 107:
-            return "7 bis"
-        case 920:
-            return "10"
-        case 924:
-            return "6"
-        default:
-            return "\(routeNumber)"
-        }
-    }
-    else if let routeName = NavigoLines.find(serviceProviderCode, routeNumber, eventTransport) {
-        return routeName.name
-    }
-    else if (eventTransport == "Tramway") {
-        switch routeNumber {
-        case 11:
-            return "T1"
-        case 12:
-            return "T2"
-        case 13:
-            return "T3a"
-        case 3:
-            return "T3b"
-        case 2:
-            return "T4"
-        case 15:
-            return "T5"
-        case 16:
-            return "T6"
-        case 17:
-            return "T7"
-        case 18:
-            return "T8"
-        case 9:
-            return "T9"
-        case 10:
-            return "T10"
-        case 43:
-            return "T13"
-        default:
-            return "\(routeNumber)"
-        }
-    }
-    
-    return "\(routeNumber)"
-}
-
-func interpretRoute(_ routeNumberBitstring: String, _ eventCodeBitstring: String, _ eventServiceProviderBitstring: String) -> NavigoLineInfo? {
-    interpretRouteCandidates(routeNumberBitstring, eventCodeBitstring, eventServiceProviderBitstring).first
-}
-
 /// Les lignes que ce numéro de course peut désigner, la retenue en tête.
 ///
 /// Presque toujours une seule. Mais le référentiel partage parfois un
@@ -274,7 +188,7 @@ func interpretRouteCandidates(_ routeNumberBitstring: String, _ eventCodeBitstri
         return []
     }
     
-    let serviceProviderCode = Int(eventServiceProviderBitstring, radix: 2)!
+    let serviceProviderCode = Int(eventServiceProviderBitstring, radix: 2) ?? 0
 
     let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: true, routeNumber: routeNumber, serviceProvider: serviceProviderCode).0
     
