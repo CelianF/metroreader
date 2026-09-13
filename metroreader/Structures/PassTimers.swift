@@ -204,23 +204,15 @@ struct PassTimers {
         hasUsableForfait = Self.usableForfait(contracts)
     }
 
-    /// Un titre encore utilisable aujourd'hui. `isContractDisabled` couvre le
-    /// statut, l'échéance et le compteur ; reste la date de début, qu'un titre
-    /// acheté pour le mois prochain n'a pas encore atteinte.
-    private static func isUsable(_ contract: [String: Any]) -> Bool {
-        guard !isContractDisabled(contract) else { return false }
-        guard let start = getKey(contract, "ContractValidityStartDate") else { return true }
-        return interpretDateAsDate(start) <= Date()
-    }
-
+    /// Un titre qui sert aujourd'hui, date de début comprise : `estUtilisable`.
     private static func usableContract(_ contracts: [[String: Any]]) -> Bool {
-        contracts.contains { isUsable($0) }
+        contracts.contains { estUtilisable($0) }
     }
 
     /// Parmi eux, ceux qui donnent un droit illimité : ni carnet à décompter,
     /// ni post-paiement.
     private static func usableForfait(_ contracts: [[String: Any]]) -> Bool {
-        contracts.contains { isUsable($0) && !isSingleUse($0) }
+        contracts.contains { estUtilisable($0) && !isSingleUse($0) }
     }
 
     /// Le dernier mode emprunté, et si le titre qui l'a payé ouvre aussi les
@@ -343,11 +335,6 @@ struct PassTimers {
     /// Ticket à l'unité ou Liberté+, par opposition à un forfait illimité.
     private static func isSingleUse(_ contract: [String: Any]?) -> Bool {
         guard let contract else { return false }
-        if getKey(contract, "CounterContractCount") != nil { return true }
-        if let tariffBits = getKey(contract, "ContractTariff"),
-           let tariff = Int(tariffBits, radix: 2) {
-            return tariff == 0x1000 || tariff == 0x1001 // Navigo Liberté +
-        }
-        return false
+        return getKey(contract, "CounterContractCount") != nil || estLibertePlus(contract)
     }
 }

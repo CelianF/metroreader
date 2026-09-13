@@ -142,19 +142,19 @@ struct ScanView: View {
     }
 
     private var preferredContractIndex: Int? {
-        Array(0..<tagContracts.count).first { isContractBest(tagContracts[$0], tagContracts) }
+        ordreDesContrats(tagContracts).first { isContractBest(tagContracts[$0], tagContracts) }
     }
 
     private var displayedContractsIndices: [Int] {
-        let allIndices = Array(0..<tagContracts.count)
+        let ordre = ordreDesContrats(tagContracts)
 
         // Sans contrat préféré, on affiche tout d'emblée
-        guard let bestIndex = preferredContractIndex else { return allIndices }
+        guard let bestIndex = preferredContractIndex else { return ordre }
 
         // Le contrat retenu garde sa place en tête : déplier ajoute les autres
         // en dessous de lui, au lieu de le faire glisser dans la liste.
         guard showAllContracts else { return [bestIndex] }
-        return [bestIndex] + allIndices.filter { $0 != bestIndex }
+        return [bestIndex] + ordre.filter { $0 != bestIndex }
     }
 
     /// Ce que le dépliage ferait apparaître, et non le nombre total de contrats
