@@ -81,6 +81,7 @@ struct ScanView: View {
     @AppStorage(TimerSettings.controlToleranceMinutes) private var toleranceMinutes = TimerSettings.defaultToleranceMinutes
     /// Lu ici pour que la fiche se redessine quand le mode debug le bascule.
     @AppStorage(ModeDebug.transitionsBrutes) private var transitionsBrutes = false
+    @AppStorage(ModeDebug.deverrouille) private var modeDebug = false
 
     // La carte des événements et les libellés d'arrêt suivent le journal des
     // saisies : ce qui vient d'être identifié apparaît sans changer d'écran.
@@ -360,6 +361,10 @@ struct ScanView: View {
                 Section(header: Text("Environnement")) {
                     EnvHolderView(envHolderInfo: tagEnvHolder, cardID: cardID)
                 }
+            }
+
+            if modeDebug {
+                DebugDesTimers(contracts: tagContracts, events: tagEvents)
             }
         }
         #if os(iOS)
