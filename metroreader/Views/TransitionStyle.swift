@@ -271,6 +271,8 @@ func transitionRacontee(_ lue: LectureValidation, suivants: some Collection<Lect
 /// qui mène au métro. Celle qui passe par la voie publique garde le nom que lui
 /// donne Île-de-France Mobilités.
 func interpretTransitionLabel(_ transition: String, mode: String? = nil) -> String {
+    // Sans correspondances déduites, le libellé du valideur, tel quel.
+    if transitionsBrutes { return transition }
     if let mode, correspondanceVersMetro(transition: transition, mode: mode) {
         return "Correspondance vers le métro"
     }

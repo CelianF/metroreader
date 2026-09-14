@@ -80,12 +80,16 @@ struct LigneEmpruntee: Hashable {
 final class Validations {
     let evenements: [[String: Any]]
     let contrats: [[String: Any]]
+    /// Les transitions telles que les valideurs les écrivent, sans rien déduire
+    /// des voisines : le mode debug le demande.
+    let brutes: Bool
     private var lectures: [LectureValidation?]
     private var transitions: [String?]
 
-    init(_ evenements: [[String: Any]], contrats: [[String: Any]]) {
+    init(_ evenements: [[String: Any]], contrats: [[String: Any]], brutes: Bool = transitionsBrutes) {
         self.evenements = evenements
         self.contrats = contrats
+        self.brutes = brutes
         lectures = Array(repeating: nil, count: evenements.count)
         transitions = Array(repeating: nil, count: evenements.count)
     }
@@ -109,8 +113,10 @@ final class Validations {
         ((i + 1)..<evenements.count).lazy.map { self[$0] }
     }
 
-    /// La transition que le trajet raconte pour la i-ième validation.
+    /// La transition que le trajet raconte pour la i-ième validation — ou, sans
+    /// correspondances déduites, celle que son valideur a écrite.
     func transition(de i: Int) -> String {
+        if brutes { return self[i].brute }
         if let racontee = transitions[i] { return racontee }
         let racontee = transitionRacontee(self[i], suivants: suivants(de: i), precedents: precedents(de: i))
         transitions[i] = racontee

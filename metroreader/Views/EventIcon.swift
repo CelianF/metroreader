@@ -11,7 +11,9 @@ import SwiftUI
 /// quitte. Sortir du RER par une porte de correspondance, c'est entrer dans le
 /// métro — le libellé, lui, garde la ligne d'où l'on vient.
 func modeDuPictogramme(mode: String, transition: String) -> String {
-    correspondanceVersMetro(transition: transition, mode: mode) ? ModeTransport.metro.rawValue : mode
+    // Sans correspondances déduites, le mode que la carte écrit.
+    guard !transitionsBrutes else { return mode }
+    return correspondanceVersMetro(transition: transition, mode: mode) ? ModeTransport.metro.rawValue : mode
 }
 
 /// Le pictogramme IDFM d'un mode, tel qu'il figure au catalogue ; rien pour un

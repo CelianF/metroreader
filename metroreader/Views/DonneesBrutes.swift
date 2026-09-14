@@ -15,10 +15,21 @@ enum ModeDebug {
     static let donneesBrutes = "debugDonneesBrutes"
     /// La base où les écrire, gardée quand on les masque.
     static let base = "debugBaseBrute"
+    /// Vrai quand « Désactiver les correspondances » est allumé : chaque
+    /// validation garde la transition que son valideur a écrite.
+    static let transitionsBrutes = "debugTransitionsBrutes"
 }
 
 enum BaseBrute: String {
     case hexadecimal, decimal
+}
+
+/// Vrai quand le mode debug a éteint les correspondances déduites : chaque
+/// validation garde la transition que son valideur a écrite, et les trajets ne
+/// se rangent que sur elle. Lu aussi hors du fil principal, par la préparation
+/// des voyages.
+var transitionsBrutes: Bool {
+    UserDefaults.standard.bool(forKey: ModeDebug.transitionsBrutes)
 }
 
 private func estBinaire(_ bits: String) -> Bool {

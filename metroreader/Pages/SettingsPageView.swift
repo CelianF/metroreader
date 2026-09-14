@@ -39,6 +39,7 @@ struct SettingsPageView: View {
     @AppStorage(ModeDebug.deverrouille) private var modeDebug = false
     @AppStorage(ModeDebug.donneesBrutes) private var donneesBrutes = false
     @AppStorage(ModeDebug.base) private var baseBrute = BaseBrute.hexadecimal
+    @AppStorage(ModeDebug.transitionsBrutes) private var transitionsBrutes = false
     /// Les touches rapprochées sur la version, et l'heure de la dernière.
     @State private var touchesVersion = 0
     @State private var derniereToucheVersion: Date?
@@ -203,9 +204,12 @@ struct SettingsPageView: View {
                         .pickerStyle(.segmented)
                     }
 
+                    Toggle("Désactiver les correspondances", isOn: $transitionsBrutes)
+
                     Button {
                         withAnimation {
                             donneesBrutes = false
+                            transitionsBrutes = false
                             modeDebug = false
                         }
                     } label: {
@@ -214,7 +218,7 @@ struct SettingsPageView: View {
                 } header: {
                     Text("Debug")
                 } footer: {
-                    Text("Données brutes : dans les fiches et l'environnement, le champ tel que la carte l'écrit, à côté de sa traduction.")
+                    Text("Données brutes : dans les fiches et l'environnement, le champ tel que la carte l'écrit, à côté de sa traduction. Correspondances désactivées : chaque validation garde la transition écrite par son valideur, et les trajets ne se rangent que sur elle.")
                 }
             }
 

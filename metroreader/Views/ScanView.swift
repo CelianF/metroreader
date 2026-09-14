@@ -79,6 +79,8 @@ struct ScanView: View {
     @AppStorage(TimerSettings.controlMode) private var controlMode = ControlMode.automatique.rawValue
     @AppStorage(TimerSettings.controlTolerance) private var toleranceEnabled = true
     @AppStorage(TimerSettings.controlToleranceMinutes) private var toleranceMinutes = TimerSettings.defaultToleranceMinutes
+    /// Lu ici pour que la fiche se redessine quand le mode debug le bascule.
+    @AppStorage(ModeDebug.transitionsBrutes) private var transitionsBrutes = false
 
     // La carte des événements et les libellés d'arrêt suivent le journal des
     // saisies : ce qui vient d'être identifié apparaît sans changer d'écran.
@@ -204,7 +206,7 @@ struct ScanView: View {
     var body: some View {
         // Une lecture des validations pour toute la fiche : chaque ligne y puise
         // sa transition sans relire les autres.
-        let validations = Validations(tagEvents, contrats: tagContracts)
+        let validations = Validations(tagEvents, contrats: tagContracts, brutes: transitionsBrutes)
         List {
             Section(header:
                 ZStack(alignment: .bottomLeading) {
