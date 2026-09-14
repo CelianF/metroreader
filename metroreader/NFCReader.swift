@@ -8,6 +8,7 @@
 import Foundation
 #if os(iOS)
 import CoreNFC
+import UIKit
 #endif
 
 /// Les octets d'une réponse, un caractère par bit : la forme que lit le parseur
@@ -274,6 +275,11 @@ extension NFCReader: NFCTagReaderSessionDelegate {
                     session.alertMessage = "⚪️⚪️⚪️⚪️⚪️⚪️⚪️"
                     self.tagIcc = try await selectAID(carte, Data([0xA0, 0x00, 0x00, 0x04, 0x04, 0x01, 0x25, 0x09, 0x01, 0x01]))
                     self.cardID = interpretCardID(self.tagIcc)
+                    // La carte a répondu en passe Navigo : une légère vibration
+                    // dit qu'elle est bien lue, et qu'il faut la laisser en place.
+                    // Pas avant — une carte bancaire vibrerait, puis serait
+                    // refusée.
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
                     session.alertMessage = "🔵⚪️⚪️⚪️⚪️⚪️⚪️"
                     self.tagEnvHolder = parseStructure(bitstring: try await readRecord(carte, 1, 0x07), element: IntercodeEnvHolder).0 as! [String: Any]
