@@ -3,6 +3,9 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var nfcReader = NFCReader()
     @StateObject private var historyManager = HistoryManager()
+    #if os(iOS)
+    @ObservedObject private var actionsRapides = ActionsRapides.shared
+    #endif
     @State private var selectedTab = 0
     @State private var lastScanTabTap: Date?
     @Environment(\.scenePhase) private var scenePhase
@@ -76,7 +79,15 @@ struct ContentView: View {
             // En arrière-plan, l'app peut être suspendue sans préavis : ce qui
             // reste à écrire s'écrit avant.
             if phase == .background { Persistance.attendre() }
+            #if os(iOS)
+            lancerLeScanDemande()
+            #endif
         }
+        #if os(iOS)
+        .onChange(of: actionsRapides.scanDemande, initial: true) {
+            lancerLeScanDemande()
+        }
+        #endif
     }
 
     private func handleIncomingFile(url: URL) {
@@ -86,10 +97,66 @@ struct ContentView: View {
             self.nfcReader.importFile(at: url, historyManager: historyManager)
         }
     }
+
+    #if os(iOS)
+    // Appui long sur l'icône, « Scanner une carte ». L'action peut arriver
+    // avant que la scène soit active — au lancement, elle précède même la
+    // première vue : elle attend donc, et part dès que les deux sont réunis.
+    private func lancerLeScanDemande() {
+        guard actionsRapides.scanDemande, scenePhase == .active else { return }
+        actionsRapides.scanDemande = false
+        selectedTab = 0
+        if !nfcReader.isScanning {
+            nfcReader.beginScanning(historyManager: historyManager)
+        }
+    }
+    #endif
 }
+
+#if os(iOS)
+// SwiftUI ne transmet pas les actions rapides de l'écran d'accueil : elles
+// passent par le délégué de scène, dans `willConnectTo` quand l'app était
+// fermée, dans `performActionFor` quand elle attendait en arrière-plan.
+// L'action « scan » est déclarée dans Info.plist.
+@MainActor
+final class ActionsRapides: ObservableObject {
+    static let shared = ActionsRapides()
+    @Published var scanDemande = false
+
+    func recevoir(_ action: UIApplicationShortcutItem) -> Bool {
+        guard action.type == "\(Bundle.main.bundleIdentifier ?? "").scan" else { return false }
+        scanDemande = true
+        return true
+    }
+}
+
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        configuration.delegateClass = SceneDelegate.self
+        return configuration
+    }
+}
+
+final class SceneDelegate: NSObject, UIWindowSceneDelegate {
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+        if let action = connectionOptions.shortcutItem {
+            _ = ActionsRapides.shared.recevoir(action)
+        }
+    }
+
+    func windowScene(_ windowScene: UIWindowScene, performActionFor shortcutItem: UIApplicationShortcutItem, completionHandler: @escaping (Bool) -> Void) {
+        completionHandler(ActionsRapides.shared.recevoir(shortcutItem))
+    }
+}
+#endif
 
 @main
 struct NFCReaderApp: App {
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    #endif
+
     var body: some Scene {
         WindowGroup {
             ContentView()
