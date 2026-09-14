@@ -35,29 +35,42 @@ struct ApercuDeCarte: View {
     @State private var reperes: (cle: String, liste: [EventAnnotation])?
     @State private var largeur: CGFloat = 0
     @State private var photo: Photo?
+    /// La clé pour laquelle la photo affichée a été prise.
+    @State private var cleDeLaPhoto: String?
     @State private var enCalcul = true
 
     /// `reperesInitiaux` : des repères déjà calculés, qui n'ont plus qu'à être
-    /// photographiés.
+    /// photographiés. `photoInitiale` : la photo elle-même, déjà prise ; la
+    /// carte s'affiche d'emblée, et ne se reprend que si la largeur mesurée
+    /// n'est pas la sienne.
     init(events: [[String: Any]], affiches: Int, contrats: [[String: Any]],
-         reperesInitiaux: [EventAnnotation]? = nil) {
+         reperesInitiaux: [EventAnnotation]? = nil, photoInitiale: Photo? = nil) {
         self.events = events
         self.affiches = affiches
         self.contrats = contrats
-        _reperes = State(initialValue: reperesInitiaux.map {
-            (cle: Self.cleDesReperes(affiches: affiches, events: events), liste: $0)
-        })
+        let cleReperes = Self.cleDesReperes(affiches: affiches, events: events)
+        _reperes = State(initialValue: reperesInitiaux.map { (cle: cleReperes, liste: $0) })
+        if let photoInitiale {
+            _photo = State(initialValue: photoInitiale)
+            _cleDeLaPhoto = State(initialValue: Self.cle(reperes: cleReperes, largeur: photoInitiale.largeur,
+                                                         sombre: photoInitiale.sombre))
+            _largeur = State(initialValue: photoInitiale.largeur)
+            _enCalcul = State(initialValue: false)
+        }
     }
 
     /// L'image et ce qu'on pose dessus, calculés ensemble : ils ne peuvent pas
     /// se décaler.
-    private struct Photo {
+    struct Photo {
         let image: Image
         let trace: [CGPoint]
-        let pastilles: [PastilleSurPhoto]
+        fileprivate let pastilles: [PastilleSurPhoto]
+        /// La largeur et l'apparence pour lesquelles elle a été prise.
+        let largeur: CGFloat
+        let sombre: Bool
     }
 
-    private struct PastilleSurPhoto: Identifiable {
+    fileprivate struct PastilleSurPhoto: Identifiable {
         var annotation: EventAnnotation
         let point: CGPoint
         var id: UUID { annotation.id }
@@ -69,9 +82,16 @@ struct ApercuDeCarte: View {
         "\(affiches)|\(events.count)|\(ManualEntries.shared.revision)"
     }
 
+    /// Ce qui oblige à reprendre la photo : d'autres repères, une autre largeur
+    /// ou une autre apparence.
+    private static func cle(reperes: String, largeur: CGFloat, sombre: Bool) -> String {
+        "\(reperes)|\(largeur)|\(sombre)"
+    }
+
     var body: some View {
         // Une autre largeur ou une autre apparence demandent une autre photo.
-        let cle = "\(Self.cleDesReperes(affiches: affiches, events: events))|\(largeur)|\(apparence == .dark)"
+        let cle = Self.cle(reperes: Self.cleDesReperes(affiches: affiches, events: events),
+                           largeur: largeur, sombre: apparence == .dark)
         ZStack {
             if let photo {
                 photo.image
@@ -100,7 +120,7 @@ struct ApercuDeCarte: View {
         // moment où la tâche s'exécute, celle d'avant la mesure prenait déjà la
         // largeur mesurée, et deux photos partaient ensemble.
         .task(id: cle) { [largeur, apparence] in
-            await photographier(largeur: largeur, sombre: apparence == .dark)
+            await photographier(cle: cle, largeur: largeur, sombre: apparence == .dark)
         }
     }
 
@@ -125,8 +145,13 @@ struct ApercuDeCarte: View {
         }
     }
 
-    private func photographier(largeur: CGFloat, sombre: Bool) async {
+    private func photographier(cle: String, largeur: CGFloat, sombre: Bool) async {
         guard largeur > 0 else { return }
+        // Déjà prise pour cette clé, avant l'ouverture de la page.
+        if cle == cleDeLaPhoto {
+            enCalcul = false
+            return
+        }
         enCalcul = true
         let cleReperes = Self.cleDesReperes(affiches: affiches, events: events)
         let liste: [EventAnnotation]
@@ -141,12 +166,13 @@ struct ApercuDeCarte: View {
                                         sombre: sombre, echelle: echelle)
         guard !Task.isCancelled else { return }
         withAnimation(.easeOut(duration: 0.25)) { photo = nouvelle }
+        cleDeLaPhoto = cle
         enCalcul = false
     }
 
     /// La carte cadrée sur les repères, dessinée hors du fil principal.
-    nonisolated private static func photo(de reperes: [EventAnnotation], taille: CGSize,
-                                          sombre: Bool, echelle: CGFloat) async -> Photo? {
+    nonisolated static func photo(de reperes: [EventAnnotation], taille: CGSize,
+                                  sombre: Bool, echelle: CGFloat) async -> Photo? {
         guard let region = EventsMapView.region(reperes) else { return nil }
         let options = MKMapSnapshotter.Options()
         options.region = region
@@ -178,7 +204,9 @@ struct ApercuDeCarte: View {
         return Photo(
             image: image,
             trace: reperes.trace().map { cliche.point(for: $0) },
-            pastilles: pastilles.map { PastilleSurPhoto(annotation: $0, point: cliche.point(for: $0.coordinate)) }
+            pastilles: pastilles.map { PastilleSurPhoto(annotation: $0, point: cliche.point(for: $0.coordinate)) },
+            largeur: taille.width,
+            sombre: sombre
         )
     }
 }

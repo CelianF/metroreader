@@ -36,6 +36,11 @@ struct ScanView: View {
     /// Les voyages préparés, et la page qui les montre.
     @State private var voyages: ValidationHistoryView.Preparation?
     @State private var voyagesOuverts = false
+    /// La largeur d'une section, où l'aperçu de carte des voyages se
+    /// photographie d'avance. Retenue sans redessiner la fiche.
+    @State private var mesure = Mesure()
+    @Environment(\.colorScheme) private var apparence
+    @Environment(\.displayScale) private var echelle
     @State private var showingRenameAlert = false
     @State private var newNickname = ""
     @State private var showingImagePicker = false
@@ -126,15 +131,19 @@ struct ScanView: View {
         }
     }
     
-    /// Range les voyages hors du fil principal, puis ouvre la page, liste
-    /// remplie. Poussée d'un coup, elle figeait l'écran à sa première
-    /// ouverture : le toucher ne s'animait pas, et rien ne disait qu'on
-    /// attendait.
+    /// Range les voyages et photographie leur carte hors du fil principal,
+    /// puis ouvre la page, remplie. Poussée d'un coup, elle figeait l'écran à
+    /// sa première ouverture : le toucher ne s'animait pas, et rien ne disait
+    /// qu'on attendait.
     private func reconstituerLesVoyages() {
         guard preparationDesVoyages == nil else { return }
         let events = tagEvents, contrats = tagContracts
+        // Sans carte du pass mesurée, la page photographie sa carte elle-même.
+        let apercu = mesure.largeur > 0 ? CGSize(width: mesure.largeur, height: ApercuDeCarte.hauteur) : nil
+        let sombre = apparence == .dark, echelle = self.echelle
         preparationDesVoyages = Task {
-            let preparation = await ValidationHistoryView.preparer(events: events, contrats: contrats)
+            let preparation = await ValidationHistoryView.preparer(events: events, contrats: contrats,
+                                                                   apercu: apercu, sombre: sombre, echelle: echelle)
             guard !Task.isCancelled else { return }
             voyages = preparation
             voyagesOuverts = true
@@ -202,6 +211,9 @@ struct ScanView: View {
                     if let holderCardStatus = getKey(tagEnvHolder, "HolderDataCardStatus"), let holderCommercialId = getKey(tagEnvHolder, "HolderDataCommercialID") {
                         NavigoImage(imageName: historyManager.history.first(where: { $0.cardID == cardID })?.image ?? interpretNavigoImage(holderCardStatus, getKey(tagEnvHolder, "EnvApplicationIssuerId") ?? "", holderCommercialId, tagContracts))
                             .shadow(radius: 2)
+                            // La carte du pass tient toute la largeur d'une
+                            // section : c'est celle de l'aperçu des voyages.
+                            .onGeometryChange(for: CGFloat.self) { $0.size.width.rounded() } action: { mesure.largeur = $0 }
                             .overlay {
                                 if let outline = validityOutline {
                                     RoundedRectangle(cornerRadius: 12)
@@ -231,7 +243,7 @@ struct ScanView: View {
             
             // Sans contrat ni événement non plus : un pass neuf n'ouvre aucun
             // droit, et le dire est le seul renseignement qu'on ait à donner.
-            TimersView(timers: timers, sansControle: depuisHistorique)
+            TimersDeLaCarte(contracts: tagContracts, events: tagEvents, sansControle: depuisHistorique)
 
             // Dans l'historique seulement : sur une carte qu'on vient de lire,
             // on regarde son titre, pas ses voyages. La vignette ne montre pas
@@ -379,6 +391,10 @@ struct ScanView: View {
             preparationDesVoyages = nil
         }
         .task {
+            // Depuis l'historique, la carte est posée d'emblée et sans contour :
+            // rien à animer, et chaque changement d'état redessinait la fiche
+            // pendant qu'elle glissait.
+            guard !depuisHistorique else { return }
             withAnimation(.spring(duration: 0.65, bounce: 0.22)) { carteEnPlace = true }
             // Le contour n'entre qu'une fois la carte immobile et à sa taille.
             guard await patiente(.seconds(0.7)) else { return }
@@ -453,6 +469,28 @@ struct ScanView: View {
             }
         }
     }
+}
+
+/// Les timers de la carte, calculés ici plutôt que dans la fiche.
+///
+/// `PassTimers` relit toutes les validations, et la fiche se redessine à chaque
+/// changement de son état — la préparation des voyages, la page qui s'ouvre.
+/// Sur 325 validations, c'était l'essentiel de son rendu, au moment même où la
+/// page glissait. Les entrées de cette vue-ci ne changent pas : SwiftUI ne
+/// refait pas son corps.
+private struct TimersDeLaCarte: View {
+    let contracts: [[String: Any]]
+    let events: [[String: Any]]
+    let sansControle: Bool
+
+    var body: some View {
+        TimersView(timers: PassTimers(contracts: contracts, events: events), sansControle: sansControle)
+    }
+}
+
+/// Une mesure gardée d'un rendu à l'autre sans en provoquer.
+private final class Mesure {
+    var largeur: CGFloat = 0
 }
 
 #Preview {

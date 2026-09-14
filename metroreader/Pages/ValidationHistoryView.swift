@@ -44,6 +44,9 @@ struct ValidationHistoryView: View {
     struct Preparation {
         let journees: [JourneeDeTrajets]
         let reperes: [EventAnnotation]
+        /// L'aperçu de carte, déjà photographié ; rien quand sa largeur n'était
+        /// pas connue d'avance, et la page le photographie en s'affichant.
+        let photo: ApercuDeCarte.Photo?
     }
 
     init(events: [[String: Any]], contracts: [[String: Any]], preparation: Preparation? = nil) {
@@ -112,7 +115,8 @@ struct ValidationHistoryView: View {
                         carteEnGrand = true
                     } label: {
                         ApercuDeCarte(events: events, affiches: montrees, contrats: contracts,
-                                      reperesInitiaux: preparation?.reperes)
+                                      reperesInitiaux: preparation?.reperes,
+                                      photoInitiale: preparation?.photo)
                             // Toute la carte se touche, pas seulement son bouton.
                             .contentShape(Rectangle())
                             .overlay(alignment: .topTrailing) {
@@ -212,11 +216,20 @@ struct ValidationHistoryView: View {
     }
 
     /// Ce que la page affiche en s'ouvrant, calculé hors du fil principal.
-    nonisolated static func preparer(events: [[String: Any]], contrats: [[String: Any]]) async -> Preparation {
+    ///
+    /// L'aperçu de carte se photographie ici aussi, à la taille `apercu` qu'il
+    /// aura : pris en s'affichant, le cliché chargeait le processeur pendant
+    /// que la page glissait, puis la photo se posait en fin de transition.
+    nonisolated static func preparer(events: [[String: Any]], contrats: [[String: Any]],
+                                     apercu: CGSize?, sombre: Bool, echelle: CGFloat) async -> Preparation {
         let montrees = montreesALOuverture(events)
         let journees = await calculerJournees(events, contrats: contrats, n: montrees)
         let reperes = await EventsMapView.reperes(events: events, affiches: montrees, contrats: contrats)
-        return Preparation(journees: journees, reperes: reperes)
+        var photo: ApercuDeCarte.Photo?
+        if let apercu {
+            photo = await ApercuDeCarte.photo(de: reperes, taille: apercu, sombre: sombre, echelle: echelle)
+        }
+        return Preparation(journees: journees, reperes: reperes, photo: photo)
     }
 
     /// Les trajets des `n` premières validations, hors du fil principal.
