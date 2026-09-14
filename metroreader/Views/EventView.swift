@@ -13,6 +13,9 @@ struct EventView: View {
     /// La transition que le trajet raconte, tirée par la liste de `Validations`,
     /// qui connaît les voisines ; rien pour une validation lue seule.
     var transition: String?
+    /// La règle qui a décidé de cette transition, tirée de la même liste ; rien
+    /// pour une validation lue seule, qui la retrouve d'elle-même.
+    var regle: RegleDeTransition?
     var contractsInfos: [[String: Any]] = []
     /// Vrai depuis les voyages reconstitués : une validation de bus y propose de
     /// dire que l'arrêt affiché n'est pas le bon.
@@ -25,6 +28,7 @@ struct EventView: View {
     @AppStorage(LocationProvider.settingKey) private var locateOnScan = false
     @AppStorage(ModeDebug.donneesBrutes) private var afficheBrut = false
     @AppStorage(ModeDebug.base) private var baseBrute = BaseBrute.hexadecimal
+    @AppStorage(ModeDebug.deverrouille) private var modeDebug = false
     /// La base des données brutes à afficher, rien quand elles sont masquées.
     private var brut: BaseBrute? { afficheBrut ? baseBrute : nil }
     @Environment(\.openURL) private var openURL
@@ -40,10 +44,11 @@ struct EventView: View {
         var id: Int { rawValue }
     }
 
-    init(eventInfo: [String: Any] = [:], transition: String? = nil, contractsInfos: [[String: Any]] = [],
-         signaleArret: Bool = false) {
+    init(eventInfo: [String: Any] = [:], transition: String? = nil, regle: RegleDeTransition? = nil,
+         contractsInfos: [[String: Any]] = [], signaleArret: Bool = false) {
         self.eventInfo = eventInfo
         self.transition = transition
+        self.regle = regle
         self.contractsInfos = contractsInfos
         self.signaleArret = signaleArret
     }
@@ -309,6 +314,11 @@ struct EventView: View {
                             .fontWeight(.semibold)
                     }
                 }
+            }
+
+            if modeDebug {
+                DebugDeLaValidation(eventInfo: eventInfo, event: event,
+                                    regle: regle ?? Validations([eventInfo], contrats: []).regle(de: 0))
             }
 
             if let base = brut {

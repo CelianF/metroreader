@@ -320,7 +320,8 @@ struct ScanView: View {
                 Section(header: Text("Derniers évènements")) {
                     ForEach(displayedEventsIndices, id: \.self) { i in
                         NavigationLink {
-                            EventView(eventInfo: tagEvents[i], transition: validations.transition(de: i), contractsInfos: tagContracts)
+                            EventView(eventInfo: tagEvents[i], transition: validations.transition(de: i),
+                                      regle: validations.regle(de: i), contractsInfos: tagContracts)
                         } label: {
                             EventPreview(eventInfo: tagEvents[i], transition: validations.transition(de: i))
                         }

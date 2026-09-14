@@ -84,7 +84,7 @@ final class Validations {
     /// des voisines : le mode debug le demande.
     let brutes: Bool
     private var lectures: [LectureValidation?]
-    private var transitions: [String?]
+    private var transitions: [(transition: String, regle: RegleDeTransition)?]
 
     init(_ evenements: [[String: Any]], contrats: [[String: Any]], brutes: Bool = transitionsBrutes) {
         self.evenements = evenements
@@ -115,8 +115,13 @@ final class Validations {
 
     /// La transition que le trajet raconte pour la i-ième validation — ou, sans
     /// correspondances déduites, celle que son valideur a écrite.
-    func transition(de i: Int) -> String {
-        if brutes { return self[i].brute }
+    func transition(de i: Int) -> String { racontee(i).transition }
+
+    /// La règle qui a décidé de cette transition.
+    func regle(de i: Int) -> RegleDeTransition { racontee(i).regle }
+
+    private func racontee(_ i: Int) -> (transition: String, regle: RegleDeTransition) {
+        if brutes { return (self[i].brute, .desactivee) }
         if let racontee = transitions[i] { return racontee }
         let racontee = transitionRacontee(self[i], suivants: suivants(de: i), precedents: precedents(de: i))
         transitions[i] = racontee

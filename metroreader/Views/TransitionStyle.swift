@@ -242,27 +242,60 @@ private func entreeDeVoyage(_ lue: LectureValidation) -> Bool {
         && (ferre(lue.mode) || surface(lue.mode))
 }
 
+/// Ce qui a décidé de la transition qu'une validation raconte.
+enum RegleDeTransition {
+    /// La borne l'a écrite, et rien n'y a été changé.
+    case valideur
+    /// Un refus : rien n'a été franchi.
+    case refus
+    /// Une porte SNCF relevée comme menant au métro.
+    case porteRelevee
+    /// La sortie « voie publique » qu'une entrée ferrée suit de près.
+    case sortieVoiePublique
+    /// L'entrée ferrée qui suit de près cette sortie.
+    case entreeApresVoiePublique
+    /// Une entrée sous forfait, dans le délai d'un trajet ouvert.
+    case forfaitDansLeDelai
+    /// Le mode debug a désactivé les correspondances.
+    case desactivee
+
+    /// Ce que le debug d'une fiche en dit.
+    var explication: String {
+        switch self {
+        case .valideur:                return "Écrite par le valideur, rien à déduire"
+        case .refus:                   return "Refus : la borne n'a rien laissé franchir"
+        case .porteRelevee:            return "Porte SNCF relevée comme menant au métro"
+        case .sortieVoiePublique:      return "Sortie voie publique suivie d'une entrée ferrée en moins de 15 min"
+        case .entreeApresVoiePublique: return "Entrée ferrée moins de 15 min après une sortie voie publique"
+        case .forfaitDansLeDelai:      return "Entrée sous forfait dans le délai du trajet ouvert : 2 h depuis le rail, 1 h 30 depuis la surface"
+        case .desactivee:              return "Correspondances désactivées : la transition du valideur"
+        }
+    }
+}
+
 /// La transition telle que le trajet la raconte, et non telle que la borne l'a
-/// écrite. Un refus n'a rien franchi. Une porte relevée tranche d'elle-même ;
-/// ailleurs, la sortie « voie publique » et l'entrée qui la suit se
-/// reconnaissent l'une l'autre ; sous forfait enfin, une entrée dans le délai
-/// d'un trajet le prolonge.
+/// écrite, avec la règle qui en a décidé. Un refus n'a rien franchi. Une porte
+/// relevée tranche d'elle-même ; ailleurs, la sortie « voie publique » et
+/// l'entrée qui la suit se reconnaissent l'une l'autre ; sous forfait enfin,
+/// une entrée dans le délai d'un trajet le prolonge.
 ///
 /// Les pastilles et le rangement de l'historique en trajets s'en remettent
 /// tous deux à elle : une validation ne peut pas se peindre en correspondance
 /// et ouvrir un trajet à la fois.
 func transitionRacontee(_ lue: LectureValidation, suivants: some Collection<LectureValidation>,
-                        precedents: some Collection<LectureValidation>) -> String {
-    if lue.refus { return transitionRefus }
-    if lue.transition != lue.brute { return lue.transition }
-    if sortieVersCorrespondance(lue, suivants: suivants)
-        || entreeApresCorrespondance(transition: lue.brute, mode: lue.mode, instant: lue.instant, precedents: precedents) {
-        return correspondanceVoiePublique
+                        precedents: some Collection<LectureValidation>) -> (transition: String, regle: RegleDeTransition) {
+    if lue.refus { return (transitionRefus, .refus) }
+    if lue.transition != lue.brute { return (lue.transition, .porteRelevee) }
+    if sortieVersCorrespondance(lue, suivants: suivants) {
+        return (correspondanceVoiePublique, .sortieVoiePublique)
+    }
+    if entreeApresCorrespondance(transition: lue.brute, mode: lue.mode, instant: lue.instant, precedents: precedents) {
+        return (correspondanceVoiePublique, .entreeApresVoiePublique)
     }
     if entreeDansLeDelai(lue, precedents: precedents) {
-        return "Entrée (correspondance)"
+        return ("Entrée (correspondance)", .forfaitDansLeDelai)
     }
-    return lue.brute
+    return (lue.brute, .valideur)
 }
 
 /// Le libellé à afficher. Les deux correspondances se disent d'un même mot :

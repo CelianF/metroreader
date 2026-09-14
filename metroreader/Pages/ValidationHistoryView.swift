@@ -144,8 +144,8 @@ struct ValidationHistoryView: View {
                             ForEach(trajet.indices, id: \.self) { i in
                                 let transition = validations.transition(de: i)
                                 NavigationLink {
-                                    EventView(eventInfo: events[i], transition: transition, contractsInfos: contracts,
-                                              signaleArret: true)
+                                    EventView(eventInfo: events[i], transition: transition, regle: validations.regle(de: i),
+                                              contractsInfos: contracts, signaleArret: true)
                                 } label: {
                                     EventPreview(eventInfo: events[i], transition: transition, afficheDate: false)
                                 }
