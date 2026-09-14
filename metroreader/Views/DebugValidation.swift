@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 /// Ce que le mode debug ajoute à la fiche d'une validation : de quoi comprendre
 /// ce que l'app a tiré de ce que la carte écrit.
@@ -11,6 +12,9 @@ struct DebugDeLaValidation: View {
     let eventInfo: [String: Any]
     let event: ResolvedEvent
     let regle: RegleDeTransition
+
+    @ObservedObject private var gps = LocationProvider.shared
+    @AppStorage(LocationProvider.settingKey) private var locateOnScan = false
 
     var body: some View {
         Section {
@@ -28,6 +32,13 @@ struct DebugDeLaValidation: View {
             ligne("Recherché avec", cleDeRecherche)
         } header: {
             Text("Debug · origine des noms")
+        }
+
+        Section {
+            ligne("Relever au scan", locateOnScan ? "Allumé" : "Éteint")
+            position
+        } header: {
+            Text("Debug · position du scan")
         }
     }
 
@@ -70,6 +81,51 @@ struct DebugDeLaValidation: View {
         if let course = event.routeNumber { morceaux.append("course \(course)") }
         morceaux.append("mode \(event.lookupMode)")
         return morceaux.joined(separator: " · ")
+    }
+
+    // MARK: - Position du scan
+
+    private static let heure: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.timeZone = intercodeTimeZone
+        formatter.dateFormat = "dd/MM HH:mm:ss"
+        return formatter
+    }()
+
+    /// Le dernier relevé de l'app, et ce qu'il vaut pour cette validation : il
+    /// n'éclaire l'arrêt que pris dans la fenêtre de fraîcheur autour d'elle.
+    @ViewBuilder
+    private var position: some View {
+        switch gps.state {
+        case .idle:
+            ligne("Relevé", "Aucun depuis le lancement")
+        case .requesting:
+            ligne("Relevé", "En cours")
+        case .denied:
+            ligne("Relevé", "Refusé par iOS")
+        case .failed:
+            ligne("Relevé", "Échec")
+        case .located(let point, let precision):
+            ligne("Relevé", "\(String(format: "%.5f, %.5f", point.latitude, point.longitude)) ± \(precision.courte)")
+            if let mesure = gps.capturedAt {
+                ligne("Mesuré le", Self.heure.string(from: mesure))
+            }
+            if let ecart = gps.gap(from: ResolvedEvent.instant(eventInfo)) {
+                ligne("Écart avec la validation", Self.duree(ecart))
+                ligne("Utilisable", ecart < LocationProvider.freshnessWindow
+                      ? "Oui"
+                      : "Non : plus de \(Int(LocationProvider.freshnessWindow)) s d'écart")
+            }
+        }
+    }
+
+    private static func duree(_ secondes: TimeInterval) -> String {
+        let s = Int(secondes.rounded())
+        if s < 60 { return "\(s) s" }
+        if s < 3600 { return "\(s / 60) min \(s % 60) s" }
+        if s < 86400 { return "\(s / 3600) h \((s % 3600) / 60) min" }
+        return "\(s / 86400) j \((s % 86400) / 3600) h"
     }
 
     /// Un intitulé, et ce qu'on en sait, qui peut tenir sur plusieurs lignes.
