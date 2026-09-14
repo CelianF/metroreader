@@ -136,7 +136,7 @@ struct SettingsPageView: View {
                 } label: {
                     Label("Supprimer", systemImage: "trash")
                 }
-                .destructrice(vide: journal.isEmpty)
+                .destructrice(vide: journal.isEmpty && journal.ignoredStops.isEmpty)
             } footer: {
                 Text("Les réseaux, lignes et arrêts que tu as identifiés. Partage-les pour enrichir l'app.")
             }
@@ -236,7 +236,7 @@ struct SettingsPageView: View {
             Button("Annuler", role: .cancel) { }
             Button("Tout effacer", role: .destructive) { journal.clearAll() }
         } message: {
-            Text("Les réseaux, lignes et arrêts que tu as identifiés seront oubliés, et réafficheront leur identifiant brut.")
+            Text("Les réseaux, lignes et arrêts que tu as identifiés seront oubliés, et réafficheront leur identifiant brut. Les arrêts ignorés réapparaîtront.")
         }
     }
 }

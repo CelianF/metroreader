@@ -92,10 +92,11 @@ struct ValidationHistoryView: View {
     /// sinon, pas de carte vide.
     private func carteUtile(_ n: Int) -> Bool {
         events.prefix(n).contains { event in
-            interpretLocationId(getKey(event, "EventLocationId") ?? "",
-                                getKey(event, "EventCode") ?? "",
-                                getKey(event, "EventServiceProvider") ?? "",
-                                getKey(event, "EventRouteNumber")).isLocatable
+            guard !entries.isStopIgnored(event) else { return false }
+            return interpretLocationId(getKey(event, "EventLocationId") ?? "",
+                                       getKey(event, "EventCode") ?? "",
+                                       getKey(event, "EventServiceProvider") ?? "",
+                                       getKey(event, "EventRouteNumber")).isLocatable
         }
     }
 
@@ -143,7 +144,8 @@ struct ValidationHistoryView: View {
                             ForEach(trajet.indices, id: \.self) { i in
                                 let transition = validations.transition(de: i)
                                 NavigationLink {
-                                    EventView(eventInfo: events[i], transition: transition, contractsInfos: contracts)
+                                    EventView(eventInfo: events[i], transition: transition, contractsInfos: contracts,
+                                              signaleArret: true)
                                 } label: {
                                     EventPreview(eventInfo: events[i], transition: transition, afficheDate: false)
                                 }

@@ -93,6 +93,40 @@ struct StopReport: Identifiable, Codable, Equatable {
 }
 
 
+/// Une validation dont l'arrêt ne vaut rien.
+///
+/// Le valideur d'un bus annonce l'arrêt qu'on lui a réglé, pas celui où le bus
+/// se trouve : mal réglé, il en donne un autre. Le code n'est pas faux pour
+/// autant — sur les autres validations, il désigne bien cet arrêt —, alors
+/// c'est cette validation seule qu'on écarte.
+struct IgnoredStop: Identifiable, Codable, Equatable {
+    let id: UUID
+    var date: Date
+    let validation: CleValidation
+}
+
+/// Une validation telle que la carte l'écrit : son jour, sa minute, son
+/// valideur, et l'arrêt qu'il annonce. La carte ne réécrit pas ce qu'elle a
+/// enregistré : chaque lecture la retrouve.
+struct CleValidation: Codable, Hashable {
+    let dateStamp: Int
+    let timeStamp: Int?
+    let device: Int?
+    let providerId: Int
+    let locationId: Int
+
+    init?(_ eventInfo: [String: Any]) {
+        func entier(_ cle: String) -> Int? { getKey(eventInfo, cle).flatMap { Int($0, radix: 2) } }
+        guard let jour = entier("EventDateStamp"), let arret = entier("EventLocationId") else { return nil }
+        dateStamp = jour
+        timeStamp = entier("EventTimeStamp")
+        device = entier("EventDevice")
+        providerId = entier("EventServiceProvider") ?? 0
+        locationId = arret
+    }
+}
+
+
 // MARK: - Le journal
 
 /// Ce que l'utilisateur a saisi faute de référentiel.
@@ -109,6 +143,9 @@ final class ManualEntries: ObservableObject {
     @Published private(set) var providers: [ProviderEntry] = []
     @Published private(set) var lines: [LineEntry] = []
     @Published private(set) var stops: [StopReport] = []
+    /// Les validations dont l'arrêt est écarté. Ce n'est pas de la donnée pour
+    /// le référentiel : elles ne partent pas à l'export.
+    @Published private(set) var ignoredStops: [IgnoredStop] = []
 
     /// Change à chaque modification du journal, quelle qu'elle soit : un
     /// renommage ne change pas le nombre de saisies.
@@ -119,31 +156,38 @@ final class ManualEntries: ObservableObject {
     private let stopsURL: URL
     private let linesURL: URL
     private let providersURL: URL
+    private let ignoredStopsURL: URL
 
     // Faux pour un fichier qui existait sans pouvoir être ni relu ni mis de
     // côté : l'écraser détruirait ce qu'il est seul à contenir.
     private var stopsEcrasables = true
     private var linesEcrasables = true
     private var providersEcrasables = true
+    private var ignoredStopsEcrasables = true
 
     private var stopIndex: [CleReseau: StopReport] = [:]
     private var lineIndex: [CleReseau: LineEntry] = [:]
     private var providerIndex: [Int: ProviderEntry] = [:]
+    private var ignoredIndex = Set<CleValidation>()
 
     /// Le dossier n'est un paramètre que pour les essais : l'app n'en a qu'un.
     init(dossier: URL) {
         stopsURL = dossier.appendingPathComponent("stopreports.json")
         linesURL = dossier.appendingPathComponent("manual-lines.json")
         providersURL = dossier.appendingPathComponent("manual-providers.json")
+        ignoredStopsURL = dossier.appendingPathComponent("ignored-stops.json")
         let arrets: Persistance.Lecture<StopReport> = Persistance.lire(stopsURL, decodeur: .iso)
         let lignes: Persistance.Lecture<LineEntry> = Persistance.lire(linesURL, decodeur: .iso)
         let reseaux: Persistance.Lecture<ProviderEntry> = Persistance.lire(providersURL, decodeur: .iso)
+        let ecartes: Persistance.Lecture<IgnoredStop> = Persistance.lire(ignoredStopsURL, decodeur: .iso)
         stopsEcrasables = arrets.ecrasable
         linesEcrasables = lignes.ecrasable
         providersEcrasables = reseaux.ecrasable
+        ignoredStopsEcrasables = ecartes.ecrasable
         stops = arrets.valeurs
         lines = lignes.valeurs
         providers = reseaux.valeurs
+        ignoredStops = ecartes.valeurs
         rebuild()
     }
 
@@ -179,6 +223,18 @@ final class ManualEntries: ObservableObject {
     func provider(_ id: Int) -> ProviderEntry? { providerIndex[id] }
 
     func providerName(_ id: Int) -> String? { providerIndex[id]?.displayName }
+
+    /// La saisie rangée pour ce couple, que le référentiel la masque ou non.
+    func stopReport(provider: Int, location: Int, mode: String) -> StopReport? {
+        stopIndex[Self.stopKey(provider, location, mode)]
+    }
+
+    /// Vrai quand l'arrêt de cette validation a été écarté. Chaque ligne de
+    /// liste le demande à chaque rendu : sans rien d'écarté, rien à lire.
+    func isStopIgnored(_ eventInfo: [String: Any]) -> Bool {
+        guard !ignoredIndex.isEmpty, let cle = CleValidation(eventInfo) else { return false }
+        return ignoredIndex.contains(cle)
+    }
 
     // MARK: L'arborescence
 
@@ -330,10 +386,33 @@ final class ManualEntries: ObservableObject {
         providersEcrasables = true
     }
 
+    func clearIgnoredStops() {
+        ignoredStops = []
+        rebuild()
+        Persistance.effacer(ignoredStopsURL)
+        ignoredStopsEcrasables = true
+    }
+
     func clearAll() {
         clearStops()
         clearLines()
         clearProviders()
+        clearIgnoredStops()
+    }
+
+    /// Écarte l'arrêt d'une validation, et d'elle seule.
+    func ignoreStop(of eventInfo: [String: Any]) {
+        guard let cle = CleValidation(eventInfo), !ignoredIndex.contains(cle) else { return }
+        ignoredStops.insert(IgnoredStop(id: UUID(), date: Date(), validation: cle), at: 0)
+        rebuild()
+        persistIgnoredStops()
+    }
+
+    func restoreStop(of eventInfo: [String: Any]) {
+        guard let cle = CleValidation(eventInfo) else { return }
+        ignoredStops.removeAll { $0.validation == cle }
+        rebuild()
+        persistIgnoredStops()
     }
 
     // MARK: Export
@@ -362,6 +441,7 @@ final class ManualEntries: ObservableObject {
                                uniquingKeysWith: { first, _ in first })
         providerIndex = Dictionary(providers.map { ($0.providerId, $0) },
                                    uniquingKeysWith: { first, _ in first })
+        ignoredIndex = Set(ignoredStops.map(\.validation))
         revision += 1
     }
 
@@ -375,6 +455,10 @@ final class ManualEntries: ObservableObject {
 
     private func persistProviders() {
         if providersEcrasables { Persistance.ecrire(providers, vers: providersURL, encodeur: .iso) }
+    }
+
+    private func persistIgnoredStops() {
+        if ignoredStopsEcrasables { Persistance.ecrire(ignoredStops, vers: ignoredStopsURL, encodeur: .iso) }
     }
 }
 

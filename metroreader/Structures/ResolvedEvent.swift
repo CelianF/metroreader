@@ -18,6 +18,9 @@ struct ResolvedEvent {
     let routeNumber: Int?
 
     let location: NavigoStationInfo
+    /// L'arrêt annoncé a été écarté pour cette validation : `location` ne le
+    /// nomme plus.
+    let isStopIgnored: Bool
     /// La ligne à représenter, éventuellement un repli portant le numéro de
     /// course brut — c'est `route.found` qui le dit.
     let route: NavigoLineInfo?
@@ -69,7 +72,15 @@ struct ResolvedEvent {
         self.locationId = Int(locationBits, radix: 2)
         self.routeNumber = Int(routeBits ?? "", radix: 2)
 
-        self.location = interpretLocationId(locationBits, codeBits, providerBits, routeBits)
+        // Un arrêt écarté ne se nomme ni ne se place plus : la validation garde
+        // son mode, sa ligne et son heure.
+        let annonce = interpretLocationId(locationBits, codeBits, providerBits, routeBits)
+        self.isStopIgnored = ManualEntries.shared.isStopIgnored(eventInfo)
+        self.location = isStopIgnored
+            ? NavigoStationInfo(name: "Arrêt ignoré", provider_id: annonce.provider_id, line_id: nil,
+                                location_id: annonce.location_id, mode: annonce.mode,
+                                lat: 0, lon: 0, found: false)
+            : annonce
 
         let eventCode = interpretEventCode(codeBits,
                                            isRouteNumberPresent: routeBits != nil,
@@ -137,7 +148,22 @@ struct ResolvedEvent {
     // MARK: - Ce qui manque au référentiel
 
     /// L'arrêt est annoncé mais introuvable, et personne ne l'a encore nommé.
-    var isStopUnidentified: Bool { !location.found && locationId != nil }
+    /// Écarté, il n'est pas à nommer : le code était juste, pas la validation.
+    var isStopUnidentified: Bool { !location.found && locationId != nil && !isStopIgnored }
+
+    /// Une validation de bus : le valideur est à bord, et l'arrêt qu'il annonce
+    /// est celui qu'on lui a réglé. Mal réglé, il en donne un autre.
+    var isBus: Bool {
+        lookupMode == ModeTransport.busUrbain.rawValue || lookupMode == ModeTransport.busInterurbain.rawValue
+    }
+
+    /// La saisie qui a nommé l'arrêt, quand c'est bien d'elle que vient son nom :
+    /// le référentiel passe devant le journal, et ne se supprime pas.
+    var stopReport: StopReport? {
+        guard let locationId,
+              NavigoStations.find(providerId, routeNumber, locationId, lookupMode) == nil else { return nil }
+        return ManualEntries.shared.stopReport(provider: providerId, location: locationId, mode: lookupMode)
+    }
 
     /// Ni la table des lignes ni les cas particuliers n'ont donné de nom : ce
     /// qui s'affiche est le numéro de course brut.

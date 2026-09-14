@@ -14,6 +14,9 @@ struct EventView: View {
     /// qui connaît les voisines ; rien pour une validation lue seule.
     var transition: String?
     var contractsInfos: [[String: Any]] = []
+    /// Vrai depuis les voyages reconstitués : une validation de bus y propose de
+    /// dire que l'arrêt affiché n'est pas le bon.
+    var signaleArret = false
 
     // La résolution est refaite à chaque rendu et le journal est observé : ce
     // qu'on vient d'identifier s'affiche sans quitter l'écran.
@@ -33,10 +36,12 @@ struct EventView: View {
         var id: Int { rawValue }
     }
 
-    init(eventInfo: [String: Any] = [:], transition: String? = nil, contractsInfos: [[String: Any]] = []) {
+    init(eventInfo: [String: Any] = [:], transition: String? = nil, contractsInfos: [[String: Any]] = [],
+         signaleArret: Bool = false) {
         self.eventInfo = eventInfo
         self.transition = transition
         self.contractsInfos = contractsInfos
+        self.signaleArret = signaleArret
     }
 
     private var event: ResolvedEvent { ResolvedEvent(eventInfo, transition: transition) }
@@ -159,6 +164,12 @@ struct EventView: View {
                         .font(.system(size: 18, weight: .medium))
                         .foregroundColor(.gray)
                         .multilineTextAlignment(.center)
+
+                    // Un arrêt inconnu n'a rien à contester ; un arrêt écarté,
+                    // lui, peut revenir.
+                    if signaleArret, event.isBus, event.location.found || event.isStopIgnored {
+                        MauvaisArret(eventInfo: eventInfo, event: event)
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 .listRowBackground(Color.white.opacity(0.0))
@@ -495,6 +506,60 @@ struct EventView: View {
             return
         }
         cityName = placemark.administrativeArea.map { "\(city), \($0)" } ?? city
+    }
+}
+
+/// Sous une validation de bus, de quoi dire que l'arrêt affiché n'est pas le
+/// bon, et d'où vient l'erreur.
+///
+/// Le valideur était mal réglé : l'arrêt s'écarte pour cette validation seule.
+/// Ou le nom vient d'une saisie erronée : c'est elle qu'on supprime, et le code
+/// perd son nom sur toutes les validations qui le portent — la fiche propose
+/// alors de l'identifier à nouveau.
+private struct MauvaisArret: View {
+    let eventInfo: [String: Any]
+    let event: ResolvedEvent
+
+    @State private var choix = false
+
+    var body: some View {
+        Group {
+            if event.isStopIgnored {
+                HStack(spacing: 4) {
+                    Text("Arrêt ignoré")
+                        .foregroundStyle(.secondary)
+                    Button("Rétablir") {
+                        ManualEntries.shared.restoreStop(of: eventInfo)
+                    }
+                }
+            } else {
+                // Le référentiel ne se supprime pas : seule une saisie le peut.
+                let saisie = event.stopReport
+                Button("Mauvais arrêt détecté ?") { choix = true }
+                    .confirmationDialog("Mauvais arrêt détecté ?", isPresented: $choix, titleVisibility: .visible) {
+                        Button("Ignorer pour ce trajet") {
+                            ManualEntries.shared.ignoreStop(of: eventInfo)
+                        }
+                        if let saisie {
+                            Button("Supprimer des données saisies", role: .destructive) {
+                                ManualEntries.shared.delete(stop: saisie.id)
+                            }
+                        }
+                        Button("Annuler", role: .cancel) {}
+                    } message: {
+                        if let saisie {
+                            Text("Bus mal configuré : l'arrêt est ignoré pour ce trajet seulement.\nSaisie erronée : « \(saisie.stationName) » est retiré de tes données, et le code \(String(saisie.locationId)) redevient inconnu sur toutes les validations.")
+                        } else {
+                            Text("Si le valideur du bus était mal configuré, l'arrêt est ignoré pour ce trajet seulement.")
+                        }
+                    }
+            }
+        }
+        .font(.subheadline)
+        // L'en-tête est une ligne de liste : sans ce style, toute la ligne
+        // prendrait le toucher.
+        .buttonStyle(.borderless)
+        .padding(.top, 4)
     }
 }
 
