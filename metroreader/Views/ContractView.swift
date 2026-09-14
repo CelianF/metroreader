@@ -195,6 +195,10 @@ struct ContractView: View {
                     }
                 }
             }
+
+            if let base = brut {
+                SectionChampsBruts(champs: champsBruts(contractInfo, structure: IntercodeContract), base: base)
+            }
         }
     }
 }

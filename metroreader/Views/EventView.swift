@@ -310,6 +310,11 @@ struct EventView: View {
                     }
                 }
             }
+
+            if let base = brut {
+                SectionChampsBruts(champs: champsBruts(eventInfo, structure: IntercodeEvent, exclues: [cleContratPaye]),
+                                   base: base)
+            }
         }
         .sheet(item: $identifying) { quoi in
             switch quoi {
