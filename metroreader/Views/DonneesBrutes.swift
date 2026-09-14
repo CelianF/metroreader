@@ -95,3 +95,13 @@ func copierDansLePressePapiers(_ texte: String) {
     NSPasteboard.general.setString(texte, forType: .string)
     #endif
 }
+
+/// Une structure lue sur la carte en JSON lisible, clés triées : ce que l'export
+/// garde, pour une seule validation ou un seul contrat.
+func jsonBrut(_ info: [String: Any]) -> String? {
+    guard JSONSerialization.isValidJSONObject(info),
+          let donnees = try? JSONSerialization.data(withJSONObject: info, options: [.prettyPrinted, .sortedKeys]) else {
+        return nil
+    }
+    return String(data: donnees, encoding: .utf8)
+}

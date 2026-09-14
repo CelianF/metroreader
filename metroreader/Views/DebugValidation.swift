@@ -15,6 +15,7 @@ struct DebugDeLaValidation: View {
 
     @ObservedObject private var gps = LocationProvider.shared
     @AppStorage(LocationProvider.settingKey) private var locateOnScan = false
+    @State private var copie = false
 
     var body: some View {
         Section {
@@ -39,6 +40,16 @@ struct DebugDeLaValidation: View {
             position
         } header: {
             Text("Debug · position du scan")
+        }
+
+        Section {
+            Button(copie ? "Copié dans le presse-papiers" : "Copier les données de la validation") {
+                guard let json = jsonBrut(eventInfo) else { return }
+                copierDansLePressePapiers(json)
+                copie = true
+            }
+        } footer: {
+            Text("En JSON, comme l'export de la carte : de quoi joindre la validation à un signalement.")
         }
     }
 

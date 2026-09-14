@@ -22,6 +22,8 @@ struct ContractView: View {
     @AppStorage(ModeDebug.base) private var baseBrute = BaseBrute.hexadecimal
     /// La base des données brutes à afficher, rien quand elles sont masquées.
     private var brut: BaseBrute? { afficheBrut ? baseBrute : nil }
+    @AppStorage(ModeDebug.deverrouille) private var modeDebug = false
+    @State private var copie = false
 
     var body: some View {
         List {
@@ -193,6 +195,20 @@ struct ContractView: View {
                             }
                         }
                     }
+                }
+            }
+
+            if modeDebug {
+                Section {
+                    Button(copie ? "Copié dans le presse-papiers" : "Copier les données du contrat") {
+                        guard let json = jsonBrut(contractInfo) else { return }
+                        copierDansLePressePapiers(json)
+                        copie = true
+                    }
+                } header: {
+                    Text("Debug")
+                } footer: {
+                    Text("En JSON, comme l'export de la carte : de quoi joindre le contrat à un signalement.")
                 }
             }
 
