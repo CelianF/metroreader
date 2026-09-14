@@ -35,6 +35,13 @@ struct SettingsPageView: View {
 
     @State private var showingDeleteAlert = false
     @State private var showingJournalAlert = false
+
+    @AppStorage(ModeDebug.deverrouille) private var modeDebug = false
+    @AppStorage(ModeDebug.donneesBrutes) private var donneesBrutes = false
+    @AppStorage(ModeDebug.base) private var baseBrute = BaseBrute.hexadecimal
+    /// Les touches rapprochées sur la version, et l'heure de la dernière.
+    @State private var touchesVersion = 0
+    @State private var derniereToucheVersion: Date?
     
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -42,6 +49,24 @@ struct SettingsPageView: View {
 
     private var buildNumber: String {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+    }
+
+    /// Sept touches sur la version, sans plus d'une seconde entre deux,
+    /// débloquent le mode debug. Une pause remet le compte à zéro.
+    private func toucherLaVersion() {
+        guard !modeDebug else { return }
+        let maintenant = Date()
+        if let derniere = derniereToucheVersion, maintenant.timeIntervalSince(derniere) > 1 {
+            touchesVersion = 0
+        }
+        derniereToucheVersion = maintenant
+        touchesVersion += 1
+        guard touchesVersion >= 7 else { return }
+        touchesVersion = 0
+        #if os(iOS)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        #endif
+        withAnimation { modeDebug = true }
     }
 
     var body: some View {
@@ -164,6 +189,35 @@ struct SettingsPageView: View {
                           compte: URL(string: "https://twitter.com/TweetingStitch")!)
             }
             
+            // Juste au-dessus d'« À propos », dont le pied reste le dernier
+            // mot de l'écran.
+            if modeDebug {
+                Section {
+                    Toggle("Afficher les données brutes", isOn: $donneesBrutes.animation())
+
+                    if donneesBrutes {
+                        Picker("Base", selection: $baseBrute) {
+                            Text("Hexadécimal").tag(BaseBrute.hexadecimal)
+                            Text("Décimal").tag(BaseBrute.decimal)
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    Button {
+                        withAnimation {
+                            donneesBrutes = false
+                            modeDebug = false
+                        }
+                    } label: {
+                        Text("Quitter le mode debug")
+                    }
+                } header: {
+                    Text("Debug")
+                } footer: {
+                    Text("Données brutes : dans les fiches et l'environnement, le champ tel que la carte l'écrit, à côté de sa traduction.")
+                }
+            }
+
             Section {
                 HStack {
                     Text("Version")
@@ -171,6 +225,9 @@ struct SettingsPageView: View {
                     Text("\(appVersion) (\(buildNumber))")
                         .foregroundColor(.secondary)
                 }
+                // Sept touches rapprochées ici débloquent le mode debug.
+                .contentShape(Rectangle())
+                .onTapGesture { toucherLaVersion() }
                 Link(destination: URL(string: "https://github.com/CelianF/metroreader")!) {
                     HStack {
                         Label {

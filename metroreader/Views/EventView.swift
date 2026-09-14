@@ -23,6 +23,10 @@ struct EventView: View {
     @ObservedObject private var entries = ManualEntries.shared
     @ObservedObject private var gps = LocationProvider.shared
     @AppStorage(LocationProvider.settingKey) private var locateOnScan = false
+    @AppStorage(ModeDebug.donneesBrutes) private var afficheBrut = false
+    @AppStorage(ModeDebug.base) private var baseBrute = BaseBrute.hexadecimal
+    /// La base des données brutes à afficher, rien quand elles sont masquées.
+    private var brut: BaseBrute? { afficheBrut ? baseBrute : nil }
     @Environment(\.openURL) private var openURL
 
     @State private var cityName: String = "Loading..."
@@ -52,7 +56,12 @@ struct EventView: View {
     @ViewBuilder
     private func modeOuLignes(_ event: ResolvedEvent) -> some View {
         if !event.routeCandidates.isEmpty {
-            LineIcons(lines: event.routeCandidates)
+            HStack(spacing: 6) {
+                LineIcons(lines: event.routeCandidates)
+                if let base = brut, let course = texteBrut([getKey(eventInfo, "EventRouteNumber")], en: base) {
+                    course
+                }
+            }
         } else {
             Text("\(event.mode)")
                 .font(.system(size: 18, weight: .medium))
@@ -67,6 +76,7 @@ struct EventView: View {
                 VStack(alignment: .center, spacing: 8) {
                     if event.location.found {
                         Text("\(event.location.name)")
+                            .brut(getKey(eventInfo, "EventLocationId"), si: brut)
                             .font(.largeTitle)
                             .fontWeight(.bold)
                             .multilineTextAlignment(.center)
@@ -81,12 +91,14 @@ struct EventView: View {
                             HStack(spacing: 0) {
                                 modeOuLignes(event)
                                 Text(" - \(interpretTransitionLabel(event.transition, mode: event.mode))")
+                                    .brut(getKey(eventInfo, "EventCode"), si: brut)
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(.gray)
                             }
                             VStack(spacing: 4) {
                                 modeOuLignes(event)
                                 Text(interpretTransitionLabel(event.transition, mode: event.mode))
+                                    .brut(getKey(eventInfo, "EventCode"), si: brut)
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(.gray)
                             }
@@ -95,6 +107,9 @@ struct EventView: View {
                         HStack(spacing: 0) {
                             if !event.routeCandidates.isEmpty {
                                 LineIcons(lines: event.routeCandidates, size: 50.0)
+                                if let base = brut, let course = texteBrut([getKey(eventInfo, "EventRouteNumber")], en: base) {
+                                    course.padding(.leading, 6)
+                                }
                             } else {
                                 Text("\(event.mode)")
                                     .font(.largeTitle)
@@ -103,6 +118,7 @@ struct EventView: View {
                         }
 
                         Text(interpretTransitionLabel(event.transition, mode: event.mode))
+                            .brut(getKey(eventInfo, "EventCode"), si: brut)
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.gray)
                     }
@@ -155,12 +171,14 @@ struct EventView: View {
 
                     if let resultat = interpretEventResult(of: eventInfo) {
                         Text(resultat)
+                            .brut(getKey(eventInfo, "EventResult"), si: brut)
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
                     }
                     
                     Text("\(interpretDate(getKey(eventInfo, "EventDateStamp") ?? "")) \(interpretTime(getKey(eventInfo, "EventTimeStamp") ?? ""))")
+                        .brut(getKey(eventInfo, "EventDateStamp"), getKey(eventInfo, "EventTimeStamp"), si: brut)
                         .font(.system(size: 18, weight: .medium))
                         .foregroundColor(.gray)
                         .multilineTextAlignment(.center)
@@ -179,10 +197,12 @@ struct EventView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     if let contrat = contratDesigne(par: eventInfo, parmi: contractsInfos) {
                         Text("Payé avec \(interpretTariff(getKey(contrat, "ContractTariff") ?? "", getKey(contrat, "ContractValidityEndDate") ?? ""))")
+                            .brut(getKey(eventInfo, "EventContractPointer"), getKey(contrat, "ContractTariff"), si: brut)
                             .fontWeight(.semibold)
                     }
                     else {
                         Text("Payé avec Navigo")
+                            .brut(getKey(eventInfo, "EventContractPointer"), si: brut)
                             .fontWeight(.semibold)
                     }
                 }
@@ -195,6 +215,7 @@ struct EventView: View {
                             .fontWeight(.semibold)
                         Spacer()
                         Text(interpretServiceProviderName(event.providerId))
+                            .brut(getKey(eventInfo, "EventServiceProvider"), si: brut)
                             .fontWeight(.semibold)
                     }
                     
@@ -206,6 +227,7 @@ struct EventView: View {
                                 .fontWeight(.semibold)
                             Spacer()
                             Text("\(interpretInt(eventLocationGate))")
+                                .brut(eventLocationGate, si: brut)
                                 .fontWeight(.semibold)
                         }
                     }
@@ -217,6 +239,7 @@ struct EventView: View {
                             .fontWeight(.semibold)
                         Spacer()
                         Text("\(interpretInt(getKey(eventInfo, "EventDevice") ?? ""))")
+                            .brut(getKey(eventInfo, "EventDevice"), si: brut)
                             .fontWeight(.semibold)
                     }
                     
@@ -228,6 +251,7 @@ struct EventView: View {
                                 .fontWeight(.semibold)
                             Spacer()
                             Text("\(interpretInt(eventVehicleId))")
+                                .brut(eventVehicleId, si: brut)
                                 .fontWeight(.semibold)
                         }
                     }
@@ -281,6 +305,7 @@ struct EventView: View {
                             .fontWeight(.semibold)
                         Spacer()
                         Text(event.location.name)
+                            .brut(getKey(eventInfo, "EventLocationId"), si: brut)
                             .fontWeight(.semibold)
                     }
                 }

@@ -18,11 +18,17 @@ struct ContractView: View {
         ]
     ]
     
+    @AppStorage(ModeDebug.donneesBrutes) private var afficheBrut = false
+    @AppStorage(ModeDebug.base) private var baseBrute = BaseBrute.hexadecimal
+    /// La base des données brutes à afficher, rien quand elles sont masquées.
+    private var brut: BaseBrute? { afficheBrut ? baseBrute : nil }
+
     var body: some View {
         List {
             Section {
                 VStack(alignment: .center, spacing: 8) {
                     Text("\(interpretTariff(getKey(contractInfo, "ContractTariff") ?? "", getKey(contractInfo, "ContractValidityEndDate") ?? ""))")
+                        .brut(getKey(contractInfo, "ContractTariff"), si: brut)
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .multilineTextAlignment(.center)
@@ -30,10 +36,12 @@ struct ContractView: View {
                     
                     HStack(spacing: 0) {
                         Text(interpretDate(getKey(contractInfo, "ContractValidityStartDate") ?? ""))
+                            .brut(getKey(contractInfo, "ContractValidityStartDate"), si: brut)
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.gray)
                         if let contractValidityEndDate = getKey(contractInfo, "ContractValidityEndDate") {
                             Text(" - \(interpretDate(contractValidityEndDate))")
+                                .brut(contractValidityEndDate, si: brut)
                                 .font(.system(size: 18, weight: .medium))
                                 .foregroundColor(.gray)
                         }
@@ -51,6 +59,7 @@ struct ContractView: View {
                                 .fontWeight(.semibold)
                             Spacer()
                             Text("\(interpretInt(counterContractCount))")
+                                .brut(counterContractCount, si: brut)
                                 .fontWeight(.semibold)
                         }
                         
@@ -61,6 +70,7 @@ struct ContractView: View {
                                 .fontWeight(.semibold)
                             Spacer()
                             Text("\(interpretInt(getKey(contractInfo, "CounterLastLoad") ?? ""))")
+                                .brut(getKey(contractInfo, "CounterLastLoad"), si: brut)
                                 .fontWeight(.semibold)
                         }
                     }
@@ -74,6 +84,7 @@ struct ContractView: View {
                             .fontWeight(.semibold)
                         Spacer()
                         Text(interpretStatus(getKey(contractInfo, "ContractStatus") ?? ""))
+                            .brut(getKey(contractInfo, "ContractStatus"), si: brut)
                             .fontWeight(.semibold)
                     }
                     
@@ -85,6 +96,7 @@ struct ContractView: View {
                                 .fontWeight(.semibold)
                             Spacer()
                             Text(interpretZonesShort(contractValidityZones))
+                                .brut(contractValidityZones, si: brut)
                                 .fontWeight(.semibold)
                         }
                     }
@@ -97,6 +109,7 @@ struct ContractView: View {
                                 .fontWeight(.semibold)
                             Spacer()
                             Text("\(interpretInt(contractSerialNumber))")
+                                .brut(contractSerialNumber, si: brut)
                                 .fontWeight(.semibold)
                         }
                     }
@@ -109,6 +122,7 @@ struct ContractView: View {
                                 .fontWeight(.semibold)
                             Spacer()
                             Text("\(interpretInt(contractAuthenticator))")
+                                .brut(contractAuthenticator, si: brut)
                                 .fontWeight(.semibold)
                         }
                     }
@@ -123,6 +137,7 @@ struct ContractView: View {
                                 .fontWeight(.semibold)
                             Spacer()
                             Text(interpretDate(getKey(contractInfo, "ContractValiditySaleDate") ?? ""))
+                                .brut(getKey(contractInfo, "ContractValiditySaleDate"), si: brut)
                                 .fontWeight(.semibold)
                         }
                         
@@ -134,6 +149,7 @@ struct ContractView: View {
                                     .fontWeight(.semibold)
                                 Spacer()
                                 Text(interpretServiceProvider(contractSaleAgent))
+                                    .brut(contractSaleAgent, si: brut)
                                     .fontWeight(.semibold)
                             }
                         }
@@ -146,6 +162,7 @@ struct ContractView: View {
                                     .fontWeight(.semibold)
                                 Spacer()
                                 Text("\(interpretInt(contractSaleDevice))")
+                                    .brut(contractSaleDevice, si: brut)
                                     .fontWeight(.semibold)
                             }
                         }
@@ -158,6 +175,7 @@ struct ContractView: View {
                                     .fontWeight(.semibold)
                                 Spacer()
                                 Text(String(format: "%.2f €", interpretAmount(contractPriceAmount)))
+                                    .brut(contractPriceAmount, si: brut)
                                     .fontWeight(.semibold)
                             }
                         }
@@ -170,6 +188,7 @@ struct ContractView: View {
                                     .fontWeight(.semibold)
                                 Spacer()
                                 Text(interpretPayMethod(contractPayMethod))
+                                    .brut(contractPayMethod, si: brut)
                                     .fontWeight(.semibold)
                             }
                         }
