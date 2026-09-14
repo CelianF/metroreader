@@ -85,3 +85,13 @@ extension Text {
         return Text("\(self) \(brut)")
     }
 }
+
+/// Met un texte dans le presse-papiers.
+func copierDansLePressePapiers(_ texte: String) {
+    #if os(iOS)
+    UIPasteboard.general.string = texte
+    #else
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(texte, forType: .string)
+    #endif
+}

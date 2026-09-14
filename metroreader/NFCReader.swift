@@ -32,11 +32,40 @@ private struct RefusDeLaCarte: Error {
 /// Envoie une commande et rend la réponse en bits, ou lève le refus que la
 /// carte a opposé.
 private func envoyer(_ tag: NFCISO7816Tag, _ apdu: NFCISO7816APDU) async throws -> String {
-    let (response, sw1, sw2) = try await tag.sendCommand(apdu: apdu)
+    JournalNFC.shared.noter(.commande, commandeEnHexadecimal(apdu))
+    let reponse: (Data, UInt8, UInt8)
+    do {
+        reponse = try await tag.sendCommand(apdu: apdu)
+    } catch {
+        JournalNFC.shared.noter(.erreur, "Échange interrompu : \(error.localizedDescription)")
+        throw error
+    }
+    let (response, sw1, sw2) = reponse
+    JournalNFC.shared.noter(.reponse, reponseEnHexadecimal(response, sw1, sw2))
     guard sw1 == 0x90 && sw2 == 0x00 else {
         throw RefusDeLaCarte(mot: UInt16(sw1) << 8 | UInt16(sw2))
     }
     return bits(response)
+}
+
+/// La commande telle qu'elle part : classe, instruction, paramètres, puis les
+/// données et la longueur attendue.
+private func commandeEnHexadecimal(_ apdu: NFCISO7816APDU) -> String {
+    var octets = [apdu.instructionClass, apdu.instructionCode, apdu.p1Parameter, apdu.p2Parameter]
+    if let donnees = apdu.data, !donnees.isEmpty {
+        octets.append(UInt8(truncatingIfNeeded: donnees.count))
+        octets.append(contentsOf: donnees)
+    }
+    if apdu.expectedResponseLength >= 0 {
+        octets.append(UInt8(truncatingIfNeeded: apdu.expectedResponseLength))
+    }
+    return hexadecimalDesOctets(Data(octets))
+}
+
+/// La réponse et son mot d'état.
+private func reponseEnHexadecimal(_ octets: Data, _ sw1: UInt8, _ sw2: UInt8) -> String {
+    let mot = String(format: "%02X %02X", sw1, sw2)
+    return octets.isEmpty ? mot : "\(hexadecimalDesOctets(octets)) · \(mot)"
 }
 
 private func selectAID(_ tag: NFCISO7816Tag, _ aidData: Data) async throws -> String {
@@ -207,6 +236,7 @@ class NFCReader: NSObject, ObservableObject {
         #if os(iOS)
         guard NFCTagReaderSession.readingAvailable else { return }
 
+        JournalNFC.shared.commencer()
         self.historyManager = historyManager
 
         session = NFCTagReaderSession(pollingOption: .iso14443, delegate: self, queue: DispatchQueue.main)
@@ -238,9 +268,23 @@ class NFCReader: NSObject, ObservableObject {
 
 #if os(iOS)
 extension NFCReader: NFCTagReaderSessionDelegate {
-    func tagReaderSessionDidBecomeActive(_ session: NFCTagReaderSession) {}
+    /// Le type d'un tag détecté, pour le journal.
+    private static func sorteDeTag(_ tag: NFCTag) -> String {
+        switch tag {
+        case .iso7816(let carte): return "ISO 7816 (\(hexadecimalDesOctets(carte.identifier)))"
+        case .miFare:             return "MIFARE"
+        case .feliCa:             return "FeliCa"
+        case .iso15693:           return "ISO 15693"
+        @unknown default:         return "inconnu"
+        }
+    }
+
+    func tagReaderSessionDidBecomeActive(_ session: NFCTagReaderSession) {
+        JournalNFC.shared.noter(.etape, "Session active : en attente d'une carte")
+    }
 
     func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {
+        JournalNFC.shared.noter(.etape, "Session fermée (\((error as NSError).code)) : \(error.localizedDescription)")
         DispatchQueue.main.async {
             self.isScanning = false
         }
@@ -250,14 +294,17 @@ extension NFCReader: NFCTagReaderSessionDelegate {
         // Seule une carte ISO 7816 porte une application Calypso : un ticket
         // carton ou une carte Mifare n'a rien à lire ici. La feuille l'annonçait
         // en anglais, description de débogage comprise.
+        JournalNFC.shared.noter(.etape, "Carte détectée : \(tags.map(Self.sorteDeTag).joined(separator: ", "))")
         guard let tag = tags.first(where: { if case .iso7816 = $0 { return true } else { return false } }),
               case let .iso7816(carte) = tag else {
+            JournalNFC.shared.noter(.erreur, "Pas de carte ISO 7816 : rien à lire")
             session.invalidate(errorMessage: "Cette carte n'est pas un passe Navigo.")
             return
         }
 
         session.connect(to: tag) { error in
-            if error != nil {
+            if let error {
+                JournalNFC.shared.noter(.erreur, "Connexion perdue : \(error.localizedDescription) — nouvelle recherche")
                 // La carte a bougé pendant la connexion. Sans relance, la feuille
                 // restait ouverte sans plus rien chercher jusqu'à expirer.
                 session.alertMessage = "Passe perdu. Replacez-le sur la cible."
@@ -273,6 +320,7 @@ extension NFCReader: NFCTagReaderSessionDelegate {
             Task { @MainActor in
                 do {
                     session.alertMessage = "⚪️⚪️⚪️⚪️⚪️⚪️⚪️"
+                    JournalNFC.shared.noter(.etape, "Sélection de l'application Navigo")
                     self.tagIcc = try await selectAID(carte, Data([0xA0, 0x00, 0x00, 0x04, 0x04, 0x01, 0x25, 0x09, 0x01, 0x01]))
                     self.cardID = interpretCardID(self.tagIcc)
                     // La carte a répondu en passe Navigo : une légère vibration
@@ -282,10 +330,12 @@ extension NFCReader: NFCTagReaderSessionDelegate {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
                     session.alertMessage = "🔵⚪️⚪️⚪️⚪️⚪️⚪️"
+                    JournalNFC.shared.noter(.etape, "Environnement et porteur (SFI 07)")
                     self.tagEnvHolder = parseStructure(bitstring: try await readRecord(carte, 1, 0x07), element: IntercodeEnvHolder).0 as! [String: Any]
 
                     // Counters
                     session.alertMessage = "🔵🔵⚪️⚪️⚪️⚪️⚪️"
+                    JournalNFC.shared.noter(.etape, "Compteurs (SFI 19)")
                     let countersBitstring = try await readRecord(carte, 1, 0x19)
                     var countersBitstrings: [String] = []
                     for i in 0...3 {
@@ -294,11 +344,13 @@ extension NFCReader: NFCTagReaderSessionDelegate {
 
                     // Contract List
                     session.alertMessage = "🔵🔵🔵⚪️⚪️⚪️⚪️"
+                    JournalNFC.shared.noter(.etape, "Liste des contrats (SFI 1E)")
                     let contractListContainer = parseStructure(bitstring: try await readRecord(carte, 1, 0x1E), element: IntercodeContractList).0 as! [String: Any]
                     let contractList = contractListContainer["ContractList"] as? [[String: Any]] ?? []
 
                     // Contracts
                     session.alertMessage = "🔵🔵🔵🔵⚪️⚪️⚪️"
+                    JournalNFC.shared.noter(.etape, "Contrats (SFI 09)")
                     for i in 1...4 {
                         guard let contractBitstring = try await lireSiPresent(carte, UInt8(i), 0x09) else { continue }
                         var parsedContract = parseStructure(bitstring: contractBitstring, element: IntercodeContract).0 as! [String: Any]
@@ -335,6 +387,7 @@ extension NFCReader: NFCTagReaderSessionDelegate {
 
                     // Events
                     session.alertMessage = "🔵🔵🔵🔵🔵⚪️⚪️"
+                    JournalNFC.shared.noter(.etape, "Événements (SFI 08)")
                     for i in 1...3 {
                         guard let eventBitstring = try await lireSiPresent(carte, UInt8(i), 0x08) else { continue }
                         let parsedEvent = parseStructure(bitstring: eventBitstring, element: IntercodeEvent).0 as! [String: Any]
@@ -345,6 +398,7 @@ extension NFCReader: NFCTagReaderSessionDelegate {
 
                     // Special Events
                     session.alertMessage = "🔵🔵🔵🔵🔵🔵⚪️"
+                    JournalNFC.shared.noter(.etape, "Événements spéciaux (SFI 1D)")
                     for i in 1...3 {
                         guard let eventBitstring = try await lireSiPresent(carte, UInt8(i), 0x1D) else { continue }
                         let parsedEvent = parseStructure(bitstring: eventBitstring, element: IntercodeEvent).0 as! [String: Any]
@@ -362,6 +416,7 @@ extension NFCReader: NFCTagReaderSessionDelegate {
                     // `catch` plus bas invalide aussi la session, mais sans
                     // passer par ici, et l'abandon par l'utilisateur non plus.
                     self.isReadComplete = true
+                    JournalNFC.shared.noter(.etape, "Lecture complète : \(self.tagContracts.count) contrat(s), \(self.tagEvents.count) événement(s), \(self.tagSpecialEvents.count) spécial(aux)")
                     session.invalidate()
 
                     self.historyManager?.saveScan(
@@ -373,6 +428,7 @@ extension NFCReader: NFCTagReaderSessionDelegate {
                         specialEvents: self.tagSpecialEvents
                     )
                 } catch {
+                    JournalNFC.shared.noter(.erreur, "Échec : \(messageDEchec(error)) — \(error)")
                     session.invalidate(errorMessage: messageDEchec(error))
                 }
             }

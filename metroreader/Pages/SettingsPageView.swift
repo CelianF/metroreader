@@ -206,6 +206,10 @@ struct SettingsPageView: View {
 
                     Toggle("Désactiver les correspondances", isOn: $transitionsBrutes)
 
+                    NavigationLink("Journal de la dernière lecture NFC") {
+                        JournalNFCView()
+                    }
+
                     Button {
                         withAnimation {
                             donneesBrutes = false
