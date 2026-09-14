@@ -200,6 +200,27 @@ func interpretRouteCandidates(_ routeNumberBitstring: String, _ eventCodeBitstri
     return [NavigoLineInfo(name: "\(routeNumber)", mode: eventTransport, public_id: "UNK\(routeNumber)", provider_id: serviceProviderCode, line_id: routeNumber, background_color: LineEntry.defaultBackground, text_color: LineEntry.defaultText, is_noctilien: false, found: false)]
 }
 
+/// D'où viennent les lignes de `interpretRouteCandidates` : le même chemin,
+/// dans le même ordre, dit plutôt que suivi.
+func provenanceLigne(_ routeNumberBitstring: String, _ eventCodeBitstring: String, _ eventServiceProviderBitstring: String) -> String {
+    guard let routeNumber = Int(routeNumberBitstring, radix: 2) else { return "Pas de numéro de course" }
+    let serviceProviderCode = Int(eventServiceProviderBitstring, radix: 2) ?? 0
+    let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: true, routeNumber: routeNumber, serviceProvider: serviceProviderCode).0
+
+    if ManualEntries.shared.line(provider: serviceProviderCode, route: routeNumber, mode: eventTransport) != nil {
+        return "Données saisies"
+    }
+    if eventTransport == "RER" {
+        if [16, 17, 26].contains(routeNumber) { return "Règle de l'app : RER A" }
+        if routeNumber == 18 { return "Règle de l'app : RER B" }
+    } else if eventTransport == "Métro" && routeNumber == 29 {
+        return "Règle de l'app : Orlyval"
+    } else if let source = NavigoLines.provenance(serviceProviderCode, routeNumber, eventTransport) {
+        return source
+    }
+    return "Aucune : le numéro de course brut"
+}
+
 func interpretServiceProvider(_ bitstring: String) -> String {
     interpretServiceProviderName(Int(bitstring, radix: 2) ?? 0)
 }
@@ -240,6 +261,13 @@ func isServiceProviderUnknown(_ id: Int) -> Bool {
     ProviderCatalog.findProvider(id) == nil && ManualEntries.shared.provider(id) == nil
 }
 
+/// D'où vient le libellé de `interpretServiceProviderName`.
+func provenanceReseau(_ id: Int) -> String {
+    if ProviderCatalog.findProvider(id) != nil { return "Référentiel" }
+    if ManualEntries.shared.providerName(id) != nil { return "Données saisies" }
+    return "Aucune : le numéro brut"
+}
+
 func interpretLocationId(_ locationIdBitString: String, _ eventCodeBitstring: String, _ eventServiceProviderBitstring: String, _ routeNumberBitstring: String?) -> NavigoStationInfo {
     guard let value = Int(locationIdBitString, radix: 2) else {
         return NavigoStationInfo.init(name: "Unknown (\(locationIdBitString))", provider_id: 0, line_id: nil, location_id: 0, mode: "Unknown", lat: 0, lon: 0, found: false)
@@ -265,5 +293,26 @@ func interpretLocationId(_ locationIdBitString: String, _ eventCodeBitstring: St
         return NavigoStationInfo.init(name: "\(value)", provider_id: eventServiceProviderId, line_id: nil, location_id: value, mode: eventTransport, lat: 0, lon: 0, found: false)
     }
     return station
+}
+
+/// D'où vient l'arrêt de `interpretLocationId` : le même chemin, dans le même
+/// ordre — référentiel, saisie, correction livrée.
+func provenanceArret(_ locationIdBitString: String, _ eventCodeBitstring: String, _ eventServiceProviderBitstring: String, _ routeNumberBitstring: String?) -> String {
+    guard let value = Int(locationIdBitString, radix: 2) else { return "Pas de code de lieu" }
+
+    let eventRouteNumberPresent = (routeNumberBitstring != nil)
+    let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: eventRouteNumberPresent, routeNumber: eventRouteNumberPresent ? Int(routeNumberBitstring ?? "0", radix: 2) : nil, serviceProvider: Int(eventServiceProviderBitstring, radix: 2)).0
+    let eventServiceProviderId = Int(eventServiceProviderBitstring, radix: 2) ?? 0
+
+    if NavigoStations.find(eventServiceProviderId, eventRouteNumberPresent ? Int(routeNumberBitstring ?? "", radix: 2) : nil, value, eventTransport) != nil {
+        return "Référentiel"
+    }
+    if ManualEntries.shared.station(provider: eventServiceProviderId, location: value, mode: eventTransport) != nil {
+        return "Données saisies"
+    }
+    if StopCorrections.find(eventServiceProviderId, value, eventTransport) != nil {
+        return "Correction livrée"
+    }
+    return "Aucune : le code brut"
 }
 

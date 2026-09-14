@@ -84,6 +84,28 @@ public class NavigoLines {
         return chez(ProviderCatalog.ratpId, line_id, mode)
     }
 
+    /// D'où `candidates` tire ses lignes, par le même chemin et dans le même
+    /// ordre. Nil quand il ne trouve rien.
+    class func provenance(_ provider: Int, _ line_id: Int, _ mode: String) -> String? {
+        if let source = provenanceChez(provider, line_id, mode) { return source }
+        guard ProviderCatalog.isRATPDelegation(provider) else { return nil }
+        return provenanceChez(ProviderCatalog.ratpId, line_id, mode).map { "\($0), sous la RATP" }
+    }
+
+    /// Le pendant de `chez`.
+    private class func provenanceChez(_ provider: Int, _ line_id: Int, _ mode: String) -> String? {
+        for course in [line_id, line_id >> 8] {
+            let octetHaut = course == line_id ? "" : " (course dans l'octet haut)"
+            if LineCorrections.corrected(provider, course, mode, parmi: allLines) != nil {
+                return "Correction livrée" + octetHaut
+            }
+            if !(parCle[CleReseau(exploitant: provider, numero: course, mode: mode)] ?? []).isEmpty {
+                return "Référentiel" + octetHaut
+            }
+        }
+        return nil
+    }
+
     /// La course est annoncée brute chez les uns, logée dans l'octet haut chez
     /// les autres. À chacun des deux niveaux, une correction livrée tranche
     /// avant le référentiel : c'est précisément lui qu'elle redresse.
