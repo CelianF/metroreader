@@ -26,11 +26,11 @@
     "public_id": "C02806",
     "remplace": null,
     "constate": "2026-09-10",
-    "raison": "Course absente de la table livrée, et ligne absente aussi : le référentiel écrit son code « 000-535-205 », ponctué de tirets là où les autres n'en portent pas, et la génération l'écarte. Le référentiel ne publiant ni couleur ni libellé pour elle, elle s'affiche en gris.",
+    "raison": "Course absente de la table livrée, et ligne absente aussi : le référentiel écrit son code « 000-535-205 », ponctué de tirets là où les autres n'en portent pas, et la génération l'écarte. Ne publiant pour elle ni libellé ni couleur, il la laissait s'afficher en gris : la correction les porte donc elle-même. La 5404 est bleu clair sur le terrain, comme la 5403 avec qui elle roule, et reprend le 8ad3de sur noir que le référentiel publie pour celle-ci sous C01601.",
     "fonde_sur": "référentiel exploitant",
     "name": "5404",
-    "background_color": null,
-    "text_color": null
+    "background_color": "8ad3de",
+    "text_color": "000000"
   },
   {
     "provider_id": 235,
