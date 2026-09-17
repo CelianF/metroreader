@@ -1,8 +1,9 @@
 # Codes d'arrêt : le bit de sens
 
-*Note de travail. Écrite le 08/09/2026, complétée le 16/09/2026. Versionnée
-parce qu'elle porte la réserve qui justifie des codes du référentiel : ce
-qu'elle avance reste à vérifier sur le terrain, protocoles compris.*
+*Note de travail. Écrite le 08/09/2026, complétée le 16/09/2026 puis le
+17/09/2026. Versionnée parce qu'elle porte la réserve qui justifie des codes du
+référentiel : ce qu'elle avance reste à vérifier sur le terrain, protocoles
+compris.*
 
 ## La question
 
@@ -31,21 +32,75 @@ fois avec :
 | 11 | 26 | 37 | Saarinen |
 | 12 | 25 | 37 | Robert Schuman |
 | 13 | 24 | 37 | La Fraternelle |
+| 15 | 23 | 38 | Hélène Boucher |
 | 16 | 22 | 38 | Caroline Aigle |
 | 17 | 21 | 38 | Cœur d'Orly |
 | 18 | 20 | 38 | Aéroport d'Orly T4 |
 
-Douze arrêts consécutifs à somme constante. Le décrochage à 38 sur les
-trois derniers vient de la branche d'Orly, dont le nombre d'arrêts
-diffère entre les deux sens.
+Douze arrêts consécutifs à somme constante, puis quatre à 38. Le
+décrochage tient à un trou : l'aller saute le 14, quand le retour, lui,
+est continu de 19 à 35. Où le trou tombe exactement, c'est le trajet du
+17/09 qui le dit — voir plus bas ; jusque-là il avait été supposé, et
+supposé au mauvais endroit.
 
 Requête pour le refaire :
 
 ```python
 import json
-st = json.load(open('metroreader/Data/NavigoStations.json'))
+st = json.load(open('metroreader/Data/NavigoStations.json'))['stations']
 t7 = [s for s in st if s['provider_id'] == 59 and s['line_id'] == 17]
 ```
+
+## Le trajet du 17/09/2026 : vingt arrêts d'affilée
+
+La carte lue ce soir-là porte un trajet complet du T7, arrêt par arrêt,
+de Domaine Chérioux au terminus et le premier arrêt du retour. C'est la
+mesure la plus solide qu'on ait : une suite continue, dont le voyageur
+connaît les deux bouts.
+
+| heure | code lu | bits bas | arrêt |
+|---|---:|---:|---|
+| 16:00 | 32771 | 3 | Domaine Chérioux |
+| 16:03 | 32772 | 4 | Moulin Vert |
+| 16:04 | 32773 | 5 | Bretagne |
+| 16:06 | 32774 | 6 | Auguste Perret |
+| 16:08 | 32775 | 7 | Chevilly-Larue |
+| 16:09 | 32776 | 8 | La Belle Épine |
+| 16:11 | 32777 | 9 | Place de la Logistique |
+| 16:12 | 32776 | 8 | La Belle Épine *(second exemplaire)* |
+| 16:13 | 32778 | 10 | Porte de Rungis |
+| 16:15 | 32779 | 11 | Saarinen |
+| 16:17 | 32780 | 12 | Robert Schuman |
+| 16:19 | 32781 | 13 | La Fraternelle |
+| **16:21** | **32783** | **15** | **Hélène Boucher** |
+| 16:24 | 32784 | 16 | Caroline Aigle |
+| 16:25 | 32785 | 17 | Cœur d'Orly |
+| 16:27 | 32786 | 18 | Aéroport d'Orly T4 |
+| 16:32 | 19 | 19 | Porte de l'Essonne |
+| 16:37 | 19 | 19 | Porte de l'Essonne |
+| 16:39 | 19 | 19 | Porte de l'Essonne |
+| 16:39 | 20 | 20 | Aéroport d'Orly T4, au retour |
+
+Ce que ça établit :
+
+- **Hélène Boucher est le 15, mesuré.** Elle tombe entre La Fraternelle
+  (13) et Caroline Aigle (16), à sa place sur le terrain, et le voyageur
+  la reconnaît. La réserve du 16/09 est levée — et dans l'autre sens que
+  prévu : le 14 avait été déduit de la constante 37, la constante vaut 38
+  dès cet arrêt.
+- **Le 14 est un trou.** La séquence passe de 13 à 15 sans lui. Rien ne
+  dit ce qu'il désignait ; ne rien y mettre est plus juste que d'y loger
+  un arrêt au prétexte qu'il manque une place.
+- **Le terminus est son propre miroir.** Porte de l'Essonne vaut 19 dans
+  les deux sens : 19 + 19 = 38. D'où la seule entrée du référentiel.
+- **Le bit 15 est écrit à l'envers de bout en bout.** Seize codes aller
+  portent le bit, les quatre codes retour ne le portent pas. Ce n'est
+  donc pas une lecture isolée qui se trompe : c'est la convention de
+  cette rame, sur un trajet entier.
+
+L'enregistrement n'est pas celui d'un voyageur qui valide vingt fois :
+la carte reçoit un code à chaque arrêt desservi. À reprendre si on veut
+comprendre ce que la borne écrit vraiment.
 
 ## Le modèle
 
@@ -124,15 +179,17 @@ aux sections. À creuser.
 ## Piste côté code
 
 `NavigoStations.find` porte un `location_id ^ 0x8000` codé en dur pour
-la ligne 17. Ce qu'il rattrape est maintenant mesuré : les trois
-validations T7 du corpus écrivent un code qui diffère de celui du
-référentiel du seul bit 15 — dans un sens comme dans l'autre.
+la ligne 17. Ce qu'il rattrape est maintenant mesuré : les validations
+T7 du corpus écrivent un code qui diffère de celui du référentiel du
+seul bit 15 — dans un sens comme dans l'autre.
 
 | date | code lu | après XOR | arrêt |
 |---|---:|---:|---|
 | 05/01/2026 | 30 | 32798 | Chevilly-Larue |
 | 08/09/2026 | 32775 | 7 | Chevilly-Larue |
 | 16/09/2026 | 32771 | 3 | Domaine Chérioux |
+| 17/09/2026 | 32771 … 32786 | 3 … 18 | seize arrêts d'affilée |
+| 17/09/2026 | 19, 20 | 32787, 32788 | Porte de l'Essonne, Aéroport T4 |
 
 Le référentiel note l'aller `n` et le retour `0x8000 | m`. En janvier la
 carte écrit le retour sans son bit 15 ; en septembre elle écrit l'aller
@@ -141,13 +198,22 @@ différentes.
 
 Le bit 15 tel que la carte l'écrit ne dit donc pas le sens de façon
 fiable, et le XOR ne prétend pas le dire : les deux sens partageant le
-nom de l'arrêt, il ramène le bon nom, rien de plus.
-
-La lecture du 16/09 est la seule dont le voyageur connaisse l'arrêt : il
-est entré à Domaine Chérioux, ce que le XOR donne bien.
+nom de l'arrêt, il ramène le bon nom, rien de plus. Le trajet du 17/09
+le montre d'un bloc : vingt codes, le bit posé sur les seize de l'aller
+et absent des quatre derniers, l'inverse exact de ce que note le
+référentiel.
 
 Généralisation possible, à valider : chercher le code tel quel, puis à
 défaut le miroir, plutôt qu'un cas particulier sur une seule ligne.
+
+Ce que `find` ne fait plus, en revanche, c'est se rabattre sur une autre
+ligne de tram quand la course est connue. Chez la RATP, seuls les trams
+portent un `line_id`, et leur code est un numéro de séquence propre à
+leur ligne : le 15 est Hélène Boucher sur le T7 et Basilique de
+Saint-Denis sur le T1. Chercher ailleurs revenait à tirer au sort. Sur
+les 81 494 clés que les tables peuvent former, 123 rendaient ainsi un
+arrêt d'une autre ligne ; elles rendent maintenant le nombre brut, et
+aucune réponse de la ligne demandée n'est perdue.
 
 ## Hélène Boucher portait les codes de Domaine Chérioux
 
@@ -163,20 +229,30 @@ ordre alphabétique inverse, et Hélène Boucher y suit immédiatement
 Domaine Chérioux : ses deux nombres, 3 et 32802, étaient la copie exacte
 de ceux du voisin.
 
-**Corrigé en 14 et 32791**, les deux trous du bloc. Avec cette réserve :
-que 3 et 32802 soient Domaine Chérioux est prouvé, par le voyage du
-16/09. Que 14 et 32791 soient Hélène Boucher ne l'est pas — c'est le
-modèle séquentiel qui les désigne, 14 + 23 = 37 tombant sur la constante
-de la ligne, et aucune validation du corpus ne porte ces codes.
+Corrigé le 16/09 **en 14 et 32791**, les deux trous du bloc, avec cette
+réserve : que 3 et 32802 soient Domaine Chérioux était prouvé par le
+voyage du 16/09 ; que 14 et 32791 soient Hélène Boucher ne l'était pas.
+Le modèle séquentiel les désignait, 14 + 23 = 37 tombant sur la
+constante de la ligne, et aucune validation du corpus ne portait ces
+codes.
 
-### Protocole
+### Ce que le terrain a répondu
 
-Valider à Hélène Boucher (Orlytech). Selon le sens et la génération du
-valideur, quatre nombres peuvent sortir : 14 ou 32782 à l'aller, 23 ou
-32791 au retour. Les quatre tombent sur le bon arrêt une fois 14 et
-32791 dans la table, par le code tel quel ou par son miroir. Un
-cinquième nombre infirmerait le placement, pas le modèle : recaler avec
-`C = aller + retour = 37`.
+Le lendemain, 17/09, le trajet complet ci-dessus. La moitié déduite était
+fausse : **l'aller est 15, pas 14**, et la constante vaut 38 dès cet
+arrêt, pas 37. La moitié retour tenait — 32791 est bien Hélène Boucher,
+le retour étant continu de 19 à 35.
 
-`build_data.py verify` refuse désormais un fichier où un même code porte
-deux noms sur une même ligne.
+L'erreur ne venait pas du modèle mais de l'endroit où on a supposé le
+trou : entre La Fraternelle et Hélène Boucher, pas entre Hélène Boucher
+et Caroline Aigle. Une place manquante ne dit pas laquelle.
+
+Entre-temps, le 32783 lu à 16:21 ne trouvait rien dans le bloc T7 et
+`find` allait le chercher sur les autres lignes : la validation s'est
+affichée **Baron Le Roy**, sur le T3a, à dix kilomètres de là. Le garde-fou
+décrit plus haut vient de cet affichage.
+
+`build_data.py verify` refuse un fichier où un même code porte deux noms
+sur une même ligne. Il ne voit pas, en revanche, le cas inverse — un trou
+dans un bloc numéroté, qu'une autre ligne vient combler. C'est l'app qui
+s'en garde désormais, en rendant le nombre brut.

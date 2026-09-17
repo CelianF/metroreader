@@ -110,6 +110,20 @@ public class NavigoStations {
         parCle[cle(provider, location, mode)]?.first { $0.line_id == line }
     }
 
+    /// Les modes dont le référentiel numérote les arrêts ligne par ligne, chez
+    /// la RATP.
+    ///
+    /// Tirés de la table plutôt qu'écrits en dur : ce qui les distingue est
+    /// qu'ils portent un `line_id` et que les autres n'en portent pas.
+    private static let modesNumerotesParLigne: Set<String> = {
+        var avecLigne: Set<String> = [], sansLigne: Set<String> = []
+        for station in allStations where station.provider_id == 59 {
+            if station.line_id == nil { sansLigne.insert(station.mode) }
+            else { avecLigne.insert(station.mode) }
+        }
+        return avecLigne.subtracting(sansLigne)
+    }()
+
     public class func find(_ provider_id: Int, _ line_id: Int?, _ location_id: Int, _ mode: String) -> NavigoStationInfo? {
         var modeToUse = mode
         if (mode == "RER") {
@@ -124,6 +138,15 @@ public class NavigoStations {
             }
             else if line_id == 17, let station = premier(59, 17, location_id ^ 0x8000, modeToUse) {
                 return station
+            }
+            // Le code d'un tram est un numéro de séquence le long de sa ligne,
+            // et rien d'autre : le 15 est Hélène Boucher sur le T7, Basilique
+            // de Saint-Denis sur le T1. Quand la course est connue, le chercher
+            // sur les autres lignes revient à tirer au sort — c'est ainsi qu'un
+            // trou du bloc T7 a nommé un arrêt du T3a, à dix kilomètres de
+            // celui où la validation avait eu lieu. Mieux vaut le nombre brut.
+            else if line_id != nil, modesNumerotesParLigne.contains(modeToUse) {
+                return nil
             }
             else if let station = premier(59, location_id, modeToUse) {
                 return station
