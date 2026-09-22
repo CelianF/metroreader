@@ -110,63 +110,142 @@ public class NavigoStations {
         parCle[cle(provider, location, mode)]?.first { $0.line_id == line }
     }
 
-    /// Les modes dont le référentiel numérote les arrêts ligne par ligne, chez
-    /// la RATP.
+    /// Les modes dont le référentiel numérote les arrêts ligne par ligne.
     ///
-    /// Tirés de la table plutôt qu'écrits en dur : ce qui les distingue est
-    /// qu'ils portent un `line_id` et que les autres n'en portent pas.
-    private static let modesNumerotesParLigne: Set<String> = {
-        var avecLigne: Set<String> = [], sansLigne: Set<String> = []
-        for station in allStations where station.provider_id == 59 {
-            if station.line_id == nil { sansLigne.insert(station.mode) }
-            else { avecLigne.insert(station.mode) }
+    /// Le code d'un bus ou d'un tram n'identifie pas un arrêt sur le réseau :
+    /// c'est un numéro de séquence le long d'une ligne. Le 68 de la RATP est
+    /// Bourse sur la 29 et tout autre chose sur la 38 ; le 15 est Hélène Boucher
+    /// sur le T7 et Basilique de Saint-Denis sur le T1. Chercher un tel code
+    /// dans la liste d'un exploitant, toutes lignes confondues, revient à tirer
+    /// au sort.
+    ///
+    /// Le rail n'en est pas : un code de station ou de gare vaut pour le réseau
+    /// entier, et c'est bien la liste de l'exploitant qui le porte.
+    private static let modesNumerotesParLigne: Set<String> = [
+        ModeTransport.busUrbain.rawValue,
+        ModeTransport.busInterurbain.rawValue,
+        ModeTransport.tramway.rawValue,
+    ]
+
+    /// Ce mode numérote-t-il ses arrêts ligne par ligne ?
+    ///
+    /// Le journal des saisies s'y range de la même façon : un nom relevé sur
+    /// une ligne ne vaut pas pour la ligne d'à côté qui réemploie le code.
+    static func numeroteParLigne(_ mode: String) -> Bool {
+        modesNumerotesParLigne.contains(mode == "RER" ? "Train" : mode)
+    }
+
+    /// Tous les arrêts d'une liste portant ce code, dans l'ordre du fichier.
+    private static func tous(_ provider: Int, _ location: Int, _ mode: String) -> [NavigoStationInfo] {
+        parCle[cle(provider, location, mode)] ?? []
+    }
+
+    /// L'arrêt que la liste d'un exploitant donne pour ce code, toutes lignes
+    /// confondues — et, pour un mode numéroté ligne par ligne, seulement si la
+    /// course annoncée le dessert.
+    ///
+    /// Pas de repli sans l'exploitant, en revanche. Les identifiants d'arrêt
+    /// sont locaux à chaque réseau et massivement recyclés — le 161 est déclaré
+    /// par vingt exploitants — donc chercher sans lui renvoie le premier venu
+    /// dans l'ordre du fichier, soit un arrêt à l'autre bout de la région
+    /// annoncé comme une certitude. Mieux vaut rendre l'identifiant brut.
+    ///
+    /// `table` est la liste où chercher, `provider` l'exploitant qu'annonce la
+    /// carte : les deux diffèrent, mais c'est bien la course de la carte qui
+    /// désigne la ligne.
+    private static func sansLaLigne(_ table: Int, annonce provider: Int, course: Int?,
+                                   _ location: Int, _ mode: String) -> NavigoStationInfo? {
+        guard let course, modesNumerotesParLigne.contains(mode) else {
+            return premier(table, location, mode)
         }
-        return avecLigne.subtracting(sansLigne)
-    }()
+        let lignes = NavigoLines.candidates(provider, course, mode)
+        return tous(table, location, mode).first { arret in
+            lignes.contains { dessert($0, arret, annonce: provider) }
+        }
+    }
+
+    /// La ligne annoncée dessert-elle cet arrêt ?
+    ///
+    /// Quand le référentiel range l'arrêt sous une ligne — les trams de la RATP,
+    /// et eux seuls —, c'est lui qui tranche, et il n'y a rien à deviner. Une
+    /// même ligne y figurant sous plusieurs numéros de course, le T1 sous 11,
+    /// 921 et 1389, la comparaison porte sur l'identifiant IDFM. C'est ce qui
+    /// permet de nommer un arrêt du T1 rangé sous 1389 quand la carte annonce
+    /// la course 11, sans pour autant rendre un arrêt du T5 qui se trouverait
+    /// porter le même code et figurer aussi sur le T1.
+    ///
+    /// Partout ailleurs, deux témoignages, l'un ou l'autre suffit : la liste de
+    /// lignes que le référentiel attache à l'arrêt, et la liste d'arrêts qu'il
+    /// attache à la ligne. Aucun ne couvre les deux modes à lui seul — il
+    /// n'attache aucune ligne aux arrêts de tram hors RATP, et un dixième des
+    /// arrêts de bus manquent à la liste de leur propre ligne, « Bois
+    /// Fleuri-Passerelle N3 » y figurant « RN3 ». Ensemble, ils y suffisent.
+    private static func dessert(_ ligne: NavigoLineInfo, _ arret: NavigoStationInfo,
+                                annonce provider: Int) -> Bool {
+        if let sienne = arret.line_id {
+            return NavigoLines.candidates(provider, sienne, arret.mode)
+                .contains { $0.public_id == ligne.public_id }
+        }
+        return arret.lines.contains { $0.public_id == ligne.public_id }
+            || LineStops.dessert(ligne.public_id, arret: arret.name)
+    }
+
+    /// Les listes du référentiel où chercher les arrêts d'un exploitant.
+    ///
+    /// Les valideurs n'annoncent pas toujours le numéro sous lequel le
+    /// référentiel range leur réseau : la SNCF s'annonce 2 et y figure sous 1,
+    /// la RATP s'annonce 3 et y figure sous 59 pour le métro, le tram et le
+    /// train, sous 3 pour ses lignes de bus. La recherche ne consultait que la
+    /// première, si bien que les neuf mille arrêts de bus n'étaient jamais
+    /// atteints — une validation sur un bus RATP n'affichait qu'un nombre.
+    ///
+    /// Le renvoi vers la RATP s'arrête là. `NavigoLines` en fait un pour les
+    /// lignes des délégations « RATP Cap », qui ont gardé leurs numéros sans
+    /// être redéclarées ; six d'entre elles ne déclarent aucun arrêt, et il
+    /// serait tentant de leur ouvrir la liste de la RATP de la même façon. Ce
+    /// serait faux : un code de bus est un numéro de séquence le long d'une
+    /// ligne, et le 12 de la 299 à Massy n'a rien à voir avec le 12 de la
+    /// liste RATP. Leurs arrêts restent des nombres jusqu'à ce qu'on les
+    /// nomme.
+    private static func listes(_ provider: Int) -> [Int] {
+        switch provider {
+        case 2:  return [1]
+        case 3:  return [59, 3]
+        default: return [provider]
+        }
+    }
+
+    /// L'exploitant déclare-t-il ce code quelque part dans ses listes ?
+    ///
+    /// Vrai même quand `find` a refusé de nommer l'arrêt : le code est bien
+    /// connu, c'est son rattachement à la ligne annoncée qui ne l'est pas.
+    public class func declare(_ provider: Int, _ location: Int, _ mode: String) -> Bool {
+        let modeToUse = (mode == "RER") ? "Train" : mode
+        return listes(provider).contains { !tous($0, location, modeToUse).isEmpty }
+    }
 
     public class func find(_ provider_id: Int, _ line_id: Int?, _ location_id: Int, _ mode: String) -> NavigoStationInfo? {
-        var modeToUse = mode
-        if (mode == "RER") {
-            modeToUse = "Train"
+        let modeToUse = (mode == "RER") ? "Train" : mode
+        let listes = listes(provider_id)
+
+        // Sur la ligne annoncée d'abord, quand le référentiel la donne.
+        for table in listes {
+            if let station = premier(table, line_id, location_id, modeToUse) { return station }
         }
-        if (provider_id == 2) { // Map SNCF Provider
-            return premier(1, line_id, location_id, modeToUse) ?? premier(1, location_id, modeToUse)
-        }
-        else if (provider_id == 3) { // Map RATP Provider
-            if let station = premier(59, line_id, location_id, modeToUse) {
-                return station
-            }
-            else if line_id == 17, let station = premier(59, 17, location_id ^ 0x8000, modeToUse) {
-                return station
-            }
-            // Le code d'un tram est un numéro de séquence le long de sa ligne,
-            // et rien d'autre : le 15 est Hélène Boucher sur le T7, Basilique
-            // de Saint-Denis sur le T1. Quand la course est connue, le chercher
-            // sur les autres lignes revient à tirer au sort — c'est ainsi qu'un
-            // trou du bloc T7 a nommé un arrêt du T3a, à dix kilomètres de
-            // celui où la validation avait eu lieu. Mieux vaut le nombre brut.
-            else if line_id != nil, modesNumerotesParLigne.contains(modeToUse) {
-                return nil
-            }
-            else if let station = premier(59, location_id, modeToUse) {
-                return station
-            }
-            // Le référentiel range la RATP sous deux exploitants : 59 pour le
-            // métro, le tram et le train, 3 pour ses lignes de bus. La
-            // recherche ne consultait que le premier, si bien que les neuf
-            // mille arrêts de bus n'étaient jamais atteints — une validation
-            // sur un bus RATP n'affichait qu'un nombre.
-            return premier(3, location_id, modeToUse)
-        }
-        if let station = premier(provider_id, line_id, location_id, modeToUse) {
+        // Le bit 15 du code d'un T7 dit le sens, et la carte l'écrit à l'envers
+        // de ce que note le référentiel. Les deux sens partageant le nom de
+        // l'arrêt, le miroir ramène le bon nom, rien de plus.
+        if provider_id == 3, line_id == 17,
+           let station = premier(59, 17, location_id ^ 0x8000, modeToUse) {
             return station
         }
-        // Pas de repli sans l'exploitant. Les identifiants d'arrêt sont locaux à
-        // chaque réseau et massivement recyclés — le 161 est déclaré par vingt
-        // exploitants — donc chercher sans lui renvoie le premier venu dans
-        // l'ordre du fichier, soit un arrêt à l'autre bout de la région annoncé
-        // comme une certitude. Mieux vaut rendre l'identifiant brut.
-        return premier(provider_id, location_id, modeToUse)
+        for table in listes {
+            if let station = sansLaLigne(table, annonce: provider_id, course: line_id,
+                                         location_id, modeToUse) {
+                return station
+            }
+        }
+        return nil
     }
 }
 

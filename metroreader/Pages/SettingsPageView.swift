@@ -135,7 +135,7 @@ struct SettingsPageView: View {
                 } label: {
                     Label("Corrections livrées", systemImage: "checkmark.seal")
                 }
-                .eteint(quand: LineCorrections.all.isEmpty && StopCorrections.all.isEmpty && GateCorrections.all.isEmpty)
+                .eteint(quand: LineCorrections.all.isEmpty && StopCorrections.consultables.isEmpty && GateCorrections.all.isEmpty)
             } header: {
                 Text("Données")
             } footer: {

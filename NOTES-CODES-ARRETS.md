@@ -1,7 +1,7 @@
 # Codes d'arrêt : le bit de sens
 
-*Note de travail. Écrite le 08/09/2026, complétée le 16/09/2026 puis le
-17/09/2026. Versionnée parce qu'elle porte la réserve qui justifie des codes du
+*Note de travail. Écrite le 08/09/2026, complétée le 16/09/2026, le
+17/09/2026 puis le 22/09/2026. Versionnée parce qu'elle porte la réserve qui justifie des codes du
 référentiel : ce qu'elle avance reste à vérifier sur le terrain, protocoles
 compris.*
 
@@ -256,3 +256,97 @@ décrit plus haut vient de cet affichage.
 sur une même ligne. Il ne voit pas, en revanche, le cas inverse — un trou
 dans un bloc numéroté, qu'une autre ligne vient combler. C'est l'app qui
 s'en garde désormais, en rendant le nombre brut.
+
+
+## 22/09/2026 : plus d'arrêt nommé par la liste d'un exploitant seul
+
+### Villejuif - Louis Aragon manquait au bloc T7
+
+Un trajet du jour écrit le code **36** sur la course 17. Le bloc T7 numérotait
+l'aller 1…18 et le retour 19…35, sous `0x8000 | m` : le 36, miroir du 1, en
+était absent. La validation n'affichait qu'un nombre.
+
+Le modèle le désignait — 1 + 36 = 37, la constante de la section nord — et le
+voyageur le confirme : c'est le terminus. `32804` a donc rejoint le bloc, avec
+les coordonnées de son aller. **Mesuré**, pas déduit : le 17/09 avait déjà
+montré ce que coûte une place supposée.
+
+### La règle générale : la ligne doit desservir l'arrêt
+
+Le garde-fou du 17/09 ne couvrait que le tram de la RATP, parce que seuls ses
+arrêts portent un `line_id`. Le bus a le même défaut sans le même marqueur : le
+**68** de la RATP est Bourse sur la 29, et tout autre chose sur la 38. Chercher
+un tel code dans la liste d'un exploitant, toutes lignes confondues, rendait le
+premier venu dans l'ordre du fichier.
+
+`find` n'accepte plus un arrêt trouvé sans la ligne, pour un bus ou un tram,
+qu'à la condition que la course annoncée le desserve. Deux témoignages, l'un ou
+l'autre suffit :
+
+- la liste de lignes que le référentiel attache à l'arrêt — présente sur les
+  39 300 arrêts de bus, vide sur les 596 arrêts de tram ;
+- la liste d'arrêts que `LineStops.json` attache à la ligne — elle couvre les
+  15 lignes de tram et 1 824 des 1 920 lignes de bus.
+
+Aucune ne suffit seule, et la seconde ne s'emploie pas seule : un dixième des
+arrêts de bus manquent à la liste de leur propre ligne, « Bois
+Fleuri-Passerelle N3 » y figurant « RN3 ». Le rapprochement se fait donc sur un
+nom replié — casse, accents et ponctuation varient d'une table à l'autre.
+
+Sauf quand le référentiel range lui-même l'arrêt sous une ligne, ce qu'il ne
+fait que pour les trams de la RATP : il tranche alors seul, et le nom ne sert
+plus à rien. La comparaison porte sur l'identifiant IDFM, pas sur le numéro de
+course, car une même ligne y figure sous plusieurs — **le T1 sous 11, 921 et
+1389**. C'est ce qui manquait au garde-fou du 17/09 : il refusait tout arrêt
+d'un autre `line_id`, y compris ceux de la ligne annoncée rangés sous son autre
+numéro.
+
+Sur les 5 222 clés que les courses de tram RATP et les codes du référentiel
+peuvent former, **955 rendent maintenant un nom, contre 464 pour le seul filtre
+par ligne — et zéro rend l'arrêt d'une autre ligne.** Les 123 réponses fausses
+que comptait la note du 17/09 ont disparu sans que le doublement de couverture
+en rouvre une.
+
+Le rail n'est pas concerné : un code de station ou de gare vaut pour le réseau
+entier, et c'est bien la liste de l'exploitant qui le porte.
+
+### La correction livrée ne donne plus un second avis
+
+Écarté par la règle, le code repartait aussitôt chercher son nom dans
+`StopCorrections.json` — qui, pour la RATP, **recopie le référentiel au mot
+près**. La 14 s'affichait ainsi à Dupleix, à six kilomètres du TVM. Sur les
+5 502 corrections livrées, 3 705 portent un code que le référentiel déclare
+déjà, et pas une seule ne lui donne un autre nom : ce sont les arrêts de bus
+RATP qu'IDFM ne publie plus, gardés là pour qu'une régénération ne les perde pas
+(voir le README du générateur, qui demande de ne pas les retirer).
+
+Une correction livrée comble donc un trou, elle ne contredit pas le référentiel :
+elle ne se consulte que pour un code qu'aucune liste de l'exploitant ne déclare.
+Restent 1 797 arrêts effectivement consultables, tous du Mantois — les Réglages
+n'annoncent plus que ceux-là.
+
+### Mesure sur le corpus
+
+1 070 validations rejouées hors de l'app, neuf lignes changent :
+
+| | avant | après |
+|---|---|---|
+| T7, code 36 | `36` | Villejuif - Louis Aragon |
+| TVM, code 729 | Dupleix | `729` |
+| 171, code 313 | Cours de Vincennes | `313` |
+| 162, code 18 | Gare Saint-Lazare | `18` |
+| 323, code 29 | Hôpital Ambroise Paré | `29` |
+| 58, code 564 | Marcadet - Poissonniers | `564` |
+| 58, code 549 | Jouffroy d'Abbans - Tocqueville | `549` |
+| 38, code 68 *(deux fois)* | Bourse | `68` |
+
+Les huit noms perdus étaient tous faux, et le référentiel le dit lui-même :
+aucune des huit lignes annoncées ne dessert l'arrêt qu'on affichait. Rien
+d'autre ne bouge — les 97 arrêts de bus que les réseaux en délégation nomment
+correctement, les 20 du Mantois, les trois du T10, le métro, le RER et le train
+sont intacts.
+
+Ce que ça ne règle pas : 197 validations de bus du corpus n'affichaient déjà
+qu'un nombre, et continuent. Il leur manque une liste d'arrêts par ligne que le
+référentiel ne publie pas.
+

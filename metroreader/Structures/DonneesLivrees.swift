@@ -36,6 +36,7 @@ enum DonneesLivrees {
         NavigoStations.prechauffer()
         NavigoLines.prechauffer()
         StopCorrections.prechauffer()
+        LineStops.prechauffer()
         LineCorrections.prechauffer()
         GateCorrections.prechauffer()
         _ = ProviderCatalog.findProvider(0)

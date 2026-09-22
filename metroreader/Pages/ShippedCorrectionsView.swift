@@ -21,7 +21,7 @@ struct ShippedCorrectionsView: View {
 
     var body: some View {
         List {
-            if corrections.isEmpty && StopCorrections.all.isEmpty && GateCorrections.all.isEmpty {
+            if corrections.isEmpty && StopCorrections.consultables.isEmpty && GateCorrections.all.isEmpty {
                 Section {
                     Text("Aucune correction livrée")
                         .foregroundStyle(.secondary)
@@ -70,7 +70,7 @@ struct ShippedCorrectionsView: View {
                     } header: {
                         Text("Arrêts")
                     } footer: {
-                        Text("Treize réseaux en délégation n'ont jamais déclaré le code billettique de leurs arrêts au référentiel : leurs validations n'y portent qu'un nombre. Ce que l'exploitant nous transmet directement comble ce trou.")
+                        Text("Des réseaux en délégation n'ont jamais déclaré le code billettique de leurs arrêts au référentiel : leurs validations n'y portent qu'un nombre. Ce que l'exploitant nous transmet directement comble ce trou.")
                     }
                 }
 
@@ -145,8 +145,7 @@ private struct ShippedStopsView: View {
     @State private var recherche = ""
 
     private var arrets: [ShippedStop] {
-        StopCorrections.all
-            .filter { $0.provider_id == providerId }
+        StopCorrections.arrets(exploitant: providerId)
             .filter { recherche.isEmpty || $0.name.localizedCaseInsensitiveContains(recherche) }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }

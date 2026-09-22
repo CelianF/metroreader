@@ -28,6 +28,37 @@ public class LineStops {
         return table[publicId] ?? []
     }
 
+    /// Décode la table et bâtit l'index des noms comparables.
+    static func prechauffer() {
+        _ = comparables
+    }
+
+    /// La ligne dessert-elle un arrêt de ce nom ?
+    ///
+    /// Le code qu'écrit un valideur de bus ou de tram est un numéro de séquence
+    /// le long de sa ligne : l'arrêt qu'il désigne est forcément dans cette
+    /// liste. C'est ce qui permet d'écarter un arrêt que la liste d'un
+    /// exploitant, toutes lignes confondues, aurait donné pour ce code.
+    static func dessert(_ publicId: String, arret nom: String) -> Bool {
+        comparables[publicId]?.contains(comparable(nom)) ?? false
+    }
+
+    /// Les noms de chaque ligne, réduits à ce qui permet de les reconnaître.
+    /// Normaliser à la volée, c'était replier quatre-vingt mille chaînes à
+    /// chaque validation affichée.
+    private static let comparables: [String: Set<String>] =
+        table.mapValues { Set($0.map { comparable($0.name) }) }
+
+    /// Le nom d'un arrêt réduit à ce qui permet de le reconnaître d'une table du
+    /// référentiel à l'autre : la casse, les accents et la ponctuation y varient
+    /// — « Route d'Ève » s'y écrit aussi « Route d'Eve », et « Trésor public »
+    /// « Trésor Public ».
+    private static func comparable(_ nom: String) -> String {
+        nom.folding(options: [.diacriticInsensitive, .caseInsensitive],
+                    locale: Locale(identifier: "fr_FR"))
+            .filter { $0.isLetter || $0.isNumber }
+    }
+
     /// Les arrêts de la ligne autour d'une position, du plus proche au plus
     /// éloigné et dédoublonnés par nom.
     ///
