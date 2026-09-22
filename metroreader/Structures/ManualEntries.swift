@@ -165,7 +165,9 @@ final class ManualEntries: ObservableObject {
     private var providersEcrasables = true
     private var ignoredStopsEcrasables = true
 
-    private var stopIndex: [CleReseau: StopReport] = [:]
+    /// Plusieurs saisies peuvent partager une clé : le même code, sur deux
+    /// lignes du même réseau, ne désigne pas le même arrêt.
+    private var stopIndex: [CleReseau: [StopReport]] = [:]
     private var lineIndex: [CleReseau: LineEntry] = [:]
     private var providerIndex: [Int: ProviderEntry] = [:]
     private var ignoredIndex = Set<CleValidation>()
@@ -205,8 +207,8 @@ final class ManualEntries: ObservableObject {
     /// aucun arrêt en base : leur nom ne peut être que saisi au clavier, sans
     /// coordonnées. Il s'affiche quand même — c'est isLocatable, et non found,
     /// qui décide de la mise en carte.
-    func station(provider: Int, location: Int, mode: String) -> NavigoStationInfo? {
-        guard let r = stopIndex[Self.stopKey(provider, location, mode)] else { return nil }
+    func station(provider: Int, location: Int, mode: String, route: Int?) -> NavigoStationInfo? {
+        guard let r = stopReport(provider: provider, location: location, mode: mode, route: route) else { return nil }
         return NavigoStationInfo(name: r.stationName, provider_id: provider, line_id: nil,
                                  location_id: location, mode: mode,
                                  lat: r.lat ?? 0, lon: r.lon ?? 0)
@@ -225,8 +227,30 @@ final class ManualEntries: ObservableObject {
     func providerName(_ id: Int) -> String? { providerIndex[id]?.displayName }
 
     /// La saisie rangée pour ce couple, que le référentiel la masque ou non.
-    func stopReport(provider: Int, location: Int, mode: String) -> StopReport? {
-        stopIndex[Self.stopKey(provider, location, mode)]
+    ///
+    /// Sur un bus ou un tram, elle doit venir de la course annoncée : le code
+    /// y est un numéro de séquence le long d'une ligne, pas un identifiant
+    /// d'arrêt sur le réseau. Le 12 de la 197 est Rue du 8 Mai 1945 à
+    /// Bourg-la-Reine ; le 12 de la 299 est Porte d'Orléans. Rangée par le seul
+    /// exploitant, la première saisie nommait la seconde validation.
+    func stopReport(provider: Int, location: Int, mode: String, route: Int?) -> StopReport? {
+        let saisies = stopIndex[Self.stopKey(provider, location, mode)] ?? []
+        guard NavigoStations.numeroteParLigne(mode) else { return saisies.first }
+        return saisies.first { Self.memeCourse($0.routeNumber, route, provider, mode) }
+    }
+
+    /// Deux numéros de course désignent-ils la même ligne ?
+    ///
+    /// Par l'identifiant IDFM quand le référentiel les connaît : une même ligne
+    /// s'y annonce sous plusieurs numéros, et la carte loge parfois la course
+    /// dans l'octet haut. Par le nombre à défaut. Une saisie sans course ne
+    /// vaut pour aucune : on ne sait pas d'où elle vient.
+    private static func memeCourse(_ saisie: Int?, _ annoncee: Int?, _ provider: Int, _ mode: String) -> Bool {
+        guard let saisie, let annoncee else { return false }
+        if saisie == annoncee { return true }
+        let siennes = Set(NavigoLines.candidates(provider, saisie, mode).map(\.public_id))
+        guard !siennes.isEmpty else { return false }
+        return NavigoLines.candidates(provider, annoncee, mode).contains { siennes.contains($0.public_id) }
     }
 
     /// Vrai quand l'arrêt de cette validation a été écarté. Chaque ligne de
@@ -308,10 +332,17 @@ final class ManualEntries: ObservableObject {
     // MARK: Écriture
 
     /// Un même arrêt ne se signale qu'une fois : le dernier avis remplace.
+    /// Une saisie en remplace une autre quand elle désigne la même chose. Sur
+    /// un bus ou un tram, il y faut la même course : le même code y nomme deux
+    /// arrêts distincts sur deux lignes, et les ranger ensemble revenait à
+    /// effacer le premier en nommant le second.
     func save(_ report: StopReport) {
         stops.removeAll { $0.providerId == report.providerId
                        && $0.locationId == report.locationId
-                       && $0.mode == report.mode }
+                       && $0.mode == report.mode
+                       && (!NavigoStations.numeroteParLigne(report.mode)
+                           || Self.memeCourse($0.routeNumber, report.routeNumber,
+                                              report.providerId, report.mode)) }
         stops.insert(report, at: 0)
         rebuild()
         persistStops()
@@ -435,8 +466,9 @@ final class ManualEntries: ObservableObject {
     // MARK: Persistance
 
     private func rebuild() {
-        stopIndex = Dictionary(stops.map { (Self.stopKey($0.providerId, $0.locationId, $0.mode), $0) },
-                               uniquingKeysWith: { first, _ in first })
+        stopIndex = Dictionary(grouping: stops) {
+            Self.stopKey($0.providerId, $0.locationId, $0.mode)
+        }
         lineIndex = Dictionary(lines.map { (Self.lineKey($0.providerId, $0.routeNumber, $0.mode), $0) },
                                uniquingKeysWith: { first, _ in first })
         providerIndex = Dictionary(providers.map { ($0.providerId, $0) },

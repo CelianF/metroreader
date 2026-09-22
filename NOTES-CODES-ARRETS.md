@@ -168,8 +168,12 @@ dont aucun ne tombe dans le bloc 722-737. Les trois viennent de
 suggestions GPS prises au même endroit en six minutes — au moins un est
 mal identifié. À reprendre proprement.
 
-**0 = La Croix de Berny RER** est suspect : 0 sert habituellement à
-dire « non renseigné ».
+**0 = La Croix de Berny RER** avait été tenu pour suspect, 0 servant
+d'ordinaire à dire « non renseigné ». Le journal le dément : la TVM y
+porte **0 = La Croix de Berny RER et 1 = Marché International de
+Rungis**, deux arrêts distincts, tous deux à son itinéraire. 0 est un
+code d'arrêt comme un autre — et, comme les autres, il ne vaut que pour
+une ligne. Voir plus bas.
 
 **Les blocs ne sont pas par ligne.** 13 et 722-729 ne peuvent pas
 cohabiter dans un compteur 1…N sur une ligne de 32 arrêts. La
@@ -350,3 +354,72 @@ Ce que ça ne règle pas : 197 validations de bus du corpus n'affichaient déjà
 qu'un nombre, et continuent. Il leur manque une liste d'arrêts par ligne que le
 référentiel ne publie pas.
 
+
+## Le second repli par DSP : le journal des saisies
+
+Le référentiel corrigé, une validation de la **299** (RATP Cap Massy-Juvisy,
+code 12) s'affichait encore « Rue du 8 Mai 1945 ». Ce nom ne venait d'aucune
+table livrée : le code d'avant comme celui d'après rendent `12`. Il venait du
+journal, où l'arrêt avait été nommé **sur la 197** :
+
+```
+providerId 236 · locationId 12 · Bus urbain · routeNumber 197 → Rue du 8 Mai 1945
+```
+
+`ManualEntries` rangeait ses arrêts par `(exploitant, code, mode)`, exactement
+le repli par DSP qu'on venait de retirer au référentiel. Le 12 de la 197 est
+Rue du 8 Mai 1945 à Bourg-la-Reine ; le 12 de la 299 est Porte d'Orléans.
+
+Trois changements, tous sur la même idée :
+
+- la recherche exige la course annoncée, pour les modes numérotés ligne par
+  ligne (`NavigoStations.numeroteParLigne`) ; les courses se comparent par
+  identifiant IDFM, une même ligne s'annonçant sous plusieurs numéros ;
+- l'index accepte donc plusieurs saisies par clé, là où il n'en gardait qu'une ;
+- `save` dédoublonne de la même façon — sans quoi nommer le 12 de la 299 aurait
+  **effacé** celui de la 197.
+
+Les saisies portent toutes leur `routeNumber` depuis l'origine : rien à
+ressaisir.
+
+### Mesure, journal réel chargé
+
+1 263 validations rejouées, 21 changent. Onze viennent du référentiel (voir
+plus haut) ; dix viennent du journal :
+
+| course | code | avant | après |
+|---|---:|---|---|
+| 299 | 12 | Rue du 8 Mai 1945 *(saisie sur la 197)* | `12` |
+| 388 | 88 | Lyon - Ledru Rollin *(référentiel, faux)* | **Porte d'Orléans** *(saisie)* |
+| 187 ×10 | 0 | La Croix de Berny RER *(saisie sur la TVM)* | `0` |
+
+Le même trajet montre la règle à l'œuvre dans l'autre sens : quatre lignes —
+197, 388, 194 et une course 32000 — nomment chacune **Porte d'Orléans** sous
+quatre codes distincts, 245, 88, 954 et 26143. Rangées par ligne, elles
+coexistent ; rangées par exploitant, la dernière aurait mangé les autres.
+
+### Le code 0 est un arrêt, pas un blanc
+
+Les dix validations perdues sont toutes le **code 0 de la course 187**, nommé
+d'après une saisie faite sur la **TVM**. Ce n'était pas un arbitrage délicat :
+c'était faux, et le référentiel le dit seul.
+
+**Le 187 ne dessert pas Croix de Berny.** Ses 25 arrêts vont d'Arcueil - Cachan
+RER à Fresnes ; la TVM, elle, dessert Gare de la Croix de Berny et pas Porte
+d'Orléans. Aucune des deux ne peut porter l'arrêt de l'autre.
+
+**Et 0 n'est pas « non renseigné ».** Sur la TVM, le journal porte 0 = La Croix
+de Berny RER *et* 1 = Marché International de Rungis, l'un et l'autre à
+l'itinéraire de la ligne. Deux codes, deux arrêts : 0 numérote comme le reste.
+
+Reste ce qu'il vaut sur le 187. **Porte d'Orléans**, selon toute vraisemblance
+— c'est le terminus nord de la ligne, il figure à ses 25 arrêts, et le trajet
+le désigne : la validation du 11/09 à 21:44 suit une entrée ligne 4 à
+Barbès - Rochechouart à 20:52, et trois cartes du corpus valident sur ce même
+187 entre 21:44 et 22:01. **Déduit, pas mesuré** : personne n'a encore nommé ce
+code depuis la fiche.
+
+Que les deux termini — La Croix de Berny sur la TVM, Porte d'Orléans sur le 187
+— portent tous deux le 0 laisse penser que ce code marque le début de course.
+Une hypothèse de plus à éprouver ; elle n'ôte rien à la règle, puisqu'elle
+désigne un arrêt différent sur chaque ligne.

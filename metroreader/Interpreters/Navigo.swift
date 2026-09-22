@@ -274,14 +274,18 @@ func interpretLocationId(_ locationIdBitString: String, _ eventCodeBitstring: St
     }
     
     let eventRouteNumberPresent = (routeNumberBitstring != nil)
-    
-    let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: eventRouteNumberPresent, routeNumber: eventRouteNumberPresent ? Int(routeNumberBitstring ?? "0", radix: 2) : nil, serviceProvider: Int(eventServiceProviderBitstring, radix: 2)).0
+    // La course annoncée : elle désigne la ligne, et sur un bus ou un tram
+    // c'est la ligne qui donne son sens au code d'arrêt.
+    let routeNumber = eventRouteNumberPresent ? Int(routeNumberBitstring ?? "", radix: 2) : nil
+
+    let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: eventRouteNumberPresent, routeNumber: routeNumber, serviceProvider: Int(eventServiceProviderBitstring, radix: 2)).0
     
     let eventServiceProviderId = Int(eventServiceProviderBitstring, radix: 2) ?? 0
 
-    guard let station = NavigoStations.find(eventServiceProviderId, eventRouteNumberPresent ? Int(routeNumberBitstring ?? "", radix: 2) : nil, value, eventTransport) else {
+    guard let station = NavigoStations.find(eventServiceProviderId, routeNumber, value, eventTransport) else {
         // Faute de référentiel, l'arrêt a pu être identifié à la main
-        if let signale = ManualEntries.shared.station(provider: eventServiceProviderId, location: value, mode: eventTransport) {
+        if let signale = ManualEntries.shared.station(provider: eventServiceProviderId, location: value,
+                                                      mode: eventTransport, route: routeNumber) {
             return signale
         }
         // Ou venir de l'exploitant lui-même, quand il nous a transmis ce qu'il
@@ -301,13 +305,15 @@ func provenanceArret(_ locationIdBitString: String, _ eventCodeBitstring: String
     guard let value = Int(locationIdBitString, radix: 2) else { return "Pas de code de lieu" }
 
     let eventRouteNumberPresent = (routeNumberBitstring != nil)
-    let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: eventRouteNumberPresent, routeNumber: eventRouteNumberPresent ? Int(routeNumberBitstring ?? "0", radix: 2) : nil, serviceProvider: Int(eventServiceProviderBitstring, radix: 2)).0
+    let routeNumber = eventRouteNumberPresent ? Int(routeNumberBitstring ?? "", radix: 2) : nil
+    let eventTransport = interpretEventCode(eventCodeBitstring, isRouteNumberPresent: eventRouteNumberPresent, routeNumber: routeNumber, serviceProvider: Int(eventServiceProviderBitstring, radix: 2)).0
     let eventServiceProviderId = Int(eventServiceProviderBitstring, radix: 2) ?? 0
 
-    if NavigoStations.find(eventServiceProviderId, eventRouteNumberPresent ? Int(routeNumberBitstring ?? "", radix: 2) : nil, value, eventTransport) != nil {
+    if NavigoStations.find(eventServiceProviderId, routeNumber, value, eventTransport) != nil {
         return "Référentiel"
     }
-    if ManualEntries.shared.station(provider: eventServiceProviderId, location: value, mode: eventTransport) != nil {
+    if ManualEntries.shared.station(provider: eventServiceProviderId, location: value,
+                                    mode: eventTransport, route: routeNumber) != nil {
         return "Données saisies"
     }
     if StopCorrections.find(eventServiceProviderId, value, eventTransport) != nil {

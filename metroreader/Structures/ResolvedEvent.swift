@@ -162,7 +162,8 @@ struct ResolvedEvent {
     var stopReport: StopReport? {
         guard let locationId,
               NavigoStations.find(providerId, routeNumber, locationId, lookupMode) == nil else { return nil }
-        return ManualEntries.shared.stopReport(provider: providerId, location: locationId, mode: lookupMode)
+        return ManualEntries.shared.stopReport(provider: providerId, location: locationId,
+                                               mode: lookupMode, route: routeNumber)
     }
 
     /// Ni la table des lignes ni les cas particuliers n'ont donné de nom : ce
