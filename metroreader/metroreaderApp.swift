@@ -64,6 +64,7 @@ struct ContentView: View {
             }
             .tag(2)
         }
+        .modifier(BordDeDefilementDoux())
         .task {
             // Au lancement, et là seulement : c'est le moment où une
             // autorisation accordée « cette fois seulement » a expiré.
@@ -111,6 +112,20 @@ struct ContentView: View {
         }
     }
     #endif
+}
+
+/// Le fondu du haut des vues défilantes reste doux partout. C'est le défaut
+/// d'iOS 26, mais iOS 27 prend `.hard` : on le pose à la racine pour que les
+/// deux systèmes se ressemblent. Le bas garde le réglage du système.
+/// Avant iOS 26, l'effet de bord n'existe pas.
+private struct BordDeDefilementDoux: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, macOS 26.0, *) {
+            content.scrollEdgeEffectStyle(.soft, for: .top)
+        } else {
+            content
+        }
+    }
 }
 
 #if os(iOS)
