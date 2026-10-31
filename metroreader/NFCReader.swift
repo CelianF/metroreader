@@ -233,7 +233,9 @@ class NFCReader: NSObject, ObservableObject {
 
     func beginScanning(historyManager: HistoryManager) {
         // Pas de NFC hors iOS : les cartes y arrivent par import.
-        #if os(iOS)
+        #if targetEnvironment(simulator)
+        simulerUneLecture(historyManager: historyManager)
+        #elseif os(iOS)
         guard NFCTagReaderSession.readingAvailable else { return }
 
         JournalNFC.shared.commencer()
@@ -251,6 +253,38 @@ class NFCReader: NSObject, ObservableObject {
         clearData()
         #endif
     }
+
+    #if targetEnvironment(simulator)
+    /// Le simulateur n'a pas d'antenne : la lecture s'y joue pour qu'on voie
+    /// l'écran de scan et son animation. Elle dure dix secondes, puis une carte
+    /// est « lue » comme si on l'avait collée : celle passée au lancement
+    /// (`-debugCarte <chemin d'un .metropass>`), sinon la plus récente de
+    /// l'historique — l'argument ne vaut que pour un lancement en ligne de
+    /// commande, pas depuis l'icône. Sans l'une ni l'autre, la lecture s'arrête
+    /// comme une session annulée.
+    private func simulerUneLecture(historyManager: HistoryManager) {
+        guard !isScanning else { return }
+        self.historyManager = historyManager
+        isScanning = true
+        clearData()
+        let carte = UserDefaults.standard.string(forKey: "debugCarte").map { URL(fileURLWithPath: $0) }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(10))
+            if let carte {
+                isTagDetected = true
+                importFile(at: carte, historyManager: historyManager)
+            } else if let recente = historyManager.history.max(by: { $0.date < $1.date }),
+                      let donnees = recente.export() {
+                isTagDetected = true
+                importJSON(from: donnees, historyManager: historyManager)
+            }
+            // L'import publie la carte dans un bloc différé : arrêter la
+            // lecture dans le suivant évite d'entrevoir l'écran vide entre les
+            // deux.
+            DispatchQueue.main.async { self.isScanning = false }
+        }
+    }
+    #endif
 
     func clearData() {
         DispatchQueue.main.async {

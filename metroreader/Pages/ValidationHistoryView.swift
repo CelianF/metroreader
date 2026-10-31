@@ -18,6 +18,9 @@ import SwiftUI
 struct ValidationHistoryView: View {
     let events: [[String: Any]]
     let contracts: [[String: Any]]
+    /// Dans le panneau du Duo plié couché, une validation touchée s'ouvre dans
+    /// le panneau d'en face plutôt que par-dessus la page.
+    var ouvrir: ((Int) -> Void)? = nil
     /// Ce qui a été calculé avant d'ouvrir la page ; rien, et elle le calcule
     /// en s'affichant.
     private let preparation: Preparation?
@@ -43,8 +46,9 @@ struct ValidationHistoryView: View {
     /// Les trajets de toute la carte, chiffrés : la part d'un forfait se compte
     /// sur le mois entier, pas sur la semaine affichée.
     @State private var chiffrage: ChiffrageDesTrajets?
-    /// Relancé au retour du calculateur, où un prix a pu être saisi.
+    /// Relancé au retour sur la page, un prix ayant pu être saisi entre-temps.
     @State private var relectureDesPrix = 0
+    @Environment(\.paysagePlie) private var paysagePlie
 
     /// Ce que la page affiche en s'ouvrant, calculé d'avance hors du fil
     /// principal : ouverte avec, elle n'a ni sablier à montrer ni second rendu
@@ -57,9 +61,11 @@ struct ValidationHistoryView: View {
         let photo: ApercuDeCarte.Photo?
     }
 
-    init(events: [[String: Any]], contracts: [[String: Any]], preparation: Preparation? = nil) {
+    init(events: [[String: Any]], contracts: [[String: Any]], preparation: Preparation? = nil,
+         ouvrir: ((Int) -> Void)? = nil) {
         self.events = events
         self.contracts = contracts
+        self.ouvrir = ouvrir
         self.preparation = preparation
         _journees = State(initialValue: preparation?.journees)
     }
@@ -152,11 +158,18 @@ struct ValidationHistoryView: View {
                         Section {
                             ForEach(trajet.indices, id: \.self) { i in
                                 let transition = validations.transition(de: i)
-                                NavigationLink {
-                                    EventView(eventInfo: events[i], transition: transition, regle: validations.regle(de: i),
-                                              contractsInfos: contracts)
-                                } label: {
-                                    EventPreview(eventInfo: events[i], transition: transition, afficheDate: false)
+                                if let ouvrir {
+                                    Button { ouvrir(i) } label: {
+                                        EventPreview(eventInfo: events[i], transition: transition, afficheDate: false)
+                                    }
+                                    .tint(.primary)
+                                } else {
+                                    NavigationLink {
+                                        EventView(eventInfo: events[i], transition: transition, regle: validations.regle(de: i),
+                                                  contractsInfos: contracts)
+                                    } label: {
+                                        EventPreview(eventInfo: events[i], transition: transition, afficheDate: false)
+                                    }
                                 }
                             }
                         } header: {
@@ -211,15 +224,7 @@ struct ValidationHistoryView: View {
         .listSectionSpacing(Self.ecartEntreTrajets)
         .contentMargins(.top, Self.margeDuHaut, for: .scrollContent)
         .navigationTitle("Validations")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                NavigationLink {
-                    CalculateurPrixView(events: events, contracts: contracts)
-                } label: {
-                    Label("Calculateur de prix", systemImage: "eurosign.circle")
-                }
-            }
-        }
+        // Au retour des Réglages, où un prix a pu être saisi.
         .onAppear { relectureDesPrix += 1 }
         .task(id: afficherPrix) {
             guard afficherPrix, chiffrage == nil else { return }
@@ -244,6 +249,9 @@ struct ValidationHistoryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(isPresented: $carteEnGrand) {
             CarteEnGrand(events: events, contrats: contracts, joursInitiaux: joursALOuverture)
+                // Présentée par-dessus tout, la carte sort du cadre tourné : elle
+                // y revient d'elle-même, en paysage sur le Duo plié couché.
+                .modifier(PaysageSurLeDuoPlie(angleImpose: paysagePlie ? OrientationDuDuo.shared.angle(deplie: false) : nil))
         }
         #endif
     }
@@ -332,6 +340,7 @@ private struct CarteEnGrand: View {
     private let couverts: Int
 
     @State private var joursRetenus: Int
+    @Environment(\.paysagePlie) private var paysagePlie
 
     init(events: [[String: Any]], contrats: [[String: Any]], joursInitiaux: Int) {
         self.events = events
@@ -345,6 +354,55 @@ private struct CarteEnGrand: View {
     }
 
     var body: some View {
+        if paysagePlie {
+            enPaysage
+        } else {
+            enPortrait
+        }
+    }
+
+    /// Le Duo plié couché : ni pile de navigation ni zones sûres, calculées
+    /// avant la rotation et retombées du mauvais côté — elles décalaient
+    /// « Fermer » et le curseur. La carte prend tout le cadre, les boutons s'y
+    /// posent.
+    private var enPaysage: some View {
+        EventsMapView(events: events,
+                      affiches: validationsSurLesDerniersJours(joursRetenus, dates: dates, recente: recente),
+                      contrats: contrats, hauteur: nil)
+            .ignoresSafeArea()
+            .overlay(alignment: cameraEnBas ? .topLeading : .topTrailing) {
+                Button("Fermer") { dismiss() }
+                    .font(.headline)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .modifier(VerreDuCurseur())
+                    .padding(16)
+            }
+            .overlay(alignment: .topTrailing) {
+                if couverts > 1 {
+                    GeometryReader { cadre in
+                        CurseurDesJours(dates: dates, recente: recente, couverts: couverts,
+                                        joursRetenus: $joursRetenus, vertical: true,
+                                        hauteurDisponible: cadre.size.height - Self.margeHaute - margeBasse)
+                            .padding(.top, Self.margeHaute)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                }
+            }
+    }
+
+    /// Le coin de la caméra, une fois l'écran tourné : en bas à droite quand
+    /// le cadre tourne vers la gauche, en haut à gauche sinon. Le curseur
+    /// s'arrête au-dessus d'elle, « Fermer » prend l'autre coin du haut.
+    private var cameraEnBas: Bool {
+        OrientationDuDuo.shared.angle(deplie: false).degrees < 0
+    }
+
+    private static let margeHaute: CGFloat = 16
+    private var margeBasse: CGFloat { cameraEnBas ? 120 : 16 }
+
+
+    private var enPortrait: some View {
         NavigationStack {
             EventsMapView(events: events,
                           affiches: validationsSurLesDerniersJours(joursRetenus, dates: dates, recente: recente),
@@ -378,13 +436,28 @@ private struct CurseurDesJours: View {
     let recente: Date?
     let couverts: Int
     @Binding var joursRetenus: Int
+    /// Debout sur le bord de la carte, en paysage : le dernier jour en bas,
+    /// toute la carte en haut.
+    var vertical = false
 
     @State private var jours: Double
 
-    init(dates: [Date?], recente: Date?, couverts: Int, joursRetenus: Binding<Int>) {
+    /// La longueur du curseur debout : toute la hauteur qu'on lui donne,
+    /// moins ses deux textes et sa bulle.
+    private var longueurDebout: CGFloat {
+        max((hauteurDisponible ?? 340) - 100, 120)
+    }
+
+    /// Debout, la hauteur qu'il peut occuper, textes et bulle compris.
+    var hauteurDisponible: CGFloat? = nil
+
+    init(dates: [Date?], recente: Date?, couverts: Int, joursRetenus: Binding<Int>, vertical: Bool = false,
+         hauteurDisponible: CGFloat? = nil) {
         self.dates = dates
         self.recente = recente
         self.couverts = couverts
+        self.vertical = vertical
+        self.hauteurDisponible = hauteurDisponible
         _joursRetenus = joursRetenus
         _jours = State(initialValue: Double(joursRetenus.wrappedValue))
     }
@@ -395,6 +468,32 @@ private struct CurseurDesJours: View {
             : valeur == 1 ? "Le dernier jour"
             : "Les \(valeur) derniers jours"
         let n = validationsSurLesDerniersJours(valeur, dates: dates, recente: recente)
+        if vertical {
+            VStack(spacing: 10) {
+                Text(n == 1 ? "1 validation" : "\(n) validations")
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                // Tourné d'un quart vers la gauche : le minimum en bas.
+                Slider(value: $jours, in: 1...Double(couverts)) { geste in
+                    if !geste { joursRetenus = Int(jours.rounded()) }
+                }
+                .frame(width: longueurDebout)
+                .rotationEffect(.degrees(-90))
+                .frame(width: 44, height: longueurDebout)
+                Text(etendue)
+                    .multilineTextAlignment(.center)
+            }
+            .font(.caption)
+            .frame(width: 96)
+            .padding(.vertical)
+            .modifier(VerreDuCurseur())
+            .padding(.trailing)
+        } else {
+            horizontal(etendue: etendue, n: n)
+        }
+    }
+
+    private func horizontal(etendue: String, n: Int) -> some View {
         VStack(spacing: 6) {
             HStack {
                 Text(etendue)
@@ -427,3 +526,4 @@ private struct VerreDuCurseur: ViewModifier {
     }
 }
 #endif
+

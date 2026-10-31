@@ -22,6 +22,16 @@ struct ScanView: View {
     /// il ne dit plus rien de vrai. Les deux autres timers, eux, décrivent
     /// l'état du pass et gardent leur sens.
     var depuisHistorique: Bool = false
+    /// Ce que la fiche montre. Sur le Duo déplié, elle se partage entre deux
+    /// panneaux : la carte et ses contrats sous l'antenne, les validations en
+    /// face.
+    var partie: PartieDeFiche = .tout
+    /// Dans la fiche en deux colonnes, un évènement touché s'ouvre dans la
+    /// colonne de la carte plutôt que par-dessus toute la page.
+    var ouvrir: ((OuvertureDansLaFiche) -> Void)? = nil
+    /// La ligne sur laquelle se caler en apparaissant : celle qu'on vient de
+    /// toucher, quand la fiche entière remplace les évènements.
+    var ancre: String? = nil
     
     @ObservedObject var historyManager: HistoryManager
     
@@ -44,6 +54,9 @@ struct ScanView: View {
     @State private var showingRenameAlert = false
     @State private var newNickname = ""
     @State private var showingImagePicker = false
+    #if os(iOS)
+    @ObservedObject private var actionsDuDuo = ActionsDuDuo.shared
+    #endif
 
     /// Le contour dit la validité à l'instant où la carte s'affiche — c'est là
     /// qu'on la regarde. Passé quelques secondes il n'apprend plus rien et ne
@@ -142,7 +155,11 @@ struct ScanView: View {
         guard preparationDesVoyages == nil else { return }
         let events = tagEvents, contrats = tagContracts
         // Sans carte du pass mesurée, la page photographie sa carte elle-même.
-        let apercu = mesure.largeur > 0 ? CGSize(width: mesure.largeur, height: ApercuDeCarte.hauteur) : nil
+        // Dans le cadre tourné, la page des voyages est plus large que la carte
+        // de la colonne : photographiée à cette largeur, la carte laissait des
+        // bandes blanches.
+        let apercu = mesure.largeur > 0 && !paysagePlie
+            ? CGSize(width: mesure.largeur, height: ApercuDeCarte.hauteur) : nil
         let sombre = apparence == .dark, echelle = self.echelle
         preparationDesVoyages = Task {
             let preparation = await ValidationHistoryView.preparer(events: events, contrats: contrats,
@@ -187,6 +204,29 @@ struct ScanView: View {
     }
     
     
+    /// Sur le Duo, les boutons de la fiche passent dans sa barre.
+    private var surLeDuo: Bool {
+        #if os(iOS)
+        Duo.estUnDuo
+        #else
+        false
+        #endif
+    }
+
+    #if os(iOS)
+    private func annoncerALaBarre() {
+        actionsDuDuo.carteAffichee = true
+        actionsDuDuo.peutPersonnaliser = canPersonalize
+        if !tagEnvHolder.isEmpty, let export {
+            actionsDuDuo.export = ExportFile(
+                fileName: "\(cardID)_\(Self.jourDExport.string(from: Date())).metropass", contenu: export)
+            actionsDuDuo.titreExport = "Données Navigo \(cardID)"
+        } else {
+            actionsDuDuo.export = nil
+        }
+    }
+    #endif
+
     /// Le coin droit sur iPhone ; ailleurs, le système place.
     private static var placementDesActions: ToolbarItemPlacement {
         #if os(iOS)
@@ -204,11 +244,30 @@ struct ScanView: View {
         return formatter
     }()
 
+    /// Plié couché, la fiche entière se présente en deux colonnes, qu'on
+    /// l'ouvre en scannant ou depuis l'historique.
+    @Environment(\.paysagePlie) private var paysagePlie
+
     var body: some View {
+        if paysagePlie && partie == .tout {
+            FicheEnDeuxColonnes(cardID: cardID, tagIcc: tagIcc, tagEnvHolder: tagEnvHolder,
+                                tagContracts: tagContracts, tagEvents: tagEvents,
+                                tagSpecialEvents: tagSpecialEvents, export: export,
+                                depuisHistorique: depuisHistorique, historyManager: historyManager)
+        } else {
+            liste
+        }
+    }
+
+    @ViewBuilder
+    private var liste: some View {
         // Une lecture des validations pour toute la fiche : chaque ligne y puise
         // sa transition sans relire les autres.
         let validations = Validations(tagEvents, contrats: tagContracts, brutes: transitionsBrutes)
+        ScrollViewReader { defilement in
         List {
+            Group {
+            if partie.montreLaCarte {
             Section(header:
                 ZStack(alignment: .bottomLeading) {
                     if let holderCardStatus = getKey(tagEnvHolder, "HolderDataCardStatus"), let holderCommercialId = getKey(tagEnvHolder, "HolderDataCommercialID") {
@@ -257,7 +316,9 @@ struct ScanView: View {
                     // Un bouton plutôt qu'un lien : la page ne s'ouvre qu'une
                     // fois prête, et le sablier prend la place de la flèche en
                     // attendant.
-                    Button(action: reconstituerLesVoyages) {
+                    // Une page, partout : dans le cadre tourné, elle prend la place
+                    // du panneau de gauche, d'où l'on revient en glissant.
+                    Button(action: { if let ouvrir { ouvrir(.voyages) } else { reconstituerLesVoyages() } }) {
                         HStack {
                             Text("Reconstituer les voyages")
                             Spacer()
@@ -288,16 +349,30 @@ struct ScanView: View {
             }
 
             if tagContracts.count > 0 {
-                Section(header: Text("Contrats")) {
+                Section(header: Text("Contrats").frame(maxWidth: .infinity, alignment: .leading)) {
                     ForEach(displayedContractsIndices, id: \.self) { i in
-                        NavigationLink {
-                            ContractView(contractInfo: tagContracts[i])
-                        } label: {
-                            ContractPreview(
-                                contractInfo: tagContracts[i],
-                                isPreferred: isContractBest(tagContracts[i], tagContracts),
-                                isDisabled: isContractDisabled(tagContracts[i])
-                            )
+                        if let ouvrir {
+                            Button { ouvrir(.contrat(i)) } label: {
+                                ContractPreview(
+                                    contractInfo: tagContracts[i],
+                                    isPreferred: isContractBest(tagContracts[i], tagContracts),
+                                    isDisabled: isContractDisabled(tagContracts[i])
+                                )
+                            }
+                            .tint(.primary)
+                            .separateurPleineLargeur()
+                            .id(OuvertureDansLaFiche.contrat(i).ancre)
+                        } else {
+                            NavigationLink {
+                                ContractView(contractInfo: tagContracts[i])
+                                    .pleinCadreSurLeDuo()
+                            } label: {
+                                ContractPreview(
+                                    contractInfo: tagContracts[i],
+                                    isPreferred: isContractBest(tagContracts[i], tagContracts),
+                                    isDisabled: isContractDisabled(tagContracts[i])
+                                )
+                            }
                         }
                     }
                     
@@ -317,14 +392,51 @@ struct ScanView: View {
                 }
             }
             
-            if tagEvents.count > 0 {
-                Section(header: Text("Derniers évènements")) {
-                    ForEach(displayedEventsIndices, id: \.self) { i in
+
+            // Le calculateur de cette carte-ci, sous ses contrats : ses mois,
+            // ses trajets chiffrés. Depuis l'historique seulement, où la carte
+            // a ses validations d'avant ; une carte qu'on vient de lire, on
+            // regarde son titre.
+            if depuisHistorique, !tagEvents.isEmpty {
+                Section {
+                    if let ouvrir {
+                        Button { ouvrir(.calculateur) } label: {
+                            Label("Calculateur de prix", systemImage: "eurosign.circle")
+                                // Calé à gauche dans la colonne lue de droite à gauche.
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .tint(.primary)
+                    } else {
                         NavigationLink {
-                            EventView(eventInfo: tagEvents[i], transition: validations.transition(de: i),
-                                      regle: validations.regle(de: i), contractsInfos: tagContracts)
+                            CalculateurPrixView(events: tagEvents, contracts: tagContracts)
+                                .pleinCadreSurLeDuo()
                         } label: {
-                            EventPreview(eventInfo: tagEvents[i], transition: validations.transition(de: i))
+                            Label("Calculateur de prix", systemImage: "eurosign.circle")
+                        }
+                    }
+                }
+            }
+            }
+
+            if partie.montreLesValidations {
+            if tagEvents.count > 0 {
+                // Calé à gauche même dans la colonne lue de droite à gauche.
+                Section(header: Text("Derniers évènements").frame(maxWidth: .infinity, alignment: .leading)) {
+                    ForEach(displayedEventsIndices, id: \.self) { i in
+                        if let ouvrir {
+                            Button { ouvrir(.evenement(i)) } label: {
+                                EventPreview(eventInfo: tagEvents[i], transition: validations.transition(de: i))
+                            }
+                            .tint(.primary)
+                            .separateurPleineLargeur()
+                            .id(OuvertureDansLaFiche.evenement(i).ancre)
+                        } else {
+                            NavigationLink {
+                                EventView(eventInfo: tagEvents[i], transition: validations.transition(de: i),
+                                          regle: validations.regle(de: i), contractsInfos: tagContracts)
+                            } label: {
+                                EventPreview(eventInfo: tagEvents[i], transition: validations.transition(de: i))
+                            }
                         }
                     }
                 }
@@ -332,12 +444,21 @@ struct ScanView: View {
             }
             
             if tagSpecialEvents.count > 0 {
-                Section(header: Text("Evènements spéciaux")) {
+                Section(header: Text("Evènements spéciaux").frame(maxWidth: .infinity, alignment: .leading)) {
                     ForEach(displayedSpecialEventsIndices, id: \.self) { i in
-                        NavigationLink {
-                            EventView(eventInfo: tagSpecialEvents[i], contractsInfos: tagContracts)
-                        } label: {
-                            EventPreview(eventInfo: tagSpecialEvents[i])
+                        if let ouvrir {
+                            Button { ouvrir(.special(i)) } label: {
+                                EventPreview(eventInfo: tagSpecialEvents[i])
+                            }
+                            .tint(.primary)
+                            .separateurPleineLargeur()
+                            .id(OuvertureDansLaFiche.special(i).ancre)
+                        } else {
+                            NavigationLink {
+                                EventView(eventInfo: tagSpecialEvents[i], contractsInfos: tagContracts)
+                            } label: {
+                                EventPreview(eventInfo: tagSpecialEvents[i])
+                            }
                         }
                     }
 
@@ -366,6 +487,16 @@ struct ScanView: View {
             if modeDebug {
                 DebugDesTimers(contracts: tagContracts, events: tagEvents)
             }
+            }
+            }
+            // Dans la colonne des évènements, lue de droite à gauche pour que
+            // son indicateur de défilement tienne au bord de l'écran, les
+            // lignes gardent le sens de lecture.
+            .environment(\.layoutDirection, .leftToRight)
+        }
+        .onAppear {
+            if let ancre { defilement.scrollTo(ancre, anchor: .center) }
+        }
         }
         #if os(iOS)
         // Grand titre, même vide : venue d'une page sans titre, la fiche
@@ -390,6 +521,7 @@ struct ScanView: View {
         }
         .navigationDestination(isPresented: $voyagesOuverts) {
             ValidationHistoryView(events: tagEvents, contracts: tagContracts, preparation: voyages)
+                .pleinCadreSurLeDuo()
         }
         // Couverte par la page des voyages, la fiche rend sa flèche à la ligne :
         // au retour, plus de sablier. Quittée en pleine préparation, elle
@@ -434,6 +566,8 @@ struct ScanView: View {
 
             // Les mêmes actions sur iPhone et sur Mac, recopiées jusque-là pour
             // un seul emplacement qui change.
+            // Sur le Duo, ces boutons vivent dans sa barre, sous la caméra.
+            if !surLeDuo {
             ToolbarItemGroup(placement: Self.placementDesActions) {
                 if canPersonalize {
                     Menu {
@@ -448,7 +582,9 @@ struct ScanView: View {
                             Label("Changer l'image", systemImage: "photo.on.rectangle")
                         }
                     } label: {
-                        Label("Modifier le pass", systemImage: "square.and.pencil")
+                        Label { Text("Modifier le pass") } icon: {
+                            Image(systemName: "square.and.pencil").droitSurLeDuo()
+                        }
                     }
                 }
 
@@ -456,14 +592,42 @@ struct ScanView: View {
                     ShareLink(
                         item: ExportFile(fileName: "\(cardID)_\(Self.jourDExport.string(from: Date())).metropass", contenu: export),
                         preview: SharePreview("Données Navigo \(cardID)")
-                    )
+                    ) {
+                        Label { Text("Exporter") } icon: {
+                            Image(systemName: "square.and.arrow.up").droitSurLeDuo()
+                        }
+                    }
                 } else {
                     // Optional: Disabled placeholder so the UI doesn't "jump"
                     Label("Exporter", systemImage: "square.and.arrow.up")
                         .opacity(0.5)
                 }
             }
+            }
         }
+        #if os(iOS)
+        // La fiche principale dit à la barre du Duo ce qu'elle propose, et
+        // répond à ses demandes. Celle des validations, en face, ne s'en mêle
+        // pas.
+        .onAppear { if partie.montreLaCarte { annoncerALaBarre() } }
+        .onChange(of: canPersonalize) { if partie.montreLaCarte { annoncerALaBarre() } }
+        .onDisappear {
+            guard partie.montreLaCarte else { return }
+            actionsDuDuo.carteAffichee = false
+            actionsDuDuo.export = nil
+        }
+        .onChange(of: actionsDuDuo.renommer) { _, demande in
+            guard demande, partie.montreLaCarte else { return }
+            actionsDuDuo.renommer = false
+            newNickname = historyManager.history.first(where: { $0.cardID == cardID })?.nickname ?? ""
+            showingRenameAlert = true
+        }
+        .onChange(of: actionsDuDuo.changerImage) { _, demande in
+            guard demande, partie.montreLaCarte else { return }
+            actionsDuDuo.changerImage = false
+            showingImagePicker = true
+        }
+        #endif
         .sheet(isPresented: $showingImagePicker) {
             ImagePickerSheet(cardID: cardID, historyManager: historyManager)
                 .presentationDetents([.medium, .large]) // Permet une ouverture partielle ou totale
@@ -503,4 +667,220 @@ private final class Mesure {
 
 #Preview {
     ScanView(cardID: 0, tagIcc: "", tagEnvHolder: [:], tagContracts: [], tagEvents: [], tagSpecialEvents: [], historyManager: HistoryManager())
+}
+
+
+/// Ce qu'une fiche montre.
+enum PartieDeFiche {
+    /// Tout, de la carte à l'environnement.
+    case tout
+    /// La carte, sa validité, ses voyages et ses contrats.
+    case carte
+    /// Les validations, les évènements spéciaux et l'environnement.
+    case validations
+    /// Tout, d'un seul tenant, même dans le cadre tourné : la colonne qui
+    /// reprend la fiche quand un évènement s'ouvre en face.
+    case ensemble
+
+    var montreLaCarte: Bool { self != .validations }
+    var montreLesValidations: Bool { self != .carte }
+}
+
+
+/// Ce qu'on ouvre dans la colonne de la carte : une validation, un évènement
+/// spécial ou un contrat, par son rang.
+enum OuvertureDansLaFiche: Equatable {
+    case evenement(Int)
+    case special(Int)
+    case contrat(Int)
+    case calculateur
+    /// La reconstitution des voyages, qui prend le panneau de gauche.
+    case voyages
+
+    /// L'identifiant de sa ligne dans la fiche, pour s'y caler.
+    var ancre: String {
+        switch self {
+        case .evenement(let i): return "evenement-\(i)"
+        case .special(let i):   return "special-\(i)"
+        case .contrat(let i):   return "contrat-\(i)"
+        case .calculateur:      return "calculateur"
+        case .voyages:          return "voyages"
+        }
+    }
+}
+
+
+/// La fiche du Duo plié tenu en paysage : à gauche, la fiche entière — la
+/// carte, sa validité et ses contrats, puis les évènements — ; à droite, le
+/// détail de ce qu'on y touche, le forfait actif tant qu'on n'a rien touché.
+/// Un espace au milieu, sans trait, et pas de barre : le titre redit la carte
+/// qu'on voit.
+struct FicheEnDeuxColonnes: View {
+    let cardID: UInt64
+    let tagIcc: String
+    let tagEnvHolder: [String: Any]
+    let tagContracts: [[String: Any]]
+    let tagEvents: [[String: Any]]
+    let tagSpecialEvents: [[String: Any]]
+    var export: (() -> Data?)?
+    var depuisHistorique: Bool
+    @ObservedObject var historyManager: HistoryManager
+
+    @State private var ouverte: OuvertureDansLaFiche?
+    /// La reconstitution des voyages tient le panneau de gauche.
+    @State private var voyages = false
+    #if os(iOS)
+    @ObservedObject private var actionsDuDuo = ActionsDuDuo.shared
+    #endif
+
+    private static let ecartDesColonnes: CGFloat = 24
+    /// La carte veut de l'air au-dessus d'elle ; le détail, un peu moins.
+    private static let margeCarte: CGFloat = 72
+    private static let margeDetail: CGFloat = 36
+    /// Ce qu'on fait défiler passe au-delà des bulles du système, en bas.
+    private static let margeBasse: CGFloat = 96
+
+    /// Le forfait actif : le contrat que la carte retient, sinon le premier.
+    private var forfaitActif: OuvertureDansLaFiche? {
+        let ordre = ordreDesContrats(tagContracts)
+        let actif = ordre.first { isContractBest(tagContracts[$0], tagContracts) } ?? ordre.first
+        return actif.map { .contrat($0) }
+    }
+
+    var body: some View {
+        HStack(spacing: Self.ecartDesColonnes) {
+            colonneFiche
+            colonneDetail
+        }
+        .padding(.horizontal, Self.ecartDesColonnes / 2)
+        .background(Color(.systemGroupedBackground))
+        .toolbar(.hidden, for: .navigationBar)
+        // Ouverte depuis une colonne lue de droite à gauche, la fiche en
+        // héritait : on la remet dans le sens de lecture.
+        .environment(\.layoutDirection, .leftToRight)
+        #if os(iOS)
+        .onChange(of: voyages) { _, ouverts in actionsDuDuo.retourPossible = ouverts }
+        .onChange(of: actionsDuDuo.retour) { _, demande in
+            guard demande else { return }
+            actionsDuDuo.retour = false
+            fermerLesVoyages()
+        }
+        .onDisappear { actionsDuDuo.retourPossible = false }
+        #endif
+        // La pile de navigation calcule ses marges avant la rotation, et les
+        // retirait aux colonnes : 84 pt côté caméra restaient vides.
+        .ignoresSafeArea()
+    }
+
+    private func fiche(_ partie: PartieDeFiche, ouvrir: ((OuvertureDansLaFiche) -> Void)? = nil) -> ScanView {
+        ScanView(cardID: cardID, tagIcc: tagIcc, tagEnvHolder: tagEnvHolder, tagContracts: tagContracts,
+                 tagEvents: tagEvents, tagSpecialEvents: tagSpecialEvents, export: export,
+                 depuisHistorique: depuisHistorique, partie: partie, ouvrir: ouvrir,
+                 historyManager: historyManager)
+    }
+
+    /// Ouvre un détail à droite ; le même, touché de nouveau, rend la place au
+    /// forfait actif. Les voyages, eux, prennent le panneau de gauche, et la
+    /// validation la plus récente s'ouvre en face.
+    private func ouvrir(_ ouverture: OuvertureDansLaFiche) {
+        withAnimation(.snappy(duration: 0.3)) {
+            if ouverture == .voyages {
+                voyages = true
+                ouverte = tagEvents.isEmpty ? nil : .evenement(0)
+            } else {
+                ouverte = ouverte == ouverture ? nil : ouverture
+            }
+        }
+    }
+
+    private func fermerLesVoyages() {
+        withAnimation(.snappy(duration: 0.3)) {
+            voyages = false
+            ouverte = nil
+        }
+    }
+
+    /// À gauche : la fiche entière, ou la reconstitution des voyages. On en
+    /// revient par la barre du Duo, ou en glissant depuis le bord.
+    @ViewBuilder
+    private var colonneFiche: some View {
+        if voyages {
+            ValidationHistoryView(events: tagEvents, contracts: tagContracts) { i in
+                withAnimation(.snappy(duration: 0.3)) { ouverte = .evenement(i) }
+            }
+            // Sans barre au-dessus, l'aperçu de carte collait au bord.
+            .contentMargins(.top, Self.margeDetail, for: .scrollContent)
+            .contentMargins(.bottom, Self.margeBasse, for: .scrollContent)
+            .toolbar(.hidden, for: .navigationBar)
+            .frame(maxWidth: .infinity)
+            .overlay(alignment: .leading) {
+                // Le bord qu'on tire pour revenir, comme une page qu'on quitte.
+                Color.clear
+                    .frame(width: 24)
+                    .contentShape(Rectangle())
+                    .gesture(DragGesture(minimumDistance: 20).onEnded { geste in
+                        if geste.translation.width > 80 { fermerLesVoyages() }
+                    })
+            }
+        } else {
+            colonneDeLaFiche
+        }
+    }
+
+    private var colonneDeLaFiche: some View {
+        fiche(.ensemble, ouvrir: ouvrir)
+            // Le halo de validité déborde sur l'espace du milieu, au lieu
+            // d'être tranché au bord de la colonne.
+            .scrollClipDisabled()
+            // Sans barre au-dessus, la carte, qui remonte un peu au-delà de sa
+            // section, sortait de l'écran : la marge la rattrape.
+            .contentMargins(.top, Self.margeCarte, for: .scrollContent)
+            .contentMargins(.bottom, Self.margeBasse, for: .scrollContent)
+            // L'indicateur de défilement au bord de l'écran plutôt qu'au milieu :
+            // la colonne se lit de droite à gauche, ses lignes de gauche à droite.
+            .environment(\.layoutDirection, .rightToLeft)
+            .frame(maxWidth: .infinity)
+    }
+
+    /// À droite : ce qu'on a touché, ou le forfait actif.
+    private var colonneDetail: some View {
+        Group {
+            if let detail = ouverte ?? forfaitActif {
+                evenementOuvert(detail)
+            }
+        }
+        .contentMargins(.top, Self.margeDetail, for: .scrollContent)
+        .contentMargins(.bottom, Self.margeBasse, for: .scrollContent)
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func evenementOuvert(_ ouverture: OuvertureDansLaFiche) -> some View {
+        switch ouverture {
+        case .evenement(let i) where tagEvents.indices.contains(i):
+            let validations = Validations(tagEvents, contrats: tagContracts)
+            EventView(eventInfo: tagEvents[i], transition: validations.transition(de: i),
+                      regle: validations.regle(de: i), contractsInfos: tagContracts)
+        case .special(let i) where tagSpecialEvents.indices.contains(i):
+            EventView(eventInfo: tagSpecialEvents[i], contractsInfos: tagContracts)
+        case .contrat(let i) where tagContracts.indices.contains(i):
+            ContractView(contractInfo: tagContracts[i])
+        case .calculateur:
+            CalculateurPrixView(events: tagEvents, contracts: tagContracts)
+        case .voyages:
+            EmptyView()
+        default:
+            EmptyView()
+        }
+    }
+}
+
+
+extension View {
+    /// Le séparateur d'une ligne d'un bord à l'autre de la section : dans la
+    /// colonne lue de droite à gauche, il s'arrêtait avant le bord.
+    func separateurPleineLargeur() -> some View {
+        alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+            .alignmentGuide(.listRowSeparatorTrailing) { dimensions in dimensions.width }
+    }
 }

@@ -13,9 +13,20 @@ struct ScanPageView: View {
     @ObservedObject var historyManager: HistoryManager
     #if os(iOS)
     @AppStorage("autoLaunchScan") private var autoLaunchScan = false
-    @State private var hasAutoLaunched = false
+    /// Une fois par lancement de l'app, pas par apparition de la page : sur le
+    /// Duo plié couché, la page se recrée quand la carte s'affiche, et un état
+    /// de la vue oubliait le premier scan — il en relançait un, qui vidait la
+    /// carte, et ainsi de suite.
+    private static var hasAutoLaunched = false
     #endif
     @State private var isImporting = false
+    /// Sur le Duo déplié, la fiche se partage : ses validations passent dans
+    /// l'autre panneau.
+    @Environment(\.ecranDeplie) private var deplie
+    #if os(iOS)
+    /// La barre du Duo demande l'import d'ici, où vit le sélecteur de fichier.
+    @ObservedObject private var actionsDuDuo = ActionsDuDuo.shared
+    #endif
 
     // Tant qu'aucune carte n'est lue en entier, on n'affiche que l'état vide :
     // les boutons de scan, de menu et de partage restent masqués. C'est la
@@ -26,7 +37,8 @@ struct ScanPageView: View {
     var body: some View {
         Group {
             if hasCard {
-                ScanView(cardID: nfcReader.cardID, tagIcc: nfcReader.tagIcc, tagEnvHolder: nfcReader.tagEnvHolder, tagContracts: nfcReader.tagContracts, tagEvents: nfcReader.tagEvents, tagSpecialEvents: nfcReader.tagSpecialEvents, export: nfcReader.export, historyManager: historyManager)
+                ScanView(cardID: nfcReader.cardID, tagIcc: nfcReader.tagIcc, tagEnvHolder: nfcReader.tagEnvHolder, tagContracts: nfcReader.tagContracts, tagEvents: nfcReader.tagEvents, tagSpecialEvents: nfcReader.tagSpecialEvents, export: nfcReader.export,
+                         partie: deplie ? .carte : .tout, historyManager: historyManager)
             } else {
                 EmptyScanView(
                     isScanning: nfcReader.isScanning,
@@ -39,17 +51,20 @@ struct ScanPageView: View {
         .navigationTitle("")
         .toolbar {
             #if os(iOS)
-            ToolbarItemGroup(placement: .topBarLeading) {
-                // Sans carte, l'écran vide porte déjà son propre bouton d'import
-                if hasCard {
-                    Button(action: { isImporting = true }) {
-                        Image(systemName: "square.and.arrow.down")
-                    }
+            // Sur le Duo, ces boutons vivent dans sa barre, sous la caméra.
+            if !Duo.estUnDuo {
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    // Sans carte, l'écran vide porte déjà son propre bouton d'import
+                    if hasCard {
+                        Button(action: { isImporting = true }) {
+                            Image(systemName: "square.and.arrow.down")
+                        }
 
-                    Button(action: {
-                        nfcReader.beginScanning(historyManager: historyManager)
-                    }) {
-                        Image(systemName: "wave.3.forward")
+                        Button(action: {
+                            nfcReader.beginScanning(historyManager: historyManager)
+                        }) {
+                            Image(systemName: "wave.3.forward")
+                        }
                     }
                 }
             }
@@ -75,10 +90,15 @@ struct ScanPageView: View {
             }
         }
         #if os(iOS)
+        .onChange(of: actionsDuDuo.importer) { _, demande in
+            guard demande else { return }
+            actionsDuDuo.importer = false
+            isImporting = true
+        }
         .onAppear {
-            if autoLaunchScan && !hasAutoLaunched {
+            if autoLaunchScan && !Self.hasAutoLaunched {
                 nfcReader.beginScanning(historyManager: historyManager)
-                hasAutoLaunched = true
+                Self.hasAutoLaunched = true
             }
         }
         #endif

@@ -134,10 +134,16 @@ struct SettingsPageView: View {
                 Toggle(isOn: $afficherPrix) {
                     Label("Prix des trajets", systemImage: "eurosign.circle")
                 }
+
+                NavigationLink {
+                    PrixDesForfaitsView()
+                } label: {
+                    Label("Prix des forfaits", systemImage: "tag")
+                }
             } header: {
                 Text("Prix")
             } footer: {
-                Text("Sous chaque trajet de l'historique : la part du forfait qui l'a payé, ou son estimation en Liberté+. Le calculateur, depuis l'historique d'une carte, compare les mois aux forfaits.")
+                Text("Sous chaque trajet de l'historique : la part du forfait qui l'a payé, ou son estimation en Liberté+. Le calculateur, dans la fiche de chaque carte, compare ses mois aux forfaits.")
             }
 
             Section {
@@ -200,6 +206,12 @@ struct SettingsPageView: View {
                           role: "Développement, jeu de données et interface",
                           photo: "Stitch",
                           compte: URL(string: "https://twitter.com/TweetingStitch")!)
+
+                NavigationLink {
+                    CreditsAssetsView()
+                } label: {
+                    Label("Assets", systemImage: "photo.on.rectangle")
+                }
             }
             
             // Juste au-dessus d'« À propos », dont le pied reste le dernier

@@ -26,6 +26,7 @@ struct EventView: View {
     @AppStorage(ModeDebug.donneesBrutes) private var afficheBrut = false
     @AppStorage(ModeDebug.base) private var baseBrute = BaseBrute.hexadecimal
     @AppStorage(ModeDebug.deverrouille) private var modeDebug = false
+    @Environment(\.paysagePlie) private var paysagePlie
     /// La base des données brutes à afficher, rien quand elles sont masquées.
     private var brut: BaseBrute? { afficheBrut ? baseBrute : nil }
     @Environment(\.openURL) private var openURL
@@ -81,9 +82,21 @@ struct EventView: View {
                             .font(.largeTitle)
                             .fontWeight(.bold)
                             .multilineTextAlignment(.center)
+                            // Dans la colonne du Duo plié couché, « Denfert- /
+                            // Rochereau » se coupait : le nom tient sur une
+                            // ligne, quitte à rapetisser.
+                            .lineLimit(paysagePlie ? 1 : nil)
+                            .minimumScaleFactor(paysagePlie ? 0.5 : 1)
                             .frame(maxWidth: .infinity, alignment: .center)
 
-                        LineIcons(lines: event.location.lines)
+                        // Les autres lignes de l'arrêt : celle qu'on a prise vient
+                        // juste dessous, la répéter collait deux fois le même B.
+                        let autresLignes = event.location.lines.filter { ligne in
+                            !event.routeCandidates.contains { $0.public_id == ligne.public_id }
+                        }
+                        if !autresLignes.isEmpty {
+                            LineIcons(lines: autresLignes)
+                        }
 
                         // « Correspondance (voie publique) » ne tient pas à côté
                         // du mode : le libellé passe dessous plutôt que de se

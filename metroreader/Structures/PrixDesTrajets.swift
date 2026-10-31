@@ -20,6 +20,8 @@ enum TarifsIDFM {
     static let navigoMois = 90.80
     static let navigoSemaine = 32.40
     static let navigoAnnuel = 998.80
+    /// Imagine R, scolaire comme étudiant, à l'année.
+    static let imagineR = 401.30
     static var navigoAnnuelParMois: Double { navigoAnnuel / 12 }
 }
 
@@ -75,12 +77,51 @@ enum PrixDesForfaits {
         getKey(contrat, "CounterContractCount") == nil && !estLibertePlus(contrat)
     }
 
-    /// Les forfaits de la grille, à défaut de prix sur la carte ou saisi.
+    /// Les forfaits de la grille, à défaut de prix sur la carte ou saisi. Les
+    /// forfaits à 75 % de la Solidarité Transport coûtent le quart du plein
+    /// tarif ; la gratuité, rien.
     private static let grille: [Int: (Double, PeriodeForfait)] = [
         0x0000: (TarifsIDFM.navigoMois, .mois),
         0x0001: (TarifsIDFM.navigoSemaine, .semaine),
         0x0002: (TarifsIDFM.navigoAnnuel, .annee),
+        0x0004: (TarifsIDFM.imagineR, .annee),
+        0x0005: (TarifsIDFM.imagineR, .annee),
+        0x4000: (TarifsIDFM.navigoMois / 4, .mois),
+        0x4001: (TarifsIDFM.navigoSemaine / 4, .semaine),
+        0x8003: (0, .mois),
     ]
+
+    /// Les forfaits du catalogue dont on peut saisir le prix, dans l'ordre où
+    /// les Réglages les présentent. Le Navigo JOP n'est plus vendu, le Pass
+    /// Interne ne s'achète pas.
+    static let duCatalogue: [Int] = [
+        0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x000D, 0x000F,
+        0x0015, 0x4015, 0x4000, 0x4001, 0x8003, 0x8010,
+    ]
+
+    /// La période d'un forfait d'après son seul code : celle de la grille, le
+    /// jour pour les titres d'un jour, le mois à défaut.
+    static func periode(tarif: Int) -> PeriodeForfait {
+        if let connu = grille[tarif] { return connu.1 }
+        switch tarif {
+        case 0x0003, 0x000D, 0x000F, 0x0015, 0x4015: return .jour
+        default: return .mois
+        }
+    }
+
+    /// Le prix d'un forfait d'après son seul code : saisi, sinon de la grille.
+    static func prix(tarif: Int, saisis: [Int: Double]) -> PrixForfait? {
+        let periode = periode(tarif: tarif)
+        if let saisi = saisis[tarif], saisi > 0 {
+            return PrixForfait(montant: saisi, periode: periode, source: .saisi)
+        }
+        return grille[tarif].map { PrixForfait(montant: $0.0, periode: $0.1, source: .grille) }
+    }
+
+    /// Les prix saisis pour tout le catalogue.
+    static func saisis() -> [Int: Double] {
+        saisis(duCatalogue)
+    }
 
     /// La période d'un forfait : celle de la grille, sinon celle que disent ses
     /// dates de validité. Un Navigo Annuel à tacite reconduction court dix ans
@@ -99,7 +140,7 @@ enum PrixDesForfaits {
 
     /// Le prix d'un forfait : celui qu'on a saisi, sinon celui que la carte
     /// écrit, sinon celui de la grille. Rien pour un forfait hors grille dont on
-    /// ne sait pas le prix — un Imagine R, faute de saisie.
+    /// ne sait pas le prix — un Navigo Jour, faute de saisie.
     static func prix(_ contrat: [String: Any], saisis: [Int: Double]) -> PrixForfait? {
         let periode = periode(contrat)
         if let tarif = tarif(contrat), let saisi = saisis[tarif], saisi > 0 {

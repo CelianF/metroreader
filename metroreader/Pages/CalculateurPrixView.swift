@@ -9,30 +9,16 @@ import SwiftUI
 /// Ce que les trajets d'une carte ont coûté, et ce qu'ils auraient coûté
 /// autrement : en Liberté+, ou sous un Navigo mois ou annuel.
 ///
-/// Les trajets se rangent une fois, hors du fil principal. Le prix d'un forfait
-/// qu'on saisit s'y applique aussitôt, sans relire la carte.
+/// Il s'ouvre depuis la fiche de la carte : chaque Navigo a ses trajets. Les
+/// prix des forfaits, eux, valent pour toutes les cartes et se règlent dans
+/// les Réglages. Les trajets se rangent une fois, hors du fil principal ; les
+/// prix se relisent à chaque retour sur la page.
 struct CalculateurPrixView: View {
     let events: [[String: Any]]
     let contracts: [[String: Any]]
 
-    @AppStorage(PrixSettings.afficher) private var afficherPrix = false
-
     @State private var chiffrage: ChiffrageDesTrajets?
-    /// Relu à chaque saisie de prix.
     @State private var saisis: [Int: Double] = [:]
-
-    /// Les forfaits de la carte, qu'ils aient payé un trajet ou non.
-    private var forfaits: [Int] {
-        var tarifs = chiffrage?.tarifsDesForfaits ?? []
-        for contrat in contracts where PrixDesForfaits.estForfait(contrat) {
-            if let tarif = PrixDesForfaits.tarif(contrat), !tarifs.contains(tarif) { tarifs.append(tarif) }
-        }
-        return tarifs
-    }
-
-    private func contrat(_ tarif: Int) -> [String: Any]? {
-        contracts.first { PrixDesForfaits.tarif($0) == tarif }
-    }
 
     private static let titreDuMois: DateFormatter = {
         let formatter = DateFormatter()
@@ -44,28 +30,6 @@ struct CalculateurPrixView: View {
 
     var body: some View {
         List {
-            Section {
-                Toggle(isOn: $afficherPrix) {
-                    Label("Prix sous chaque trajet", systemImage: "eurosign.circle")
-                }
-            } footer: {
-                Text("Dans l'historique, un trajet payé par un forfait affiche sa part du forfait ; un trajet en Liberté+, son estimation.")
-            }
-
-            if !forfaits.isEmpty {
-                Section {
-                    ForEach(forfaits, id: \.self) { tarif in
-                        PrixForfaitField(tarif: tarif, contrat: contrat(tarif)) {
-                            saisis = PrixDesForfaits.saisis(forfaits)
-                        }
-                    }
-                } header: {
-                    Text("Tes forfaits")
-                } footer: {
-                    Text("Le prix sert à répartir le forfait entre les trajets qu'il a payés. Sans saisie, l'app prend celui que la carte écrit, ou la grille IDFM pour les Navigo mois, semaine et annuel.")
-                }
-            }
-
             if let chiffrage {
                 let bilans = chiffrage.bilans(saisis: saisis)
                 if bilans.isEmpty {
@@ -96,7 +60,7 @@ struct CalculateurPrixView: View {
             }
 
             Section {
-                Text("Tarifs IDFM au 1er janvier \(String(TarifsIDFM.annee)), plein tarif : Liberté+ \(enEuros(TarifsIDFM.libertePlusRail)) en métro-train-RER et \(enEuros(TarifsIDFM.libertePlusSurface)) en bus-tram, Navigo mois \(enEuros(TarifsIDFM.navigoMois)), Navigo annuel \(enEuros(TarifsIDFM.navigoAnnuel)). L'estimation Liberté+ compte les correspondances : 2 h dans le rail sans sortir, sauf par la voie publique, et 1 h 30 entre bus et tram. Les liaisons aéroport et le tarif réduit n'y sont pas.")
+                Text("Tarifs IDFM au 1er janvier \(String(TarifsIDFM.annee)), plein tarif : Liberté+ \(enEuros(TarifsIDFM.libertePlusRail)) en métro-train-RER et \(enEuros(TarifsIDFM.libertePlusSurface)) en bus-tram, Navigo mois \(enEuros(TarifsIDFM.navigoMois)), Navigo annuel \(enEuros(TarifsIDFM.navigoAnnuel)). L'estimation Liberté+ compte les correspondances : 2 h dans le rail sans sortir, sauf par la voie publique, et 1 h 30 entre bus et tram. Les liaisons aéroport et le tarif réduit n'y sont pas. Le prix de ton forfait se règle dans Réglages › Prix des forfaits.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -105,15 +69,34 @@ struct CalculateurPrixView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .onAppear { saisis = PrixDesForfaits.saisis() }
         .task {
-            saisis = PrixDesForfaits.saisis(forfaits)
             guard chiffrage == nil else { return }
             let events = events, contrats = contracts
             chiffrage = await Task.detached(priority: .userInitiated) {
                 ChiffrageDesTrajets(events: events, contrats: contrats)
             }.value
-            saisis = PrixDesForfaits.saisis(forfaits)
         }
+    }
+}
+
+
+/// Les prix des forfaits, saisis une fois pour toutes les cartes.
+struct PrixDesForfaitsView: View {
+    var body: some View {
+        List {
+            Section {
+                ForEach(PrixDesForfaits.duCatalogue, id: \.self) { tarif in
+                    PrixForfaitField(tarif: tarif)
+                }
+            } footer: {
+                Text("Le prix sert à répartir un forfait entre les trajets qu'il a payés. Sans saisie, l'app prend celui que la carte écrit, sinon la grille IDFM \(String(TarifsIDFM.annee)) : Navigo mois, semaine et annuel, Imagine R, Solidarité. Un prix saisi l'emporte sur les deux.")
+            }
+        }
+        .navigationTitle("Prix des forfaits")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }
 
@@ -152,15 +135,11 @@ private struct BilanDuMoisView: View {
 /// Le prix d'un forfait, à saisir.
 private struct PrixForfaitField: View {
     let tarif: Int
-    let contrat: [String: Any]?
-    let onChange: () -> Void
 
     @AppStorage private var saisi: Double
 
-    init(tarif: Int, contrat: [String: Any]?, onChange: @escaping () -> Void) {
+    init(tarif: Int) {
         self.tarif = tarif
-        self.contrat = contrat
-        self.onChange = onChange
         _saisi = AppStorage(wrappedValue: 0, PrixDesForfaits.cle(tarif))
     }
 
@@ -168,19 +147,19 @@ private struct PrixForfaitField: View {
         TariffCatalog.find(tarif)?.name ?? String(format: "Titre 0x%04X", tarif)
     }
 
-    /// Rien tant qu'on n'a rien saisi : le champ montre alors le prix qui
-    /// s'applique, plutôt qu'un zéro.
+    /// Rien tant qu'on n'a rien saisi : le champ montre alors le prix de la
+    /// grille, plutôt qu'un zéro.
     private var saisieOptionnelle: Binding<Double?> {
         Binding(get: { saisi > 0 ? saisi : nil }, set: { saisi = max($0 ?? 0, 0) })
     }
 
     /// Le prix qui s'applique faute de saisie.
     private var parDefaut: PrixForfait? {
-        contrat.flatMap { PrixDesForfaits.prix($0, saisis: [:]) }
+        PrixDesForfaits.prix(tarif: tarif, saisis: [:])
     }
 
     var body: some View {
-        let periode = contrat.map(PrixDesForfaits.periode) ?? .mois
+        let periode = PrixDesForfaits.periode(tarif: tarif)
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(nom)
@@ -199,15 +178,11 @@ private struct PrixForfaitField: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .onChange(of: saisi) { _, _ in onChange() }
     }
 
     private func legende(_ periode: PeriodeForfait) -> String {
         if saisi > 0 { return "Saisi, \(periode.parPeriode)" }
-        switch parDefaut?.source {
-        case .carte:  return "Écrit sur la carte, \(periode.parPeriode)"
-        case .grille: return "Grille IDFM \(String(TarifsIDFM.annee)), \(periode.parPeriode)"
-        default:      return "Prix inconnu, \(periode.parPeriode) : à saisir"
-        }
+        if parDefaut != nil { return "Grille IDFM \(String(TarifsIDFM.annee)), \(periode.parPeriode)" }
+        return "Prix inconnu, \(periode.parPeriode) : à saisir"
     }
 }

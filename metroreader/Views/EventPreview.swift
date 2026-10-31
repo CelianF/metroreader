@@ -27,6 +27,15 @@ struct EventPreview: View {
 
     private var event: ResolvedEvent { ResolvedEvent(eventInfo, transition: transition) }
 
+    /// Le mode, la ligne, puis le résultat ou la transition.
+    private var sousTitre: String {
+        var texte = event.mode
+        if let routeName = event.routeName { texte += " \(routeName)" }
+        let suite = interpretEventResult(of: eventInfo)
+            ?? interpretTransitionLabel(event.transition, mode: event.mode)
+        return texte + " - " + suite
+    }
+
     var body: some View {
         let event = self.event
         HStack {
@@ -36,26 +45,12 @@ struct EventPreview: View {
                     Text("\(event.location.name)")
                         .fontWeight(.bold)
 
-                    HStack(spacing: 0) {
-                        Text("\(event.mode)")
-                            .font(.caption)
-                            .foregroundColor(Color.gray)
-                        if let routeName = event.routeName {
-                            Text(" \(routeName)")
-                                .font(.caption)
-                                .foregroundColor(Color.gray)
-                        }
-                        if let resultat = interpretEventResult(of: eventInfo) {
-                            Text(" - \(resultat)")
-                                .font(.caption)
-                                .foregroundColor(Color.gray)
-                        }
-                        else {
-                            Text(" - \(interpretTransitionLabel(event.transition, mode: event.mode))")
-                                .font(.caption)
-                                .foregroundColor(Color.gray)
-                        }
-                    }
+                    // Un seul texte : en morceaux, chacun revenait à la ligne de
+                    // son côté dans une colonne étroite, « RER B » à gauche et
+                    // « - Correspondance vers / le métro » empilé à droite.
+                    Text(sousTitre)
+                        .font(.caption)
+                        .foregroundColor(Color.gray)
                 }
                 else {
                     HStack(spacing: 0) {

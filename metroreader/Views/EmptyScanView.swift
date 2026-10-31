@@ -22,6 +22,13 @@ struct EmptyScanView: View {
     /// haute, sans monter, sans battre, et sans carte qui défile. Rien ne bouge.
     @Environment(\.accessibilityReduceMotion) private var sansAnimation
 
+    /// Le Duo déplié : la cible tient le panneau de droite, là où est l'antenne.
+    @Environment(\.ecranDeplie) private var deplie
+
+    /// Tourné d'un quart sur le Duo, le libellé du bouton ne tient plus en
+    /// largeur : il cède la place à son pictogramme.
+    @Environment(\.angleDesBoutons) private var angleDesBoutons
+
     @State private var pulse = false
 
     /// Le centre et le côté de la cible au repos. Déduits de la colonne,
@@ -48,10 +55,10 @@ struct EmptyScanView: View {
     /// capturé la vue, elle relirait éternellement la valeur du départ.
     @State private var dernierTour = false
 
-    /// Tiré au sort à chaque tour : le bord d'où la carte entre (-1 à gauche,
-    /// +1 à droite), son inclinaison en arrivant, celle qu'elle garde une fois
-    /// posée. Deux passages ne se ressemblent donc jamais tout à fait.
-    @State private var sensEntree: CGFloat = 1
+    /// Tiré au sort à chaque tour : le bord d'où la carte entre, son
+    /// inclinaison en arrivant, celle qu'elle garde une fois posée. Deux
+    /// passages ne se ressemblent donc jamais tout à fait.
+    @State private var entree = Entree.droite
     @State private var angleEntree: Double = 0
     @State private var anglePose: Double = 0
 
@@ -70,6 +77,8 @@ struct EmptyScanView: View {
     /// sa largeur en fraction du côté de la cible avant qu'elle ne se pose.
     private static let formatCarte: CGFloat = 533 / 334
     private static let largeurCarte: CGFloat = 0.55
+    /// Ce qu'elle mesure au moins, celle d'un iPhone ordinaire.
+    private static let largeurCarteMinimale: CGFloat = 220
 
     /// Ce qui reste de la carte une fois posée sur la cible. Elle rapetisse en
     /// se posant, comme si elle s'éloignait d'un cran vers le fond.
@@ -98,6 +107,9 @@ struct EmptyScanView: View {
         let categorie: String
     }
 
+    /// Le bord d'où la carte entre.
+    private enum Entree { case gauche, droite }
+
     /// Les quatre temps de la traversée d'une carte.
     private enum Etape {
         /// Hors champ, sur le côté, en attente d'entrer.
@@ -112,21 +124,74 @@ struct EmptyScanView: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            cible
-
-            Text(isScanning ? "Collez la carte sur la cible" : "Aucun Navigo scanné")
-                .font(.title2)
-                .fontWeight(.semibold)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-
-            actions
+            // L'antenne dans la moitié basse — le Duo déplié tourné : la cible
+            // passe sous les boutons, sans quoi elle descendait se poser dessus.
+            if couche {
+                cible
+                zoneCouchee
+            } else if cibleEnBas {
+                titre
+                actions
+                cible
+            } else {
+                cible
+                titre
+                actions
+            }
         }
         .background(mesureColonne)
         .padding(.horizontal, 32)
-        .padding(.top, 24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .onPreferenceChange(CibleKey.self) { mesure = $0 }
+        .padding(cibleEnBas ? .bottom : .top, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: cibleEnBas ? .bottom : .top)
+        // Une passe de mise en page qui sonde la vue remonte parfois une colonne
+        // étroite, centrée hors de l'écran ; sur le Duo tourné, c'était elle
+        // qu'on gardait, et la cible partait se perdre. Une mesure ne vaut que
+        // si son centre tombe dans l'écran.
+        .onPreferenceChange(CibleKey.self) { nouvelle in
+            if nouvelle.centre > 0 && nouvelle.milieu > 0 { mesure = nouvelle }
+        }
+    }
+
+    private var titre: some View {
+        Text(isScanning ? "Collez la carte sur la cible" : "Aucun Navigo scanné")
+            .font(.title2)
+            .fontWeight(.semibold)
+            .foregroundColor(.secondary)
+            .multilineTextAlignment(.center)
+    }
+
+    /// Le Duo plié tenu en paysage : l'écran ne tourne pas, la cible reste sur
+    /// l'antenne, mais le titre et les boutons pivotent d'un bloc pour se lire
+    /// droits.
+    private var couche: Bool {
+        !deplie && abs(angleDesBoutons.degrees) == 90
+    }
+
+    /// Le titre et les boutons, tournés d'un quart, au milieu de la place que
+    /// la cible laisse libre. Le bloc reçoit la hauteur de la zone pour
+    /// largeur, puis pivote : une fois tourné, il la remplit exactement. Rien
+    /// n'y pivote plus de son côté, et le bouton garde son libellé.
+    private var zoneCouchee: some View {
+        GeometryReader { zone in
+            VStack(spacing: 20) {
+                titre
+                actions
+            }
+            .environment(\.angleDesBoutons, .zero)
+            .frame(width: zone.size.height, height: zone.size.width)
+            .rotationEffect(angleDesBoutons)
+            .frame(width: zone.size.width, height: zone.size.height)
+        }
+    }
+
+    /// La cible se range au bas de la colonne quand l'antenne est dans la
+    /// moitié basse de l'écran.
+    private var cibleEnBas: Bool {
+        #if os(iOS)
+        deplie && Ecran.antenneDuDuoDeplie.y > Ecran.taille.height / 2
+        #else
+        false
+        #endif
     }
 
     // MARK: - Cible
@@ -159,20 +224,23 @@ struct EmptyScanView: View {
             .scaledToFit()
             // Pleine largeur, bornée pour ne pas devenir démesurée sur iPad
             .frame(maxWidth: Self.coteCible)
-            // Pendant la lecture, la cible bat entre demi-opacité et pleine
-            .opacity(pulse ? 0.5 : 1.0)
+            // Pendant la lecture, la cible bat entre demi-opacité et pleine.
             // L'animation est choisie ici plutôt qu'au moment de la
             // mutation : à l'arrêt, c'est le fondu court qui reprend la
-            // main, là où un withAnimation laissait la boucle courir.
-            .animation(animationPulse, value: pulse)
-            // Le glissement est posé au-dessus du battement : plus bas, il
-            // serait happé par la boucle infinie et la cible ferait la navette
-            // au lieu de monter une fois. Un décalage plutôt qu'une mise en
-            // page, pour que le reste de l'écran ne bouge pas avec elle.
-            .offset(y: decalage)
-            // L'animation suit le décalage lui-même et non isScanning : quand
-            // la lecture repart depuis une carte affichée, l'écran vide naît
-            // alors qu'elle a déjà commencé et isScanning ne change plus.
+            // main, là où un withAnimation laissait la boucle courir. Elle ne
+            // couvre que l'opacité : sur le Duo, déplier pendant la lecture
+            // redimensionne le panneau, et une boucle infinie posée sur toute
+            // la vue happait ce changement — la cible faisait sans fin la
+            // navette entre son ancienne taille et la nouvelle.
+            .animation(animationPulse) { $0.opacity(pulse ? 0.5 : 1.0) }
+            // Un décalage plutôt qu'une mise en page, pour que le reste de
+            // l'écran ne bouge pas avec elle. L'animation suit le décalage
+            // lui-même et non isScanning : quand la lecture repart depuis une
+            // carte affichée, l'écran vide naît alors qu'elle a déjà commencé
+            // et isScanning ne change plus. Elle reste attachée à la valeur, et
+            // non limitée au seul décalage comme le battement : sous cette
+            // forme, la montée ne jouait plus, la cible sautait d'un coup.
+            .offset(decalage)
             .animation(sansAnimation ? nil : .snappy(duration: 0.4), value: decalage)
             .onChange(of: isScanning) { _, enCours in pulse = enCours && !sansAnimation }
             .onChange(of: sansAnimation) { _, fige in if fige { pulse = false } }
@@ -197,11 +265,17 @@ struct EmptyScanView: View {
     @ViewBuilder
     private var carteExemple: some View {
         if let exemple, mesure.cote > 0 {
-            let largeur = mesure.cote * Self.largeurCarte
+            // Dans le demi-panneau du Duo déplié, 55 % de la cible ne faisait
+            // plus qu'une vignette : la carte garde la taille qu'elle a sur un
+            // iPhone, sans déborder de la cible.
+            let largeur = min(max(mesure.cote * Self.largeurCarte, Self.largeurCarteMinimale),
+                              mesure.cote * 0.9)
             NavigoImage(imageName: exemple)
                 .frame(width: largeur, height: largeur / Self.formatCarte)
                 .shadow(color: .black.opacity(0.22), radius: 16, y: 10)
-                .rotationEffect(.degrees(angleCarte))
+                // Plié couché, la carte suit le titre et les boutons : elle se
+                // présente droite pour qui tient le téléphone en paysage.
+                .rotationEffect(.degrees(angleCarte) + (couche ? angleDesBoutons : .zero))
                 .scaleEffect(echelleCarte)
                 .offset(decalageCarte)
                 .transition(.opacity)
@@ -209,21 +283,25 @@ struct EmptyScanView: View {
     }
 
     /// Où se trouve la carte, en écart depuis le centre de l'emplacement de la
-    /// cible. Le pas « posée » vise `decalage` : c'est de cette hauteur que la
-    /// cible s'est déplacée, la carte tombe donc pile sur son centre.
+    /// cible. Le pas « posée » vise `decalage` : c'est de là que la cible s'est
+    /// déplacée, la carte tombe donc pile sur son centre — un peu en retrait du
+    /// bord où elle s'est collée, pour rester entière à l'écran.
     private var decalageCarte: CGSize {
         let cote = mesure.cote
         switch etape {
         case .cachee:
-            return CGSize(width: sensEntree * cote * 1.3, height: cote * 0.30)
+            return CGSize(width: (entree == .gauche ? -1 : 1) * cote * 1.3, height: cote * 0.30)
         case .sousCible:
             return CGSize(width: 0, height: cote * 0.30)
         case .posee:
-            return CGSize(width: 0, height: decalage + cote * Self.poseSousCentre)
+            return CGSize(width: decalage.width - versLAntenne.width * cote * Self.poseSousCentre,
+                          height: decalage.height - versLAntenne.height * cote * Self.poseSousCentre)
         case .sortie:
-            // Assez haut pour sortir entièrement du cadre : la carte s'en va
-            // en bougeant, elle ne s'efface pas sur place.
-            return CGSize(width: 0, height: decalage - cote * 1.3)
+            // Assez loin pour sortir entièrement du cadre, par le bord de
+            // l'antenne : la carte s'en va en bougeant, elle ne s'efface pas
+            // sur place.
+            return CGSize(width: decalage.width + versLAntenne.width * cote * 1.3,
+                          height: decalage.height + versLAntenne.height * cote * 1.3)
         }
     }
 
@@ -270,7 +348,7 @@ struct EmptyScanView: View {
             // Hors animation : la carte doit reparaître sur le côté sans
             // revenir en arrière depuis sa sortie par le haut.
             exemple = tirage.image
-            sensEntree = Bool.random() ? -1 : 1
+            entree = bordDEntree
             angleEntree = Double.random(in: 9...20) * (Bool.random() ? -1 : 1)
             anglePose = Double.random(in: -4...4)
             etape = .cachee
@@ -344,30 +422,73 @@ struct EmptyScanView: View {
 
     // MARK: - Géométrie
 
+    /// Le bord d'où entrent les cartes. Sur l'iPhone, l'un ou l'autre, au sort.
+    /// Sur le Duo déplié, la gauche et elle seule : c'est le bord du panneau de
+    /// scan, sous l'antenne, et la droite traverserait l'historique.
+    private var bordDEntree: Entree {
+        #if os(iOS)
+        if deplie {
+            // Le côté de l'antenne : le bord où elle tient, ou, collée en haut
+            // ou en bas, la moitié de l'écran où elle se trouve.
+            if versLAntenne.width != 0 { return versLAntenne.width < 0 ? .gauche : .droite }
+            return Ecran.antenneDuDuoDeplie.x < Ecran.taille.width / 2 ? .gauche : .droite
+        }
+        #endif
+        return Bool.random() ? .gauche : .droite
+    }
+
     /// La colonne ne bouge pas quand son contenu se décale : c'est le seul
-    /// repère sûr. La cible en occupe le haut, et son côté vaut la largeur
-    /// disponible tant qu'elle n'est pas coiffée — d'où son centre.
+    /// repère sûr. La cible en occupe le haut, ou le bas quand elle passe sous
+    /// les boutons, et son côté vaut la largeur disponible tant qu'elle n'est
+    /// pas coiffée — d'où son centre.
     private var mesureColonne: some View {
         GeometryReader { proxy in
             let cote = min(proxy.size.width, Self.coteCible)
             Color.clear.preference(
                 key: CibleKey.self,
-                value: MesureCible(centre: proxy.frame(in: .global).minY + cote / 2,
+                value: MesureCible(centre: cibleEnBas ? proxy.frame(in: .global).maxY - cote / 2
+                                                      : proxy.frame(in: .global).minY + cote / 2,
+                                   milieu: proxy.frame(in: .global).midX,
                                    cote: cote)
             )
         }
     }
 
-    /// De combien remonter pour amener le centre de la cible sur l'île. Écran
-    /// figé, elle y est en permanence : c'est la même place, atteinte sans le
-    /// glissement qui l'annonçait.
-    private var decalage: CGFloat {
+    /// De combien déplacer la cible pour amener son centre sur l'antenne :
+    /// l'île sur un iPhone, le bord gauche sur le Duo déplié. Écran figé, elle y
+    /// est en permanence : c'est la même place, atteinte sans le glissement qui
+    /// l'annonçait.
+    private var decalage: CGSize {
         #if os(iOS)
-        guard isScanning || sansAnimation, mesure.cote > 0 else { return 0 }
-        return centreIle - mesure.centre
+        guard isScanning || sansAnimation, mesure.cote > 0 else { return .zero }
+        if deplie {
+            let antenne = Ecran.antenneDuDuoDeplie
+            return CGSize(width: antenne.x - mesure.milieu, height: antenne.y - mesure.centre)
+        }
+        return CGSize(width: 0, height: centreIle - mesure.centre)
         #else
-        return 0
+        return .zero
         #endif
+    }
+
+    /// Le sens dans lequel la cible part vers l'antenne : vers le haut sur un
+    /// iPhone ; sur le Duo déplié, vers le bord où l'antenne tient dans
+    /// l'orientation du moment.
+    private var versLAntenne: CGSize {
+        #if os(iOS)
+        if deplie {
+            let antenne = Ecran.antenneDuDuoDeplie
+            let taille = Ecran.taille
+            let ecarts: [(CGFloat, CGSize)] = [
+                (antenne.x, CGSize(width: -1, height: 0)),
+                (taille.width - antenne.x, CGSize(width: 1, height: 0)),
+                (antenne.y, CGSize(width: 0, height: -1)),
+                (taille.height - antenne.y, CGSize(width: 0, height: 1)),
+            ]
+            return ecarts.min { $0.0 < $1.0 }?.1 ?? CGSize(width: 0, height: -1)
+        }
+        #endif
+        return CGSize(width: 0, height: -1)
     }
 
     #if os(iOS)
@@ -384,6 +505,7 @@ struct EmptyScanView: View {
         return (fenetre?.safeAreaInsets.top ?? 59) / 2
     }
     #endif
+
 
     // MARK: - Boutons
 
@@ -404,8 +526,7 @@ struct EmptyScanView: View {
 
     private var scanButton: some View {
         Button(action: onScan) {
-            Text(isScanning ? "Scan en cours…" : "Scanner une carte")
-                .font(.headline)
+            LibelleDuScan(enCours: isScanning)
                 .frame(maxWidth: .infinity, minHeight: Self.hauteurContenu)
         }
     }
@@ -418,6 +539,7 @@ struct EmptyScanView: View {
         return Button(action: onImport) {
             Image(systemName: "square.and.arrow.down")
                 .font(.headline)
+                .droitSurLeDuo()
                 .foregroundStyle(.primary)
                 .frame(width: cote, height: cote)
                 .background(.bar, in: Circle())
@@ -458,8 +580,33 @@ struct EmptyScanView: View {
 /// Ce que la colonne sait de la cible : où tombe son centre à l'écran, et de
 /// quel côté elle est. Les deux voyagent ensemble dans une seule préférence,
 /// une par grandeur s'étant révélée trop fragile.
+/// Le libellé du bouton de scan. Une vue à part pour lire l'angle là où elle
+/// est posée : dans le bloc qui pivote d'une pièce sur le Duo plié couché,
+/// l'angle y est remis à zéro et le libellé reste entier.
+private struct LibelleDuScan: View {
+    let enCours: Bool
+    @Environment(\.angleDesBoutons) private var angle
+
+    var body: some View {
+        Group {
+            // Tourné d'un quart, le libellé ne tient plus en largeur : il cède
+            // la place à son pictogramme.
+            if abs(angle.degrees) == 90 {
+                Image(systemName: "wave.3.forward")
+                    .accessibilityLabel(enCours ? "Scan en cours…" : "Scanner une carte")
+            } else {
+                Text(enCours ? "Scan en cours…" : "Scanner une carte")
+            }
+        }
+        .font(.headline)
+        .droitSurLeDuo()
+    }
+}
+
 private struct MesureCible: Equatable {
     var centre: CGFloat = 0
+    /// Le milieu horizontal de la colonne, où la cible est centrée.
+    var milieu: CGFloat = 0
     var cote: CGFloat = 0
 }
 
