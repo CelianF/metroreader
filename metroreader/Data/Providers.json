@@ -31,7 +31,7 @@
     {
       "id": 11,
       "network": "Ligne 18",
-      "operator": "Keolis"
+      "operator": "Keolis Compagnie du Métro du Grand Paris - Ligne 18"
     },
     {
       "id": 12,
@@ -56,6 +56,11 @@
     {
       "id": 116,
       "name": "R'Bus (VEOLIA)"
+    },
+    {
+      "id": 120,
+      "network": "Vallée Sud Bus",
+      "operator": "Transdev Vallée Sud"
     },
     {
       "id": 156,

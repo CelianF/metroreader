@@ -224,13 +224,46 @@ struct EventView: View {
             
             Section {
                 VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Text("Transporteur")
-                            .fontWeight(.semibold)
-                        Spacer()
-                        Text(interpretServiceProviderName(event.providerId))
-                            .brut(getKey(eventInfo, "EventServiceProvider"), si: brut)
-                            .fontWeight(.semibold)
+                    // Une délégation se lit en trois lignes plutôt qu'en un
+                    // libellé qui ne tenait pas sur la sienne.
+                    if let delegation = interpretServiceProviderParts(event.providerId) {
+                        HStack {
+                            Text("Réseau")
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Text(delegation.reseau)
+                                .brut(getKey(eventInfo, "EventServiceProvider"), si: brut)
+                                .fontWeight(.semibold)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        Divider()
+                        HStack {
+                            Text("Exploitant")
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Text(delegation.exploitant)
+                                .fontWeight(.semibold)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        if let dsp = delegation.dsp {
+                            Divider()
+                            HStack {
+                                Text("DSP")
+                                    .fontWeight(.semibold)
+                                Spacer()
+                                Text("\(dsp)")
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                    } else {
+                        HStack {
+                            Text("Transporteur")
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Text(interpretServiceProviderName(event.providerId))
+                                .brut(getKey(eventInfo, "EventServiceProvider"), si: brut)
+                                .fontWeight(.semibold)
+                        }
                     }
                     
                     if let eventLocationGate = getKey(eventInfo, "EventLocationGate") {

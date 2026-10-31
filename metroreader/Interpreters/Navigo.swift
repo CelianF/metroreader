@@ -176,7 +176,7 @@ func interpretRouteCandidates(_ routeNumberBitstring: String, _ eventCodeBitstri
         if (routeNumber == 16) || (routeNumber == 17) || (routeNumber == 26) {
             return [NavigoLineInfo(name: "A", mode: "RER", public_id: "C01742", provider_id: 3, line_id: 16, background_color: "eb2132", text_color: "ffffff", is_noctilien: false)]
         }
-        else if routeNumber == 18 {
+        else if routeNumber == 18 || routeNumber == 28 {
             return [NavigoLineInfo(name: "B", mode: "RER", public_id: "C01743", provider_id: 3, line_id: 18, background_color: "5091cb", text_color: "ffffff", is_noctilien: false)]
         }
     }
@@ -212,7 +212,7 @@ func provenanceLigne(_ routeNumberBitstring: String, _ eventCodeBitstring: Strin
     }
     if eventTransport == "RER" {
         if [16, 17, 26].contains(routeNumber) { return "Règle de l'app : RER A" }
-        if routeNumber == 18 { return "Règle de l'app : RER B" }
+        if [18, 28].contains(routeNumber) { return "Règle de l'app : RER B" }
     } else if eventTransport == "Métro" && routeNumber == 29 {
         return "Règle de l'app : Orlyval"
     } else if let source = NavigoLines.provenance(serviceProviderCode, routeNumber, eventTransport) {
@@ -232,6 +232,13 @@ func interpretServiceProviderName(_ id: Int) -> String {
     ProviderCatalog.findProvider(id)?.displayName
         ?? ManualEntries.shared.providerName(id)
         ?? "Unknown (\(id))"
+}
+
+/// Une délégation, réseau, exploitant et lot séparés. Nil pour ce qui n'en
+/// est pas une — SNCF, RATP.
+func interpretServiceProviderParts(_ id: Int) -> PartiesDeDelegation? {
+    ProviderCatalog.findProvider(id)?.partiesDeDelegation
+        ?? ManualEntries.shared.provider(id)?.partiesDeDelegation
 }
 
 /// Le nom court d'un exploitant : celui de son réseau, ou son libellé s'il n'en

@@ -17,6 +17,13 @@ protocol LibelleExploitant {
     var name: String? { get }
 }
 
+/// Le réseau, la société qui le fait rouler et son numéro de lot.
+struct PartiesDeDelegation {
+    let reseau: String
+    let exploitant: String
+    let dsp: Int?
+}
+
 extension LibelleExploitant {
     /// Le réseau, quand l'exploitant en exploite une délégation.
     private var reseau: String? { network?.nilIfEmpty }
@@ -30,6 +37,12 @@ extension LibelleExploitant {
         guard let reseau else { return nil }
         guard let dsp else { return "\(reseau) — \(societe)" }
         return "\(reseau) — \(societe) (DSP \(dsp))"
+    }
+
+    /// Le même libellé, en morceaux, pour l'afficher sur des lignes séparées.
+    var partiesDeDelegation: PartiesDeDelegation? {
+        guard let reseau else { return nil }
+        return PartiesDeDelegation(reseau: reseau, exploitant: societe, dsp: dsp)
     }
 
     /// Le nom court : le réseau, ou le libellé libre.
