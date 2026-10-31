@@ -38,6 +38,14 @@ struct ValidationHistoryView: View {
     /// montrés restent, et le bas de la liste dit qu'il en vient d'autres.
     @State private var chargementDeTout = false
 
+    /// Le prix sous chaque trajet, quand on l'a demandé.
+    @AppStorage(PrixSettings.afficher) private var afficherPrix = false
+    /// Les trajets de toute la carte, chiffrés : la part d'un forfait se compte
+    /// sur le mois entier, pas sur la semaine affichée.
+    @State private var chiffrage: ChiffrageDesTrajets?
+    /// Relancé au retour du calculateur, où un prix a pu être saisi.
+    @State private var relectureDesPrix = 0
+
     /// Ce que la page affiche en s'ouvrant, calculé d'avance hors du fil
     /// principal : ouverte avec, elle n'a ni sablier à montrer ni second rendu
     /// à faire.
@@ -138,6 +146,7 @@ struct ValidationHistoryView: View {
                 // Une lecture des validations pour toute la liste : chaque ligne
                 // y puise sa transition, au lieu de recopier et relire la carte.
                 let validations = Validations(events, contrats: contracts)
+                let prix = prixDesTrajets
                 ForEach(journees) { journee in
                     ForEach(Array(journee.trajets.enumerated()), id: \.element.id) { rang, trajet in
                         Section {
@@ -153,6 +162,11 @@ struct ValidationHistoryView: View {
                         } header: {
                             if rang == 0 {
                                 Text(Self.titreDuJour.string(from: journee.jour))
+                            }
+                        } footer: {
+                            if let libelle = prix?[trajet.id].flatMap(Self.libelle) {
+                                Text(libelle)
+                                    .monospacedDigit()
                             }
                         }
                     }
@@ -197,6 +211,23 @@ struct ValidationHistoryView: View {
         .listSectionSpacing(Self.ecartEntreTrajets)
         .contentMargins(.top, Self.margeDuHaut, for: .scrollContent)
         .navigationTitle("Validations")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                NavigationLink {
+                    CalculateurPrixView(events: events, contracts: contracts)
+                } label: {
+                    Label("Calculateur de prix", systemImage: "eurosign.circle")
+                }
+            }
+        }
+        .onAppear { relectureDesPrix += 1 }
+        .task(id: afficherPrix) {
+            guard afficherPrix, chiffrage == nil else { return }
+            let events = events, contrats = contracts
+            chiffrage = await Task.detached(priority: .userInitiated) {
+                ChiffrageDesTrajets(events: events, contrats: contrats)
+            }.value
+        }
         .task(id: toutVoir) {
             // Ouverte avec ses trajets, la page n'a rien à calculer tant qu'on ne
             // demande pas tout l'historique.
@@ -215,6 +246,25 @@ struct ValidationHistoryView: View {
             CarteEnGrand(events: events, contrats: contracts, joursInitiaux: joursALOuverture)
         }
         #endif
+    }
+
+    /// Le prix de chaque trajet, rien tant qu'on ne l'a pas demandé.
+    private var prixDesTrajets: [Int: PrixTrajet]? {
+        _ = relectureDesPrix
+        guard afficherPrix, let chiffrage else { return nil }
+        return chiffrage.prix(saisis: PrixDesForfaits.saisis(chiffrage.tarifsDesForfaits))
+    }
+
+    /// Ce qu'on écrit sous un trajet : sa part du forfait, ou son prix en
+    /// Liberté+ — et, sous forfait, ce qu'il aurait coûté en Liberté+.
+    private static func libelle(_ prix: PrixTrajet) -> String? {
+        guard prix.libertePlus > 0 else { return nil }
+        let libertePlus = enEuros(prix.libertePlus)
+        if prix.payeEnLibertePlus { return "Liberté+ : \(libertePlus) estimés" }
+        if let part = prix.forfait {
+            return "Forfait : \(enEuros(part)) · en Liberté+ : \(libertePlus)"
+        }
+        return "En Liberté+ : \(libertePlus)"
     }
 
     /// Ce que la page affiche en s'ouvrant, calculé hors du fil principal.

@@ -25,6 +25,7 @@ struct SettingsPageView: View {
     @AppStorage(TimerSettings.alreadyValidated) private var alreadyValidatedTimer = true
     @AppStorage(TimerSettings.sale) private var saleTimer = true
     @AppStorage(TimerSettings.control) private var controlTimer = true
+    @AppStorage(PrixSettings.afficher) private var afficherPrix = false
     
     @ObservedObject private var journal = ManualEntries.shared
 
@@ -130,12 +131,23 @@ struct SettingsPageView: View {
             }
 
             Section {
+                Toggle(isOn: $afficherPrix) {
+                    Label("Prix des trajets", systemImage: "eurosign.circle")
+                }
+            } header: {
+                Text("Prix")
+            } footer: {
+                Text("Sous chaque trajet de l'historique : la part du forfait qui l'a payé, ou son estimation en Liberté+. Le calculateur, depuis l'historique d'une carte, compare les mois aux forfaits.")
+            }
+
+            Section {
                 NavigationLink {
                     ShippedCorrectionsView()
                 } label: {
                     Label("Corrections livrées", systemImage: "checkmark.seal")
                 }
-                .eteint(quand: LineCorrections.all.isEmpty && StopCorrections.consultables.isEmpty && GateCorrections.all.isEmpty)
+                .eteint(quand: LineCorrections.all.isEmpty && StopCorrections.consultables.isEmpty
+                        && StopCorrections.deLigne.isEmpty && GateCorrections.all.isEmpty)
             } header: {
                 Text("Données")
             } footer: {
