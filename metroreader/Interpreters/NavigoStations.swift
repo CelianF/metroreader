@@ -224,6 +224,13 @@ public class NavigoStations {
         return listes(provider).contains { !tous($0, location, modeToUse).isEmpty }
     }
 
+    /// Le bit 15 du code d'un T7 dit le sens, et la carte l'écrit à l'envers
+    /// de ce que note le référentiel. Les deux sens partageant le nom de
+    /// l'arrêt, le miroir ramène le bon nom, rien de plus. Rien hors du T7.
+    static func miroirDuSens(_ provider: Int, _ course: Int?, _ location: Int) -> Int? {
+        provider == 3 && course == 17 ? location ^ 0x8000 : nil
+    }
+
     public class func find(_ provider_id: Int, _ line_id: Int?, _ location_id: Int, _ mode: String) -> NavigoStationInfo? {
         let modeToUse = (mode == "RER") ? "Train" : mode
         let listes = listes(provider_id)
@@ -232,11 +239,8 @@ public class NavigoStations {
         for table in listes {
             if let station = premier(table, line_id, location_id, modeToUse) { return station }
         }
-        // Le bit 15 du code d'un T7 dit le sens, et la carte l'écrit à l'envers
-        // de ce que note le référentiel. Les deux sens partageant le nom de
-        // l'arrêt, le miroir ramène le bon nom, rien de plus.
-        if provider_id == 3, line_id == 17,
-           let station = premier(59, 17, location_id ^ 0x8000, modeToUse) {
+        if let miroir = miroirDuSens(provider_id, line_id, location_id),
+           let station = premier(59, 17, miroir, modeToUse) {
             return station
         }
         for table in listes {

@@ -30,6 +30,35 @@ struct ShippedStop: Decodable {
     /// ambiguïté. L'arrêt s'affiche alors sans être placé sur la carte.
     let lat: Double?
     let lon: Double?
+
+    /// La ligne, pour un mode qui numérote ses arrêts ligne par ligne : le 15
+    /// du T7 n'est pas celui du T1. Absente, l'arrêt vaut pour le réseau.
+    let line_id: Int?
+    /// Quand l'arrêt a été relevé, sur quelle foi, et pourquoi la table livrée
+    /// ne suffisait pas. Seuls les arrêts de ligne les portent.
+    let constate: String?
+    let fonde_sur: String?
+    let raison: String?
+
+    /// Le jour du constat, quand il se laisse lire.
+    var jour: Date? {
+        constate.flatMap { formatConstat.date(from: $0) }
+    }
+}
+
+private let formatConstat: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd"
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    return formatter
+}()
+
+/// Un arrêt de ligne : l'exploitant annoncé, la course, le code et le mode.
+private struct CleArretDeLigne: Hashable {
+    let exploitant: Int
+    let course: Int
+    let numero: Int
+    let mode: String
 }
 
 
@@ -37,13 +66,38 @@ public class StopCorrections {
     static let all: [ShippedStop] = DonneesLivrees.charger("StopCorrections", comme: [ShippedStop].self) ?? []
 
     private static let index: [CleReseau: ShippedStop] = {
-        Dictionary(all.map { (CleReseau(exploitant: $0.provider_id, numero: $0.location_id, mode: $0.mode), $0) },
+        Dictionary(all.filter { $0.line_id == nil }
+                       .map { (CleReseau(exploitant: $0.provider_id, numero: $0.location_id, mode: $0.mode), $0) },
                    uniquingKeysWith: { first, _ in first })
     }()
+
+    /// Les arrêts redressés sur une ligne : le T7, dont la table livrée tient un
+    /// bloc saisi à la main où des codes manquaient ou portaient le nom du
+    /// voisin.
+    static let deLigne: [ShippedStop] = all.filter { $0.line_id != nil }
+
+    private static let indexDeLigne: [CleArretDeLigne: ShippedStop] = {
+        Dictionary(deLigne.map { (CleArretDeLigne(exploitant: $0.provider_id, course: $0.line_id ?? 0,
+                                                  numero: $0.location_id, mode: $0.mode), $0) },
+                   uniquingKeysWith: { first, _ in first })
+    }()
+
+    /// Les lignes redressées, et leurs arrêts, dans l'ordre du fichier.
+    static var parLigne: [(providerId: Int, lineId: Int, mode: String, arrets: [ShippedStop])] {
+        var ordre: [CleArretDeLigne] = []
+        var arrets: [CleArretDeLigne: [ShippedStop]] = [:]
+        for arret in deLigne {
+            let cle = CleArretDeLigne(exploitant: arret.provider_id, course: arret.line_id ?? 0, numero: 0, mode: arret.mode)
+            if arrets[cle] == nil { ordre.append(cle) }
+            arrets[cle, default: []].append(arret)
+        }
+        return ordre.map { ($0.exploitant, $0.course, $0.mode, arrets[$0] ?? []) }
+    }
 
     /// Décode la table, bâtit son index et trie ce qui reste consultable.
     static func prechauffer() {
         _ = index
+        _ = indexDeLigne
         _ = consultables
     }
 
@@ -56,7 +110,7 @@ public class StopCorrections {
     /// les annoncer dans les Réglages promettait des noms que rien ne va plus
     /// chercher.
     static let consultables: [ShippedStop] =
-        all.filter { !NavigoStations.declare($0.provider_id, $0.location_id, $0.mode) }
+        all.filter { $0.line_id == nil && !NavigoStations.declare($0.provider_id, $0.location_id, $0.mode) }
 
     /// Les arrêts consultables d'un exploitant.
     static func arrets(exploitant: Int) -> [ShippedStop] {
@@ -83,7 +137,21 @@ public class StopCorrections {
     /// de rattacher ce code à la ligne annoncée, elles redonnaient précisément
     /// l'arrêt qu'il venait d'écarter : la 14 s'affichait à Dupleix, à six
     /// kilomètres du TVM.
-    static func find(_ provider: Int, _ location_id: Int, _ mode: String) -> NavigoStationInfo? {
+    ///
+    /// Un arrêt de ligne, lui, se cherche sur la course annoncée, sans ce garde :
+    /// le code est bien déclaré ailleurs — le 15 est Basilique de Saint-Denis
+    /// sur le T1 —, c'est sur cette ligne-ci que la table se trompait.
+    static func find(_ provider: Int, _ location_id: Int, _ mode: String, course: Int? = nil) -> NavigoStationInfo? {
+        if let course {
+            let codes = [location_id] + [NavigoStations.miroirDuSens(provider, course, location_id)].compactMap { $0 }
+            for code in codes {
+                if let arret = indexDeLigne[CleArretDeLigne(exploitant: provider, course: course, numero: code, mode: mode)] {
+                    return NavigoStationInfo(name: arret.name, provider_id: provider, line_id: course,
+                                             location_id: code, mode: mode,
+                                             lat: arret.lat ?? 0, lon: arret.lon ?? 0, found: true)
+                }
+            }
+        }
         guard !NavigoStations.declare(provider, location_id, mode),
               let arret = index[CleReseau(exploitant: provider, numero: location_id, mode: mode)] else { return nil }
         return NavigoStationInfo(name: arret.name,

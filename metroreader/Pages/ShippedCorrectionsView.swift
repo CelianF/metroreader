@@ -21,7 +21,8 @@ struct ShippedCorrectionsView: View {
 
     var body: some View {
         List {
-            if corrections.isEmpty && StopCorrections.consultables.isEmpty && GateCorrections.all.isEmpty {
+            if corrections.isEmpty && StopCorrections.consultables.isEmpty && StopCorrections.deLigne.isEmpty
+                && GateCorrections.all.isEmpty {
                 Section {
                     Text("Aucune correction livrée")
                         .foregroundStyle(.secondary)
@@ -71,6 +72,33 @@ struct ShippedCorrectionsView: View {
                         Text("Arrêts")
                     } footer: {
                         Text("Des réseaux en délégation n'ont jamais déclaré le code billettique de leurs arrêts au référentiel : leurs validations n'y portent qu'un nombre. Ce que l'exploitant nous transmet directement comble ce trou.")
+                    }
+                }
+
+                if !StopCorrections.parLigne.isEmpty {
+                    Section {
+                        ForEach(StopCorrections.parLigne, id: \.lineId) { ligne in
+                            NavigationLink {
+                                ShippedLineStopsView(providerId: ligne.providerId, lineId: ligne.lineId,
+                                                     mode: ligne.mode, arrets: ligne.arrets)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    let lignes = NavigoLines.candidates(ligne.providerId, ligne.lineId, ligne.mode)
+                                    if lignes.isEmpty {
+                                        Text("course \(ligne.lineId)").fontWeight(.semibold)
+                                    } else {
+                                        LineIcons(lines: Array(lignes.prefix(1)))
+                                    }
+                                    Text(ligne.arrets.count == 1 ? "1 arrêt" : "\(ligne.arrets.count) arrêts")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("Arrêts de ligne")
+                    } footer: {
+                        Text("Un code de tram est un numéro de séquence le long de sa ligne. Là où la table livrée en oubliait un, ou lui donnait le nom du voisin, l'arrêt relevé sur le terrain le remplace.")
                     }
                 }
 
@@ -175,6 +203,57 @@ private struct ShippedStopsView: View {
         }
         .searchable(text: $recherche, prompt: "Rechercher un arrêt")
         .navigationTitle(interpretServiceProviderShortName(providerId))
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+
+/// Les arrêts redressés d'une ligne, chacun avec ce qui le fonde.
+private struct ShippedLineStopsView: View {
+    let providerId: Int
+    let lineId: Int
+    let mode: String
+    let arrets: [ShippedStop]
+
+    private var ligne: NavigoLineInfo? { NavigoLines.candidates(providerId, lineId, mode).first }
+
+    var body: some View {
+        List {
+            ForEach(arrets, id: \.location_id) { arret in
+                Section {
+                    LabeledContent("Code", value: "\(arret.location_id)")
+                    if let fonde = arret.fonde_sur {
+                        LabeledContent("Fondement", value: fonde)
+                    }
+                    if let jour = arret.jour {
+                        LabeledContent("Constaté le", value: jour.formatted(date: .long, time: .omitted))
+                    }
+                    if arret.lat == nil {
+                        Text("sans position")
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text(arret.name)
+                } footer: {
+                    if let raison = arret.raison {
+                        Text(raison)
+                    }
+                }
+            }
+
+            if NavigoStations.miroirDuSens(providerId, lineId, 0) != nil {
+                Section {
+                    Text("La carte écrit le bit 15 du code à l'envers de la table : elle annonce 32783 là où la table range 15. L'app essaie les deux, pour ces arrêts comme pour tout le reste de la ligne.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("Le sens")
+                }
+            }
+        }
+        .navigationTitle(ligne?.name ?? "course \(lineId)")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif

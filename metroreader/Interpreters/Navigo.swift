@@ -291,7 +291,7 @@ func interpretLocationId(_ locationIdBitString: String, _ eventCodeBitstring: St
         // Ou venir de l'exploitant lui-même, quand il nous a transmis ce qu'il
         // n'a jamais déclaré au référentiel. La saisie de l'utilisateur passe
         // devant : c'est lui qui corrige ce qu'on livre, pas l'inverse.
-        if let livre = StopCorrections.find(eventServiceProviderId, value, eventTransport) {
+        if let livre = StopCorrections.find(eventServiceProviderId, value, eventTransport, course: routeNumber) {
             return livre
         }
         return NavigoStationInfo.init(name: "\(value)", provider_id: eventServiceProviderId, line_id: nil, location_id: value, mode: eventTransport, lat: 0, lon: 0, found: false)
@@ -316,7 +316,7 @@ func provenanceArret(_ locationIdBitString: String, _ eventCodeBitstring: String
                                     mode: eventTransport, route: routeNumber) != nil {
         return "Données saisies"
     }
-    if StopCorrections.find(eventServiceProviderId, value, eventTransport) != nil {
+    if StopCorrections.find(eventServiceProviderId, value, eventTransport, course: routeNumber) != nil {
         return "Correction livrée"
     }
     return "Aucune : le code brut"
