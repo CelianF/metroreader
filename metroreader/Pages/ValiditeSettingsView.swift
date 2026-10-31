@@ -1,5 +1,5 @@
 //
-//  ControlSettingsView.swift
+//  ValiditeSettingsView.swift
 //  metroreader
 //
 
@@ -11,11 +11,11 @@ import SwiftUI
 /// Un titre ne se juge pas qu'au temps écoulé : il se juge là où l'on voyage.
 /// La carte ne sait que ce qu'on a validé, pas où l'on se trouve maintenant —
 /// c'est ici qu'on le lui dit.
-struct ControlSettingsView: View {
-    @AppStorage(TimerSettings.controlOutline) private var outlineEnabled = true
-    @AppStorage(TimerSettings.controlMode) private var controlMode = ControlMode.automatique.rawValue
-    @AppStorage(TimerSettings.controlTolerance) private var toleranceEnabled = true
-    @AppStorage(TimerSettings.controlToleranceMinutes) private var toleranceMinutes = TimerSettings.defaultToleranceMinutes
+struct ValiditeSettingsView: View {
+    @AppStorage(TimerSettings.contourValidite) private var outlineEnabled = true
+    @AppStorage(TimerSettings.modeDeValidite) private var modeDeValidite = ModeDeValidite.automatique.rawValue
+    @AppStorage(TimerSettings.validiteTolerance) private var toleranceEnabled = true
+    @AppStorage(TimerSettings.validiteToleranceMinutes) private var toleranceMinutes = TimerSettings.defaultToleranceMinutes
 
     private var minutes: Binding<Double> {
         Binding(get: { Double(toleranceMinutes) },
@@ -33,8 +33,8 @@ struct ControlSettingsView: View {
             }
 
             Section {
-                Picker(selection: $controlMode) {
-                    ForEach(ControlMode.allCases) { mode in
+                Picker(selection: $modeDeValidite) {
+                    ForEach(ModeDeValidite.allCases) { mode in
                         Label {
                             Text(mode.label)
                         } icon: {
@@ -86,13 +86,13 @@ struct ControlSettingsView: View {
             Section {
             } footer: {
                 Text("""
-                L'encart Titre valable n'est pas un outil de contrôle, ni un vérificateur officiel. Il lit ce que contient la carte et en tire une indication, qui ne remplace ni les valideurs, ni l'appréciation d'un agent assermenté.
+                L'encart Validité n'est pas un vérificateur officiel. Il lit ce que contient la carte et en tire une indication, qui ne remplace ni les valideurs, ni l'appréciation d'un agent assermenté.
 
-                La tolérance est un réglage personnel : elle n'engage en rien un contrôleur.
+                La tolérance est un réglage personnel : elle n'engage en rien un agent.
                 """)
             }
         }
-        .navigationTitle("Titre valable")
+        .navigationTitle("Validité")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -107,5 +107,5 @@ struct ControlSettingsView: View {
 }
 
 #Preview {
-    NavigationStack { ControlSettingsView() }
+    NavigationStack { ValiditeSettingsView() }
 }

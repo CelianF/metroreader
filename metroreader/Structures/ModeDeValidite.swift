@@ -1,19 +1,19 @@
 //
-//  ControlMode.swift
+//  ModeDeValidite.swift
 //  metroreader
 //
 
 import Foundation
 
 
-/// Le mode dans lequel on se déclare contrôlé.
+/// Le mode où l'on veut savoir si son titre vaut.
 ///
-/// La carte ne sait que ce qu'on a validé. Se dire contrôlé en RER après avoir
+/// La carte ne sait que ce qu'on a validé. Se placer en RER après avoir
 /// validé en métro, c'est la correspondance qu'on a oublié de valider : le
-/// titre passe encore, et l'encart le dit en jaune. Se dire contrôlé en bus
+/// titre passe encore, et l'encart le dit en jaune. Se placer en bus
 /// avec une validation ferrée, c'est autre chose — un train n'est pas un bus,
 /// et l'encart passe au rouge.
-enum ControlMode: String, CaseIterable, Identifiable {
+enum ModeDeValidite: String, CaseIterable, Identifiable {
     // L'ordre est celui du menu. Les rawValue ne bougent pas : un réglage déjà
     // enregistré se relit.
     case automatique
@@ -89,8 +89,8 @@ enum ControlMode: String, CaseIterable, Identifiable {
     }
 
     /// Le mode couvert par une validation, ramené aux mêmes termes.
-    static func couvrant(_ mode: String) -> ControlMode? {
-        ModeTransport(rawValue: mode)?.modeDeControle
+    static func couvrant(_ mode: String) -> ModeDeValidite? {
+        ModeTransport(rawValue: mode)?.modeDeValidite
     }
 
     enum Accord {
@@ -99,7 +99,7 @@ enum ControlMode: String, CaseIterable, Identifiable {
         case non     // rien à voir
     }
 
-    /// Ce que la validation en cours vaut face au mode où l'on se dit contrôlé.
+    /// Ce que la validation en cours vaut face au mode où l'on se place.
     func accord(avec coverage: PassTimers.Coverage) -> Accord {
         switch self {
         case .automatique:

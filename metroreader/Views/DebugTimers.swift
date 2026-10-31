@@ -6,16 +6,16 @@
 import SwiftUI
 
 /// Ce que le mode debug dit des timers, sous l'environnement de la carte : l'état
-/// que calcule le contrôle et les fenêtres dont il part, pour comprendre un
+/// que calcule la validité et les fenêtres dont il part, pour comprendre un
 /// encart qui surprend. Il se calcule avec les mêmes réglages que l'encart, et
 /// même là où l'encart se tait, dans l'historique.
 struct DebugDesTimers: View {
     let contracts: [[String: Any]]
     let events: [[String: Any]]
 
-    @AppStorage(TimerSettings.controlMode) private var controlMode = ControlMode.automatique.rawValue
-    @AppStorage(TimerSettings.controlTolerance) private var toleranceEnabled = true
-    @AppStorage(TimerSettings.controlToleranceMinutes) private var toleranceMinutes = TimerSettings.defaultToleranceMinutes
+    @AppStorage(TimerSettings.modeDeValidite) private var modeDeValidite = ModeDeValidite.automatique.rawValue
+    @AppStorage(TimerSettings.validiteTolerance) private var toleranceEnabled = true
+    @AppStorage(TimerSettings.validiteToleranceMinutes) private var toleranceMinutes = TimerSettings.defaultToleranceMinutes
 
     private static let jourHeure: DateFormatter = {
         let formatter = DateFormatter()
@@ -27,12 +27,12 @@ struct DebugDesTimers: View {
 
     var body: some View {
         let timers = PassTimers(contracts: contracts, events: events)
-        let mode = ControlMode(rawValue: controlMode) ?? .automatique
+        let mode = ModeDeValidite(rawValue: modeDeValidite) ?? .automatique
         let tolerance: TimeInterval? = toleranceEnabled ? TimeInterval(toleranceMinutes) * 60 : nil
         Section {
-            ligne("État du contrôle", Self.etat(timers.validity(mode: mode, tolerance: tolerance)))
-            ligne("Contrôlé", mode.label + (tolerance.map { " · tolérance \(Int($0 / 60)) min" } ?? " · sans tolérance"))
-            ligne("Temps de validité", Self.fenetre(timers.control))
+            ligne("État de la validité", Self.etat(timers.validity(mode: mode, tolerance: tolerance)))
+            ligne("Mode choisi", mode.label + (tolerance.map { " · tolérance \(Int($0 / 60)) min" } ?? " · sans tolérance"))
+            ligne("Temps de validité", Self.fenetre(timers.validite))
             ligne("Mode couvert", timers.coverage.map { $0.mode + ($0.airport ? ", aéroports compris" : "") } ?? "—")
             ligne("Pass déjà validé", Self.fenetre(timers.alreadyValidated))
             ligne("Achat impossible", Self.vente(timers.sale))

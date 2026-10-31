@@ -11,16 +11,34 @@ import Combine
 enum TimerSettings {
     static let alreadyValidated = "timerAlreadyValidated"
     static let sale = "timerSale"
-    static let control = "timerControl"
+    static let validite = "timerValidite"
 
-    // Options du contrôle
-    static let controlOutline = "timerControlOutline"
-    static let controlMode = "timerControlMode"
-    static let controlTolerance = "timerControlTolerance"
-    static let controlToleranceMinutes = "timerControlToleranceMinutes"
+    // Options de la validité
+    static let contourValidite = "timerValiditeContour"
+    static let modeDeValidite = "timerValiditeMode"
+    static let validiteTolerance = "timerValiditeTolerance"
+    static let validiteToleranceMinutes = "timerValiditeToleranceMinutes"
 
     static let defaultToleranceMinutes = 30
     static let toleranceRange: ClosedRange<Double> = 10...120
+
+    /// Reprend les réglages enregistrés sous les clés d'avant le 31/10/2026,
+    /// quand l'encart s'appelait encore « Contrôle ». Sans cela, renommer les
+    /// clés rallumait ce qu'on avait éteint.
+    static func reprendreLesAnciennesCles(_ defaults: UserDefaults = .standard) {
+        let anciennes = [
+            "timerControl": validite,
+            "timerControlOutline": contourValidite,
+            "timerControlMode": modeDeValidite,
+            "timerControlTolerance": validiteTolerance,
+            "timerControlToleranceMinutes": validiteToleranceMinutes,
+        ]
+        for (ancienne, nouvelle) in anciennes {
+            guard let valeur = defaults.object(forKey: ancienne) else { continue }
+            if defaults.object(forKey: nouvelle) == nil { defaults.set(valeur, forKey: nouvelle) }
+            defaults.removeObject(forKey: ancienne)
+        }
+    }
 }
 
 
@@ -79,18 +97,18 @@ struct TimersView: View {
 
     /// Tait l'encart Titre valable, sans toucher au réglage : il ne se juge que sur
     /// une carte qu'on vient de lire.
-    var sansControle: Bool = false
+    var sansValidite: Bool = false
 
     @StateObject private var ticker = SecondTicker()
 
     @AppStorage(TimerSettings.alreadyValidated) private var alreadyValidatedEnabled = true
     @AppStorage(TimerSettings.sale) private var saleEnabled = true
-    @AppStorage(TimerSettings.control) private var controlEnabled = true
-    @AppStorage(TimerSettings.controlMode) private var controlMode = ControlMode.automatique.rawValue
-    @AppStorage(TimerSettings.controlTolerance) private var toleranceEnabled = true
-    @AppStorage(TimerSettings.controlToleranceMinutes) private var toleranceMinutes = TimerSettings.defaultToleranceMinutes
+    @AppStorage(TimerSettings.validite) private var validiteEnabled = true
+    @AppStorage(TimerSettings.modeDeValidite) private var modeDeValidite = ModeDeValidite.automatique.rawValue
+    @AppStorage(TimerSettings.validiteTolerance) private var toleranceEnabled = true
+    @AppStorage(TimerSettings.validiteToleranceMinutes) private var toleranceMinutes = TimerSettings.defaultToleranceMinutes
 
-    private var mode: ControlMode { ControlMode(rawValue: controlMode) ?? .automatique }
+    private var mode: ModeDeValidite { ModeDeValidite(rawValue: modeDeValidite) ?? .automatique }
 
     private var tolerance: TimeInterval? {
         toleranceEnabled ? TimeInterval(toleranceMinutes) * 60 : nil
@@ -126,15 +144,15 @@ struct TimersView: View {
                 }
             }
 
-            if controlEnabled, !sansControle {
+            if validiteEnabled, !sansValidite {
                 let validity = timers.validity(mode: mode, tolerance: tolerance)
-                box(color: validity.color) { controle(validity) }
+                box(color: validity.color) { encartValidite(validity) }
             }
         }
     }
 
     @ViewBuilder
-    private func controle(_ validity: PassTimers.Validity) -> some View {
+    private func encartValidite(_ validity: PassTimers.Validity) -> some View {
         switch validity {
         case .valid(let countdown):
             row(TimersView.titreValable(timers.coverage),
@@ -179,7 +197,7 @@ struct TimersView: View {
                 Text("Titre non valable \(mode.enPhrase)")
                     .fontWeight(.semibold)
                 if let coverage = timers.coverage,
-                   let valide = ControlMode.couvrant(coverage.mode) {
+                   let valide = ModeDeValidite.couvrant(coverage.mode) {
                     Text("La validation ne couvre que \(valide.label.lowercased()).")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -279,7 +297,7 @@ private struct ModeBadges: View {
                 badge(mode)
             }
             if coverage.airport {
-                badge(ControlMode.aeroport.icon)
+                badge(ModeDeValidite.aeroport.icon)
             }
         }
     }

@@ -51,7 +51,7 @@ enum TransitionKind {
 
 extension Color {
     /// L'entrée : un vert adouci, qui ne se confond pas avec le vert franc d'un
-    /// titre valable dans l'encart Contrôle.
+    /// titre valable dans l'encart Validité.
     static let vertPale = Color(red: 0.49, green: 0.80, blue: 0.53)
 }
 

@@ -17,7 +17,7 @@ struct ScanView: View {
     /// Le contenu du fichier .metropass, préparé seulement au partage.
     var export: (() -> Data?)?
 
-    /// Vrai quand la fiche vient de l'historique. Le contrôle se juge à
+    /// Vrai quand la fiche vient de l'historique. La validité se juge à
     /// l'instant où l'on est devant l'agent : sur un scan d'il y a trois jours,
     /// il ne dit plus rien de vrai. Les deux autres timers, eux, décrivent
     /// l'état du pass et gardent leur sens.
@@ -74,11 +74,11 @@ struct ScanView: View {
     /// pour partir du même point.
     private static let monteeArrivee: CGFloat = 150 - remonteeCarte
 
-    @AppStorage(TimerSettings.control) private var controlTimerEnabled = true
-    @AppStorage(TimerSettings.controlOutline) private var controlOutlineEnabled = true
-    @AppStorage(TimerSettings.controlMode) private var controlMode = ControlMode.automatique.rawValue
-    @AppStorage(TimerSettings.controlTolerance) private var toleranceEnabled = true
-    @AppStorage(TimerSettings.controlToleranceMinutes) private var toleranceMinutes = TimerSettings.defaultToleranceMinutes
+    @AppStorage(TimerSettings.validite) private var validiteTimerEnabled = true
+    @AppStorage(TimerSettings.contourValidite) private var contourValiditeEnabled = true
+    @AppStorage(TimerSettings.modeDeValidite) private var modeDeValidite = ModeDeValidite.automatique.rawValue
+    @AppStorage(TimerSettings.validiteTolerance) private var toleranceEnabled = true
+    @AppStorage(TimerSettings.validiteToleranceMinutes) private var toleranceMinutes = TimerSettings.defaultToleranceMinutes
     /// Lu ici pour que la fiche se redessine quand le mode debug le bascule.
     @AppStorage(ModeDebug.transitionsBrutes) private var transitionsBrutes = false
     @AppStorage(ModeDebug.deverrouille) private var modeDebug = false
@@ -101,15 +101,15 @@ struct ScanView: View {
         PassTimers(contracts: tagContracts, events: tagEvents)
     }
 
-    // Contour du visuel : la couleur de l'encart Contrôle, portée sur la carte
+    // Contour du visuel : la couleur de l'encart Validité, portée sur la carte
     // pour qu'un coup d'œil suffise.
     private var validityOutline: (color: Color, glow: CGFloat)? {
-        // Le contour dit la même chose que l'encart Contrôle, en plus criant :
+        // Le contour dit la même chose que l'encart Validité, en plus criant :
         // le taire dans l'historique et garder son halo rouge reviendrait à
         // juger quand même un scan d'il y a trois jours.
-        guard !depuisHistorique, controlTimerEnabled, controlOutlineEnabled else { return nil }
+        guard !depuisHistorique, validiteTimerEnabled, contourValiditeEnabled else { return nil }
         let validity = timers.validity(
-            mode: ControlMode(rawValue: controlMode) ?? .automatique,
+            mode: ModeDeValidite(rawValue: modeDeValidite) ?? .automatique,
             tolerance: toleranceEnabled ? TimeInterval(toleranceMinutes) * 60 : nil
         )
         return (validity.color, validity.glow)
@@ -246,7 +246,7 @@ struct ScanView: View {
             
             // Sans contrat ni événement non plus : un pass neuf n'ouvre aucun
             // droit, et le dire est le seul renseignement qu'on ait à donner.
-            TimersDeLaCarte(contracts: tagContracts, events: tagEvents, sansControle: depuisHistorique)
+            TimersDeLaCarte(contracts: tagContracts, events: tagEvents, sansValidite: depuisHistorique)
 
             // Dans l'historique seulement : sur une carte qu'on vient de lire,
             // on regarde son titre, pas ses voyages. La vignette ne montre pas
@@ -489,10 +489,10 @@ struct ScanView: View {
 private struct TimersDeLaCarte: View {
     let contracts: [[String: Any]]
     let events: [[String: Any]]
-    let sansControle: Bool
+    let sansValidite: Bool
 
     var body: some View {
-        TimersView(timers: PassTimers(contracts: contracts, events: events), sansControle: sansControle)
+        TimersView(timers: PassTimers(contracts: contracts, events: events), sansValidite: sansValidite)
     }
 }
 

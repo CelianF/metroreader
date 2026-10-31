@@ -6,7 +6,7 @@
 import Foundation
 
 
-/// Les lignes de contrôle SNCF qui donnent directement sur le métro.
+/// Les lignes de valideurs SNCF qui donnent directement sur le métro.
 ///
 /// Dans les gares de la liste IDFM des correspondances par la voie publique,
 /// la SNCF écrit « Entrée » ou « Sortie (voie publique) » à toutes ses portes,

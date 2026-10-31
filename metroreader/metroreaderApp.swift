@@ -172,6 +172,11 @@ struct NFCReaderApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     #endif
 
+    init() {
+        // Avant que la moindre vue ne lise ses réglages.
+        TimerSettings.reprendreLesAnciennesCles()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

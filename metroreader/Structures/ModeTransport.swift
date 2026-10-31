@@ -128,8 +128,8 @@ enum ModeTransport: String, CaseIterable {
         }
     }
 
-    /// Le mode de contrôle qu'une validation dans ce mode couvre.
-    var modeDeControle: ControlMode? {
+    /// Le mode de validité qu'une validation dans ce mode couvre.
+    var modeDeValidite: ModeDeValidite? {
         switch self {
         case .busUrbain, .busInterurbain, .noctilien:    return .bus
         case .tramway:                                   return .tram

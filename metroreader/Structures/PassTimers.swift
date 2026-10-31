@@ -22,14 +22,13 @@ struct PassTimers {
         let countdown: Countdown? // nil : blocage permanent, un titre bloquant est encore sur le pass
     }
 
-    /// Validité opposable à un contrôle, telle que la calcule le timer
-    /// « Contrôle ».
+    /// La validité du titre, telle que la calcule le timer « Validité ».
     ///
     /// Deux choses s'y jouent à la fois : le temps, et le mode. Une validation
     /// peut courir encore et ne rien valoir — un titre ferré ne couvre pas un
     /// bus. Elle peut être éteinte depuis peu et passer quand même.
     enum Validity {
-        /// Vert : une validation en cours, qui couvre le mode contrôlé.
+        /// Vert : une validation en cours, qui couvre le mode choisi.
         case valid(Countdown)
         /// Jaune : ça devrait passer sans que ce soit net.
         case tolerated(Tolerance)
@@ -46,9 +45,9 @@ struct PassTimers {
             case recentlyExpired(Countdown)
             /// En cours, mais validée sur le mode voisin : la correspondance
             /// n'a pas été revalidée.
-            case neighbouringMode(Countdown, validated: ControlMode?)
+            case neighbouringMode(Countdown, validated: ModeDeValidite?)
             /// Rien de validé, mais un forfait illimité est chargé et l'on se
-            /// dit contrôlé en bus ou en tramway : le trajet est payé, seul le
+            /// place en bus ou en tramway : le trajet est payé, seul le
             /// geste manque.
             case unvalidatedPass
         }
@@ -56,7 +55,7 @@ struct PassTimers {
 
     /// Ce sur quoi la validation en cours donne un droit.
     ///
-    /// Le décompte de contrôle peut courir depuis une validation antérieure —
+    /// Le décompte de validité peut courir depuis une validation antérieure —
     /// un bus puis un tram le fait partir du bus — mais c'est le dernier mode
     /// emprunté qui dit ce qui est légal maintenant. Un titre valable en bus ne
     /// l'est pas dans le métro : afficher « Titre valable » sans le préciser
@@ -72,7 +71,7 @@ struct PassTimers {
 
     let alreadyValidated: Countdown? // 7 min après une entrée ou une correspondance
     let sale: SaleBlock? // 4 h après la consommation d'un T+, TMTR ou Aéroport
-    let control: Countdown? // Temps de validité : 2 h en rail, 1 h 30 en surface
+    let validite: Countdown? // Temps de validité : 2 h en rail, 1 h 30 en surface
     let coverage: Coverage? // Le mode que ce temps de validité couvre
 
     /// Un titre utilisable est chargé sur le pass, indépendamment de toute
@@ -86,47 +85,47 @@ struct PassTimers {
     let hasUsableForfait: Bool
 
     /// - Parameters:
-    ///   - mode: le mode dans lequel on se déclare contrôlé.
+    ///   - mode: le mode où l'on se place.
     ///   - tolerance: le délai pendant lequel un titre éteint passe encore,
     ///     ou nil si la tolérance est désactivée.
-    func validity(mode: ControlMode = .automatique,
+    func validity(mode: ModeDeValidite = .automatique,
                   tolerance: TimeInterval? = defaultToleranceWindow) -> Validity {
-        guard let control else { return sansValidation(mode) }
+        guard let validite else { return sansValidation(mode) }
 
-        // Le mode d'abord : une validation qui ne couvre pas ce qu'on contrôle
+        // Le mode d'abord : une validation qui ne couvre pas le mode choisi
         // ne vaut rien, si récente soit-elle.
         let accord = coverage.map { mode.accord(avec: $0) } ?? .exact
 
-        if control.isRunning {
+        if validite.isRunning {
             switch accord {
-            case .exact:  return .valid(control)
-            case .voisin: return .tolerated(.neighbouringMode(control,
-                                                              validated: coverage.flatMap { ControlMode.couvrant($0.mode) }))
+            case .exact:  return .valid(validite)
+            case .voisin: return .tolerated(.neighbouringMode(validite,
+                                                              validated: coverage.flatMap { ModeDeValidite.couvrant($0.mode) }))
             case .non:    return horsMode(mode)
             }
         }
 
         if accord == .non { return horsMode(mode) }
-        if let tolerance, -control.remaining < tolerance {
-            return .tolerated(.recentlyExpired(control))
+        if let tolerance, -validite.remaining < tolerance {
+            return .tolerated(.recentlyExpired(validite))
         }
         return sansValidation(mode)
     }
 
-    /// La validation ne couvre pas le mode contrôlé.
+    /// La validation ne couvre pas le mode choisi.
     ///
     /// Un ticket ne paie qu'un réseau : le prendre ailleurs est une fraude, et
     /// c'est rouge. Un forfait illimité, lui, paie déjà le trajet — le mode où
     /// l'on a validé en dernier ne lui retire rien. En bus et en tramway, où
     /// l'on monte sans barrière, il ne reste alors que le geste oublié.
-    private func horsMode(_ mode: ControlMode) -> Validity {
+    private func horsMode(_ mode: ModeDeValidite) -> Validity {
         if hasUsableForfait, mode.oubliVeniel { return .tolerated(.unvalidatedPass) }
         return .wrongMode
     }
 
     /// Rien qui coure : reste à savoir si le pass porte quand même de quoi
-    /// voyager, et si l'oubli se plaide là où l'on se dit contrôlé.
-    private func sansValidation(_ mode: ControlMode) -> Validity {
+    /// voyager, et si l'oubli se plaide là où l'on se place.
+    private func sansValidation(_ mode: ModeDeValidite) -> Validity {
         if hasUsableForfait, mode.oubliVeniel { return .tolerated(.unvalidatedPass) }
         return hasUsableContract ? .notValidated : .none
     }
@@ -198,7 +197,7 @@ struct PassTimers {
 
         alreadyValidated = Self.alreadyValidatedTimer(parsed)
         sale = Self.saleTimer(contracts: contracts, events: parsed)
-        control = Self.controlTimer(parsed)
+        validite = Self.validiteTimer(parsed)
         coverage = Self.coverage(parsed)
         hasUsableContract = Self.usableContract(contracts)
         hasUsableForfait = Self.usableForfait(contracts)
@@ -308,7 +307,7 @@ struct PassTimers {
     }
 
     /// Temps de validité. La famille est choisie par le mode du dernier événement.
-    private static func controlTimer(_ events: [TimedEvent]) -> Countdown? {
+    private static func validiteTimer(_ events: [TimedEvent]) -> Countdown? {
         guard let last = events.first else { return nil }
 
         if last.isRail {

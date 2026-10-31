@@ -24,7 +24,7 @@ struct SettingsPageView: View {
 
     @AppStorage(TimerSettings.alreadyValidated) private var alreadyValidatedTimer = true
     @AppStorage(TimerSettings.sale) private var saleTimer = true
-    @AppStorage(TimerSettings.control) private var controlTimer = true
+    @AppStorage(TimerSettings.validite) private var validiteTimer = true
     @AppStorage(PrixSettings.afficher) private var afficherPrix = false
     
     @ObservedObject private var journal = ManualEntries.shared
@@ -118,16 +118,16 @@ struct SettingsPageView: View {
                     Label("Titres Incompatibles", systemImage: "cart")
                 }
 
-                Toggle(isOn: $controlTimer) {
-                    Label("Titre valable", systemImage: "checkmark.seal")
+                Toggle(isOn: $validiteTimer) {
+                    Label("Validité", systemImage: "checkmark.seal")
                 }
 
                 NavigationLink {
-                    ControlSettingsView()
+                    ValiditeSettingsView()
                 } label: {
-                    Label("Options du titre valable", systemImage: "slider.horizontal.3")
+                    Label("Options de validité", systemImage: "slider.horizontal.3")
                 }
-                .disabled(!controlTimer)
+                .disabled(!validiteTimer)
             }
 
             Section {
