@@ -15,22 +15,46 @@ struct HistoryRowButton: View {
     // Le déplacement entre sections est séquencé par HistoryPageView
     let onTogglePin: () -> Void
     
+    /// Sur le Duo déplié, la carte s'ouvre en plein écran plutôt que dans le
+    /// panneau de l'historique.
+    @Environment(\.ouvrirFicheHistorique) private var ouvrirFiche
+
     var body: some View {
-        // Une vraie page, poussée dans la pile de l'onglet : flèche de retour
-        // et geste depuis le bord gauche, comme dans les réglages.
-        NavigationLink {
-            ScanView(
-                cardID: record.cardID,
-                tagIcc: record.icc,
-                tagEnvHolder: record.envHolder,
-                tagContracts: record.contracts,
-                tagEvents: record.events,
-                tagSpecialEvents: record.specialEvents,
-                export: record.export,
-                depuisHistorique: true,
-                historyManager: historyManager
-            )
-        } label: {
+        ligne
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                Button(action: onTogglePin) {
+                    Label(record.isPinned ? "Désépingler" : "Épingler",
+                          systemImage: record.isPinned ? "pin.slash" : "pin.fill")
+                }
+                .tint(record.isPinned ? .gray : .yellow)
+            }
+    }
+
+    @ViewBuilder
+    private var ligne: some View {
+        if let ouvrirFiche {
+            Button { ouvrirFiche(record) } label: { etiquette }
+                .tint(.primary)
+        } else {
+            // Une vraie page, poussée dans la pile de l'onglet : flèche de
+            // retour et geste depuis le bord gauche, comme dans les réglages.
+            NavigationLink {
+                ScanView(
+                    cardID: record.cardID,
+                    tagIcc: record.icc,
+                    tagEnvHolder: record.envHolder,
+                    tagContracts: record.contracts,
+                    tagEvents: record.events,
+                    tagSpecialEvents: record.specialEvents,
+                    export: record.export,
+                    depuisHistorique: true,
+                    historyManager: historyManager
+                )
+            } label: { etiquette }
+        }
+    }
+
+    private var etiquette: some View {
             HStack(spacing: 8) {
                 NavigoImage(imageName: record.image)
                     .shadow(radius: 2)
@@ -67,13 +91,5 @@ struct HistoryRowButton: View {
                 }
                 .padding(.vertical, 4)
             }
-        }
-        .swipeActions(edge: .leading, allowsFullSwipe: true) {
-            Button(action: onTogglePin) {
-                Label(record.isPinned ? "Désépingler" : "Épingler",
-                      systemImage: record.isPinned ? "pin.slash" : "pin.fill")
-            }
-            .tint(record.isPinned ? .gray : .yellow)
-        }
     }
 }

@@ -27,6 +27,8 @@ struct EventView: View {
     @AppStorage(ModeDebug.base) private var baseBrute = BaseBrute.hexadecimal
     @AppStorage(ModeDebug.deverrouille) private var modeDebug = false
     @Environment(\.paysagePlie) private var paysagePlie
+    @Environment(\.ecranDeplie) private var ecranDeplie
+    private var enColonne: Bool { paysagePlie || ecranDeplie }
     /// La base des données brutes à afficher, rien quand elles sont masquées.
     private var brut: BaseBrute? { afficheBrut ? baseBrute : nil }
     @Environment(\.openURL) private var openURL
@@ -82,11 +84,11 @@ struct EventView: View {
                             .font(.largeTitle)
                             .fontWeight(.bold)
                             .multilineTextAlignment(.center)
-                            // Dans la colonne du Duo plié couché, « Denfert- /
-                            // Rochereau » se coupait : le nom tient sur une
-                            // ligne, quitte à rapetisser.
-                            .lineLimit(paysagePlie ? 1 : nil)
-                            .minimumScaleFactor(paysagePlie ? 0.5 : 1)
+                            // Dans une colonne du Duo, plié couché ou déplié,
+                            // « Denfert- / Rochereau » se coupait : le nom
+                            // tient sur une ligne, quitte à rapetisser.
+                            .lineLimit(enColonne ? 1 : nil)
+                            .minimumScaleFactor(enColonne ? 0.5 : 1)
                             .frame(maxWidth: .infinity, alignment: .center)
 
                         // Les autres lignes de l'arrêt : celle qu'on a prise vient

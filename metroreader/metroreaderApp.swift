@@ -17,6 +17,8 @@ struct ContentView: View {
     @State private var tailleFenetre: CGSize = .zero
     /// Les Réglages, ouverts depuis la barre du Duo déplié, faute d'onglets.
     @State private var reglagesOuverts = false
+    /// Déplié, la carte de l'historique ouverte en plein écran.
+    @State private var ficheHistorique: UUID?
     #if os(iOS)
     @ObservedObject private var actionsDuDuo = ActionsDuDuo.shared
     #endif
@@ -59,11 +61,16 @@ struct ContentView: View {
         }
         .modifier(BordDeDefilementDoux())
         .onGeometryChange(for: CGSize.self) { $0.size } action: { tailleFenetre = $0 }
+        // Une carte lue ou importée passe devant la fiche de l'historique.
+        .onChange(of: nfcReader.isReadComplete) { _, lue in if lue { ficheHistorique = nil } }
         #if os(iOS)
         .overlay { barreDuDuo }
         .sheet(isPresented: $reglagesOuverts) {
             NavigationStack {
                 SettingsPageView(historyManager: historyManager)
+                    // Sans titre, la feuille n'avait que son OK, seul à droite.
+                    .navigationTitle("Réglages")
+                    .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("OK") { reglagesOuverts = false }
@@ -114,34 +121,60 @@ struct ContentView: View {
     @ViewBuilder
     private var deplie: some View {
         Group {
-            if enHauteur {
+            if let id = ficheHistorique, let fiche = historyManager.history.first(where: { $0.id == id }) {
+                // Une carte de l'historique, comme une carte lue : tout l'écran.
+                NavigationStack {
+                    ScanView(cardID: fiche.cardID, tagIcc: fiche.icc, tagEnvHolder: fiche.envHolder,
+                             tagContracts: fiche.contracts, tagEvents: fiche.events,
+                             tagSpecialEvents: fiche.specialEvents, export: fiche.export,
+                             depuisHistorique: true, historyManager: historyManager)
+                }
+                .modifier(FicheDuDeplie(enHauteur: enHauteur))
+                .environment(\.retraitDeLaBarre, Self.largeurBarre)
+            } else if nfcReader.isReadComplete {
+                // Une carte lue prend tout l'écran, en deux colonnes : la fiche
+                // à gauche, le détail à droite. La colonne de droite s'écarte
+                // de la barre par l'intérieur, pour que la séparation tombe sur
+                // la charnière.
+                panneauScan
+                    .modifier(FicheDuDeplie(enHauteur: enHauteur))
+                    .environment(\.retraitDeLaBarre, Self.largeurBarre)
+            } else if enHauteur {
                 // En portrait, l'un sur l'autre, comme l'écran plié : le scan
-                // dans la moitié de l'antenne.
+                // dans la moitié de l'antenne. Le panneau du haut côtoie la
+                // barre.
                 VStack(spacing: 0) {
                     if scanEnPremier {
-                        panneauScan.safeAreaPadding(.trailing, Self.largeurBarre)
+                        panneauScan.environment(\.retraitDeLaBarre, Self.largeurBarre)
                         separateur
                         panneauSecond
                     } else {
-                        panneauSecond.safeAreaPadding(.trailing, Self.largeurBarre)
+                        panneauSecond.environment(\.retraitDeLaBarre, Self.largeurBarre)
                         separateur
                         panneauScan
                     }
                 }
+                // Toute la hauteur de l'écran : la barre d'état ne réservait
+                // que le haut, et la séparation tombait sous le milieu.
+                .ignoresSafeArea(.container, edges: .vertical)
             } else {
-                // En paysage, côte à côte. Le panneau de droite laisse la place
-                // de la barre, sous la caméra.
+                // En paysage, côte à côte, chacun sa moitié : la séparation
+                // tombe sur la charnière. Le panneau de droite côtoie la barre.
                 HStack(spacing: 0) {
                     if scanEnPremier {
                         panneauScan
                         separateur
-                        panneauSecond.safeAreaPadding(.trailing, Self.largeurBarre)
+                        panneauSecond.environment(\.retraitDeLaBarre, Self.largeurBarre)
                     } else {
                         panneauSecond
                         separateur
-                        panneauScan.safeAreaPadding(.trailing, Self.largeurBarre)
+                        panneauScan.environment(\.retraitDeLaBarre, Self.largeurBarre)
                     }
                 }
+                // Toute la largeur de l'écran, pas celle de sa zone sûre : sinon
+                // la marge des capteurs, d'un côté seulement, décalait la
+                // séparation hors de la charnière.
+                .ignoresSafeArea(.container, edges: .horizontal)
             }
         }
         .environment(\.ecranDeplie, true)
@@ -154,24 +187,22 @@ struct ContentView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// L'autre panneau : l'historique, ou, une carte lue, ses validations —
-    /// le panneau de l'antenne n'en garde que la carte et ses contrats.
+    /// L'autre panneau, tant qu'aucune carte n'est lue : l'historique.
     private var panneauSecond: some View {
         NavigationStack {
-            if nfcReader.isReadComplete {
-                ScanView(cardID: nfcReader.cardID, tagIcc: nfcReader.tagIcc, tagEnvHolder: nfcReader.tagEnvHolder,
-                         tagContracts: nfcReader.tagContracts, tagEvents: nfcReader.tagEvents,
-                         tagSpecialEvents: nfcReader.tagSpecialEvents, export: nfcReader.export,
-                         partie: .validations, historyManager: historyManager)
-            } else {
-                HistoryPageView(historyManager: historyManager)
-            }
+            // Sans onglet pour le nommer, le panneau dit ce qu'il est.
+            HistoryPageView(historyManager: historyManager)
+                .navigationTitle("Historique")
+                .navigationBarTitleDisplayMode(.inline)
+                .environment(\.ouvrirFicheHistorique) { fiche in ficheHistorique = fiche.id }
+                .modifier(ScanCarteEcarteDeLaBarre())
         }
         .frame(maxWidth: .infinity)
     }
 
-    /// La place que la barre du Duo prend au bord de l'écran.
-    private static let largeurBarre: CGFloat = 76
+    /// La place que la barre du Duo prend au bord de l'écran, et un peu d'air
+    /// pour que rien ne la touche.
+    private static let largeurBarre: CGFloat = 96
 
     #if os(iOS)
     /// La barre du Duo, sous la caméra, plié comme déplié. Pliée, elle ne vaut
@@ -185,6 +216,11 @@ struct ContentView: View {
             BarreDuDuo(
                 // Pliée, hors de l'onglet de scan, seule la bulle de la carte.
                 avecLecture: deplie,
+                // Déplié, une carte lue tient tout l'écran : refermer la carte
+                // rend l'historique.
+                retourALHistorique: deplie && (nfcReader.isReadComplete || ficheHistorique != nil) ? {
+                    if ficheHistorique != nil { ficheHistorique = nil } else { nfcReader.clearData() }
+                } : nil,
                 scanner: {
                     if !nfcReader.isScanning { nfcReader.beginScanning(historyManager: historyManager) }
                 },
@@ -379,4 +415,38 @@ struct NFCReaderApp: App {
 
 #Preview {
     ContentView()
+}
+
+
+/// Une liste qui côtoie la barre du Duo s'en écarte par une marge de contenu :
+/// son cadre ne bouge pas, la séparation des panneaux reste sur la charnière.
+struct ScanCarteEcarteDeLaBarre: ViewModifier {
+    @Environment(\.retraitDeLaBarre) private var retrait
+
+    /// Loin de la barre, la liste garde sa marge ordinaire : une marge nulle
+    /// remplaçait la sienne, et ses cartes touchaient le bord de l'écran.
+    func body(content: Content) -> some View {
+        if retrait > 0 {
+            content.contentMargins(.trailing, retrait, for: .scrollContent)
+        } else {
+            content
+        }
+    }
+}
+
+/// Une carte ouverte sur l'écran déplié. En paysage, deux colonnes ; en
+/// portrait, la fiche ordinaire de l'iPhone, sur toute la largeur, qui
+/// s'écarte seulement de la barre.
+private struct FicheDuDeplie: ViewModifier {
+    let enHauteur: Bool
+
+    func body(content: Content) -> some View {
+        if enHauteur {
+            content
+                .modifier(ScanCarteEcarteDeLaBarre())
+                .environment(\.ecranDeplie, false)
+        } else {
+            content
+        }
+    }
 }

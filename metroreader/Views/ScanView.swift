@@ -247,9 +247,12 @@ struct ScanView: View {
     /// Plié couché, la fiche entière se présente en deux colonnes, qu'on
     /// l'ouvre en scannant ou depuis l'historique.
     @Environment(\.paysagePlie) private var paysagePlie
+    @Environment(\.ecranDeplie) private var ecranDeplie
 
     var body: some View {
-        if paysagePlie && partie == .tout {
+        // Sur le Duo, plié en paysage comme déplié, la fiche se présente en
+        // deux colonnes.
+        if (paysagePlie || ecranDeplie) && partie == .tout {
             FicheEnDeuxColonnes(cardID: cardID, tagIcc: tagIcc, tagEnvHolder: tagEnvHolder,
                                 tagContracts: tagContracts, tagEvents: tagEvents,
                                 tagSpecialEvents: tagSpecialEvents, export: export,
@@ -735,10 +738,15 @@ struct FicheEnDeuxColonnes: View {
 
     private static let ecartDesColonnes: CGFloat = 24
     /// La carte veut de l'air au-dessus d'elle ; le détail, un peu moins.
-    private static let margeCarte: CGFloat = 72
-    private static let margeDetail: CGFloat = 36
-    /// Ce qu'on fait défiler passe au-delà des bulles du système, en bas.
-    private static let margeBasse: CGFloat = 96
+    @Environment(\.paysagePlie) private var paysagePlie
+
+    /// Les marges ne valent que dans le cadre tourné du Duo plié, où rien ne
+    /// réserve plus le haut ni le bas. Déplié, l'écran garde ses zones sûres.
+    /// La carte remonte un peu au-delà de sa section : sans barre au-dessus, il
+    /// lui faut de l'air pour ne pas sortir par le haut, plié comme déplié.
+    private var margeCarte: CGFloat { paysagePlie ? 72 : 80 }
+    private var margeDetail: CGFloat { paysagePlie ? 36 : 40 }
+    private var margeBasse: CGFloat { paysagePlie ? 96 : 16 }
 
     /// Le forfait actif : le contrat que la carte retient, sinon le premier.
     private var forfaitActif: OuvertureDansLaFiche? {
@@ -767,9 +775,12 @@ struct FicheEnDeuxColonnes: View {
         }
         .onDisappear { actionsDuDuo.retourPossible = false }
         #endif
-        // La pile de navigation calcule ses marges avant la rotation, et les
-        // retirait aux colonnes : 84 pt côté caméra restaient vides.
-        .ignoresSafeArea()
+        // Dans le cadre tourné, la pile de navigation calcule ses marges avant
+        // la rotation, et les retirait aux colonnes : 84 pt côté caméra
+        // restaient vides. Déplié, rien ne tourne, mais la marge des capteurs,
+        // d'un côté seulement, décalait la séparation hors de la charnière :
+        // les colonnes prennent toute la largeur, et chacune sa moitié.
+        .ignoresSafeArea(edges: paysagePlie ? .all : .horizontal)
     }
 
     private func fiche(_ partie: PartieDeFiche, ouvrir: ((OuvertureDansLaFiche) -> Void)? = nil) -> ScanView {
@@ -808,9 +819,9 @@ struct FicheEnDeuxColonnes: View {
             ValidationHistoryView(events: tagEvents, contracts: tagContracts) { i in
                 withAnimation(.snappy(duration: 0.3)) { ouverte = .evenement(i) }
             }
-            // Sans barre au-dessus, l'aperçu de carte collait au bord.
-            .contentMargins(.top, Self.margeDetail, for: .scrollContent)
-            .contentMargins(.bottom, Self.margeBasse, for: .scrollContent)
+            // La marge du haut, c'est la liste qui la fixe : la sienne
+            // l'emporterait sur celle qu'on poserait ici.
+            .contentMargins(.bottom, margeBasse, for: .scrollContent)
             .toolbar(.hidden, for: .navigationBar)
             .frame(maxWidth: .infinity)
             .overlay(alignment: .leading) {
@@ -834,23 +845,28 @@ struct FicheEnDeuxColonnes: View {
             .scrollClipDisabled()
             // Sans barre au-dessus, la carte, qui remonte un peu au-delà de sa
             // section, sortait de l'écran : la marge la rattrape.
-            .contentMargins(.top, Self.margeCarte, for: .scrollContent)
-            .contentMargins(.bottom, Self.margeBasse, for: .scrollContent)
+            .contentMargins(.top, margeCarte, for: .scrollContent)
+            .contentMargins(.bottom, margeBasse, for: .scrollContent)
             // L'indicateur de défilement au bord de l'écran plutôt qu'au milieu :
             // la colonne se lit de droite à gauche, ses lignes de gauche à droite.
             .environment(\.layoutDirection, .rightToLeft)
             .frame(maxWidth: .infinity)
     }
 
-    /// À droite : ce qu'on a touché, ou le forfait actif.
+    @Environment(\.retraitDeLaBarre) private var retraitDeLaBarre
+
+    /// À droite : ce qu'on a touché, ou le forfait actif. Elle s'écarte de la
+    /// barre du Duo par l'intérieur, pour que les colonnes se partagent
+    /// l'écran à la charnière.
     private var colonneDetail: some View {
         Group {
             if let detail = ouverte ?? forfaitActif {
                 evenementOuvert(detail)
             }
         }
-        .contentMargins(.top, Self.margeDetail, for: .scrollContent)
-        .contentMargins(.bottom, Self.margeBasse, for: .scrollContent)
+        .contentMargins(.top, margeDetail, for: .scrollContent)
+        .contentMargins(.bottom, margeBasse, for: .scrollContent)
+        .contentMargins(.trailing, retraitDeLaBarre, for: .scrollContent)
         .frame(maxWidth: .infinity)
     }
 

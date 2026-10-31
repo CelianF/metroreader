@@ -49,6 +49,7 @@ struct ValidationHistoryView: View {
     /// Relancé au retour sur la page, un prix ayant pu être saisi entre-temps.
     @State private var relectureDesPrix = 0
     @Environment(\.paysagePlie) private var paysagePlie
+    @Environment(\.ecranDeplie) private var ecranDeplie
 
     /// Ce que la page affiche en s'ouvrant, calculé d'avance hors du fil
     /// principal : ouverte avec, elle n'a ni sablier à montrer ni second rendu
@@ -81,6 +82,9 @@ struct ValidationHistoryView: View {
     /// 45 pt sous la barre. À 12 pt, elle se tient à 22 pt des boutons, comme
     /// la carte d'une fiche.
     private static let margeDuHaut: CGFloat = 12
+    /// Déplié, la colonne n'a pas de barre au-dessus d'elle : la carte prend
+    /// la marge du détail d'en face, sans quoi elle collait au bord.
+    private var margeEnHaut: CGFloat { ecranDeplie && !paysagePlie ? 40 : Self.margeDuHaut }
 
     private static let titreDuJour: DateFormatter = {
         let formatter = DateFormatter()
@@ -222,7 +226,7 @@ struct ValidationHistoryView: View {
         // Deux trajets d'un même jour se tiennent à mi-distance de l'ordinaire.
         // Entre deux jours, le titre garde son écart : 57 pt avant comme après.
         .listSectionSpacing(Self.ecartEntreTrajets)
-        .contentMargins(.top, Self.margeDuHaut, for: .scrollContent)
+        .contentMargins(.top, margeEnHaut, for: .scrollContent)
         .navigationTitle("Validations")
         // Au retour des Réglages, où un prix a pu être saisi.
         .onAppear { relectureDesPrix += 1 }

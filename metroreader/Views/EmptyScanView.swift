@@ -24,6 +24,9 @@ struct EmptyScanView: View {
 
     /// Le Duo déplié : la cible tient le panneau de droite, là où est l'antenne.
     @Environment(\.ecranDeplie) private var deplie
+    /// La place de la barre du Duo : le titre et les boutons s'en écartent, la
+    /// cible peut glisser dessous jusqu'à l'antenne.
+    @Environment(\.retraitDeLaBarre) private var retraitDeLaBarre
 
     /// Tourné d'un quart sur le Duo, le libellé du bouton ne tient plus en
     /// largeur : il cède la place à son pictogramme.
@@ -108,7 +111,7 @@ struct EmptyScanView: View {
     }
 
     /// Le bord d'où la carte entre.
-    private enum Entree { case gauche, droite }
+    private enum Entree { case gauche, droite, haut, bas }
 
     /// Les quatre temps de la traversée d'une carte.
     private enum Etape {
@@ -123,33 +126,105 @@ struct EmptyScanView: View {
     }
 
     var body: some View {
+        Group {
+            if cibleACote {
+                aCote
+            } else {
+                enColonne
+            }
+        }
+    }
+
+    /// Ne retient une mesure que si son centre tombe dans l'écran : une passe
+    /// de mise en page qui sonde la vue remonte parfois une colonne étroite,
+    /// centrée hors de l'écran ; sur le Duo tourné, c'était elle qu'on
+    /// gardait, et la cible partait se perdre.
+    private func retenir(_ nouvelle: MesureCible) {
+        if nouvelle.centre > 0 && nouvelle.milieu > 0 && nouvelle.cote > 0 { mesure = nouvelle }
+    }
+
+    /// Le Duo déplié tenu en portrait, l'antenne contre un bord : la cible s'y
+    /// range, centrée en hauteur, le titre et les boutons de l'autre côté,
+    /// comme plié en paysage.
+    private var aCote: some View {
+        HStack(spacing: 28) {
+            // La cible du côté de l'antenne, le titre et les boutons de l'autre.
+            if versLAntenne.width < 0 {
+                cibleACoteMesuree
+                titreEtActions
+            } else {
+                titreEtActions
+                cibleACoteMesuree
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.trailing, retraitDeLaBarre)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Centrée sur le vrai milieu du panneau, pas sur celui de sa zone
+        // sûre : la barre d'état la tirait de 40 pt vers le bas.
+        .ignoresSafeArea(.container, edges: .vertical)
+    }
+
+    private static let coteACote: CGFloat = 240
+
+    private var cibleACoteMesuree: some View {
+        cible
+            .frame(width: Self.coteACote)
+            // Le cadre de la cible et non son dessin : le décalage de la
+            // montée ne s'applique qu'au dessin, la mesure reste au repos.
+            .onGeometryChange(for: MesureCible.self) { proxy in
+                let cadre = proxy.frame(in: .global)
+                return MesureCible(centre: cadre.midY, milieu: cadre.midX, cote: cadre.width)
+            } action: { retenir($0) }
+    }
+
+    private var titreEtActions: some View {
+        VStack(spacing: 20) {
+            titre
+            actions
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// La cible à côté des boutons : déplié, en portrait, l'antenne contre le
+    /// bord gauche ou, tête en bas, le bord droit.
+    private var cibleACote: Bool {
+        #if os(iOS)
+        let taille = Ecran.taille
+        return deplie && taille.height > taille.width && versLAntenne.width != 0
+        #else
+        return false
+        #endif
+    }
+
+    private var enColonne: some View {
         VStack(spacing: 24) {
-            // L'antenne dans la moitié basse — le Duo déplié tourné : la cible
-            // passe sous les boutons, sans quoi elle descendait se poser dessus.
             if couche {
                 cible
                 zoneCouchee
-            } else if cibleEnBas {
-                titre
-                actions
-                cible
             } else {
                 cible
-                titre
-                actions
+                // Déplié, l'antenne peut être au bas du panneau : pendant que
+                // la cible y descend, le titre et les boutons montent prendre
+                // sa place, plutôt que de passer dessous.
+                VStack(spacing: 24) {
+                    titre
+                    actions
+                }
+                .offset(y: decalage.height > 0 ? -(mesure.cote + 24) : 0)
+                .animation(sansAnimation ? nil : .snappy(duration: 0.4), value: decalage.height > 0)
             }
         }
-        .background(mesureColonne)
+        .onGeometryChange(for: MesureCible.self) { proxy in
+            let cadre = proxy.frame(in: .global)
+            let cote = min(cadre.width, Self.coteCible)
+            return MesureCible(centre: cadre.minY + cote / 2, milieu: cadre.midX, cote: cote)
+        } action: { retenir($0) }
         .padding(.horizontal, 32)
-        .padding(cibleEnBas ? .bottom : .top, 24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: cibleEnBas ? .bottom : .top)
-        // Une passe de mise en page qui sonde la vue remonte parfois une colonne
-        // étroite, centrée hors de l'écran ; sur le Duo tourné, c'était elle
-        // qu'on gardait, et la cible partait se perdre. Une mesure ne vaut que
-        // si son centre tombe dans l'écran.
-        .onPreferenceChange(CibleKey.self) { nouvelle in
-            if nouvelle.centre > 0 && nouvelle.milieu > 0 { mesure = nouvelle }
-        }
+        .padding(.top, 24)
+        // La cible en haut, à la taille qu'elle a plié, les boutons dessous :
+        // le panneau de scan est l'écran fermé, posé à côté de l'historique.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var titre: some View {
@@ -182,16 +257,6 @@ struct EmptyScanView: View {
             .rotationEffect(angleDesBoutons)
             .frame(width: zone.size.width, height: zone.size.height)
         }
-    }
-
-    /// La cible se range au bas de la colonne quand l'antenne est dans la
-    /// moitié basse de l'écran.
-    private var cibleEnBas: Bool {
-        #if os(iOS)
-        deplie && Ecran.antenneDuDuoDeplie.y > Ecran.taille.height / 2
-        #else
-        false
-        #endif
     }
 
     // MARK: - Cible
@@ -290,9 +355,21 @@ struct EmptyScanView: View {
         let cote = mesure.cote
         switch etape {
         case .cachee:
-            return CGSize(width: (entree == .gauche ? -1 : 1) * cote * 1.3, height: cote * 0.30)
+            switch entree {
+            // Au-dessus de l'écran, d'où qu'il commence.
+            case .haut: return CGSize(width: 0, height: -(mesure.centre + cote))
+            // Sous l'écran, d'où qu'il finisse.
+            case .bas:  return CGSize(width: 0, height: hauteurEcran - mesure.centre + cote)
+            default:    return CGSize(width: (entree == .gauche ? -1 : 1) * cote * 1.3, height: cote * 0.30)
+            }
         case .sousCible:
-            return CGSize(width: 0, height: cote * 0.30)
+            // Venue du haut ou du bas, elle marque sa pause sur ce bord de la
+            // cible.
+            switch entree {
+            case .haut: return CGSize(width: 0, height: -cote * 0.35)
+            case .bas:  return CGSize(width: 0, height: cote * 0.35)
+            default:    return CGSize(width: 0, height: cote * 0.30)
+            }
         case .posee:
             return CGSize(width: decalage.width - versLAntenne.width * cote * Self.poseSousCentre,
                           height: decalage.height - versLAntenne.height * cote * Self.poseSousCentre)
@@ -303,6 +380,15 @@ struct EmptyScanView: View {
             return CGSize(width: decalage.width + versLAntenne.width * cote * 1.3,
                           height: decalage.height + versLAntenne.height * cote * 1.3)
         }
+    }
+
+    /// La hauteur de l'écran, pour faire partir la carte d'en dessous.
+    private var hauteurEcran: CGFloat {
+        #if os(iOS)
+        Ecran.taille.height
+        #else
+        0
+        #endif
     }
 
     private var echelleCarte: CGFloat {
@@ -427,6 +513,11 @@ struct EmptyScanView: View {
     /// scan, sous l'antenne, et la droite traverserait l'historique.
     private var bordDEntree: Entree {
         #if os(iOS)
+        // La cible rangée à côté des boutons : la carte arrive par le bord de
+        // l'écran le plus proche, sans traverser l'autre panneau.
+        if cibleACote {
+            return Ecran.antenneDuDuoDeplie.y < Ecran.taille.height / 2 ? .haut : .bas
+        }
         if deplie {
             // Le côté de l'antenne : le bord où elle tient, ou, collée en haut
             // ou en bas, la moitié de l'écran où elle se trouve.
@@ -435,23 +526,6 @@ struct EmptyScanView: View {
         }
         #endif
         return Bool.random() ? .gauche : .droite
-    }
-
-    /// La colonne ne bouge pas quand son contenu se décale : c'est le seul
-    /// repère sûr. La cible en occupe le haut, ou le bas quand elle passe sous
-    /// les boutons, et son côté vaut la largeur disponible tant qu'elle n'est
-    /// pas coiffée — d'où son centre.
-    private var mesureColonne: some View {
-        GeometryReader { proxy in
-            let cote = min(proxy.size.width, Self.coteCible)
-            Color.clear.preference(
-                key: CibleKey.self,
-                value: MesureCible(centre: cibleEnBas ? proxy.frame(in: .global).maxY - cote / 2
-                                                      : proxy.frame(in: .global).minY + cote / 2,
-                                   milieu: proxy.frame(in: .global).midX,
-                                   cote: cote)
-            )
-        }
     }
 
     /// De combien déplacer la cible pour amener son centre sur l'antenne :
@@ -514,6 +588,11 @@ struct EmptyScanView: View {
             #if os(iOS)
             styled(scanButton)
                 .disabled(isScanning)
+                // Sa hauteur à lui, jamais celle de la rangée : le cercle
+                // d'import prend la hauteur mesurée ici, et la rangée celle du
+                // cercle. Sur le Duo, une rotation les a fait grandir l'un
+                // l'autre jusqu'à remplir le panneau.
+                .fixedSize(horizontal: false, vertical: true)
                 .background(mesureBouton)
             importButton
             #else
@@ -535,7 +614,9 @@ struct EmptyScanView: View {
     /// Le même matériau que la barre du bas, translucide, sur un cercle aussi
     /// haut que le bouton de scan.
     private var importButton: some View {
-        let cote = max(hauteurBouton, Self.hauteurContenu)
+        // Borné aussi par prudence : un cercle plus haut qu'un bouton ne
+        // serait plus le bouton d'à côté.
+        let cote = min(max(hauteurBouton, Self.hauteurContenu), Self.hauteurContenu * 3)
         return Button(action: onImport) {
             Image(systemName: "square.and.arrow.down")
                 .font(.headline)
@@ -595,7 +676,11 @@ private struct LibelleDuScan: View {
                 Image(systemName: "wave.3.forward")
                     .accessibilityLabel(enCours ? "Scan en cours…" : "Scanner une carte")
             } else {
+                // Sur une ligne : sur deux, le bouton grandissait, le cercle
+                // d'import avec lui, et le bouton rétrécissait d'autant.
                 Text(enCours ? "Scan en cours…" : "Scanner une carte")
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
         }
         .font(.headline)
@@ -608,16 +693,6 @@ private struct MesureCible: Equatable {
     /// Le milieu horizontal de la colonne, où la cible est centrée.
     var milieu: CGFloat = 0
     var cote: CGFloat = 0
-}
-
-private struct CibleKey: PreferenceKey {
-    static let defaultValue = MesureCible()
-    // Le plus grand côté l'emporte, comme le `max` de la hauteur des boutons :
-    // sinon les frères de la colonne écrasent la mesure avec leur défaut.
-    static func reduce(value: inout MesureCible, nextValue: () -> MesureCible) {
-        let suivant = nextValue()
-        if suivant.cote > value.cote { value = suivant }
-    }
 }
 
 private struct HauteurBouton: PreferenceKey {

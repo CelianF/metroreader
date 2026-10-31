@@ -20,9 +20,6 @@ struct ScanPageView: View {
     private static var hasAutoLaunched = false
     #endif
     @State private var isImporting = false
-    /// Sur le Duo déplié, la fiche se partage : ses validations passent dans
-    /// l'autre panneau.
-    @Environment(\.ecranDeplie) private var deplie
     #if os(iOS)
     /// La barre du Duo demande l'import d'ici, où vit le sélecteur de fichier.
     @ObservedObject private var actionsDuDuo = ActionsDuDuo.shared
@@ -38,7 +35,7 @@ struct ScanPageView: View {
         Group {
             if hasCard {
                 ScanView(cardID: nfcReader.cardID, tagIcc: nfcReader.tagIcc, tagEnvHolder: nfcReader.tagEnvHolder, tagContracts: nfcReader.tagContracts, tagEvents: nfcReader.tagEvents, tagSpecialEvents: nfcReader.tagSpecialEvents, export: nfcReader.export,
-                         partie: deplie ? .carte : .tout, historyManager: historyManager)
+                         historyManager: historyManager)
             } else {
                 EmptyScanView(
                     isScanning: nfcReader.isScanning,

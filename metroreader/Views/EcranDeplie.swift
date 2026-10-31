@@ -18,6 +18,14 @@ extension EnvironmentValues {
     /// Vrai dans le cadre tourné du Duo plié tenu en paysage : la page dispose
     /// de la largeur, et peut se mettre en colonnes.
     @Entry var paysagePlie: Bool = false
+
+    /// Sur le Duo déplié, ouvrir une carte de l'historique l'affiche en plein
+    /// écran, en deux colonnes, plutôt que dans le panneau de l'historique.
+    @Entry var ouvrirFicheHistorique: ((ScanRecord) -> Void)? = nil
+
+    /// La largeur que la barre du Duo occupe au bord de ce panneau : le
+    /// contenu s'en écarte, le cadre non — la cible peut glisser dessous.
+    @Entry var retraitDeLaBarre: CGFloat = 0
 }
 
 
@@ -58,8 +66,14 @@ final class OrientationDuDuo: ObservableObject {
     /// l'appareil a tourné, moins ce dont le système a déjà tourné l'interface.
     /// L'écran intérieur est posé d'un quart de tour par rapport à l'extérieur :
     /// déplié et tenu droit, l'appareil se dit en paysage, interface en portrait.
+    ///
+    /// Déplié, l'interface suit l'appareil dans les quatre sens : rien à
+    /// tourner. Le calcul y valait zéro aussi, mais pendant la rotation
+    /// l'appareil se disait déjà tourné et l'interface pas encore — les boutons
+    /// pivotaient d'un quart, et restaient ainsi, géants.
     func angle(deplie: Bool) -> Angle {
-        let degres = angleDeLAppareil.degrees - Ecran.angleDeLInterface - (deplie ? 90 : 0)
+        guard !deplie else { return .zero }
+        let degres = angleDeLAppareil.degrees - Ecran.angleDeLInterface
         // Ramené entre -180 et 180, pour que le bouton tourne par le plus court.
         let ramene = (degres + 540).truncatingRemainder(dividingBy: 360) - 180
         return .degrees(ramene == -180 ? 180 : ramene)
@@ -112,13 +126,12 @@ enum Ecran {
 
     /// L'antenne NFC du Duo déplié, sous les boutons de volume. Elle ne bouge
     /// pas sur l'appareil, mais le système tourne l'interface : on la fixe donc
-    /// dans le repère de l'écran, où elle tient contre le bord gauche à 190 pt
-    /// du haut, et on la ramène dans l'orientation du moment. Relevé sur
-    /// l'habillage du simulateur — la charnière coupe l'écran à mi-hauteur, les
-    /// boutons sont à 285 pt d'elle.
+    /// dans le repère de l'écran, où elle tient contre le bord gauche au milieu
+    /// de la moitié haute, et on la ramène dans l'orientation du moment.
     static var antenneDuDuoDeplie: CGPoint {
-        let fixe = CGPoint(x: 0, y: 190)
-        guard let ecran = scene?.screen else { return fixe }
+        guard let ecran = scene?.screen else { return CGPoint(x: 0, y: 238) }
+        // Au milieu de la moitié haute, comme le voit le voyageur.
+        let fixe = CGPoint(x: 0, y: ecran.fixedCoordinateSpace.bounds.height / 4)
         return ecran.coordinateSpace.convert(fixe, from: ecran.fixedCoordinateSpace)
     }
 
@@ -183,6 +196,9 @@ struct BarreDuDuo: View {
     /// Plié, la barre d'onglets du système fait déjà scanner et les Réglages :
     /// la bulle de lecture y ferait double emploi.
     var avecLecture = true
+    /// Déplié, une carte lue tient tout l'écran : de quoi revenir à
+    /// l'historique.
+    var retourALHistorique: (() -> Void)? = nil
     let scanner: () -> Void
     let ouvrirReglages: () -> Void
 
@@ -191,7 +207,14 @@ struct BarreDuDuo: View {
             if avecLecture {
                 bulle {
                     bouton("Importer", "square.and.arrow.down") { actions.importer = true }
-                    bouton("Scanner", "wave.3.forward", action: scanner)
+                    // Une carte affichée en plein écran : un seul bouton referme
+                    // la carte et rend la cible et l'historique, d'où l'on
+                    // scanne de nouveau.
+                    if let retourALHistorique {
+                        bouton("Lecture et historique", "wave.3.forward", action: retourALHistorique)
+                    } else {
+                        bouton("Scanner", "wave.3.forward", action: scanner)
+                    }
                     bouton("Réglages", "gearshape", action: ouvrirReglages)
                 }
             }
