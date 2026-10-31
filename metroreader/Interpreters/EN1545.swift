@@ -205,6 +205,10 @@ func interpretEventResult(_ bitstring: String) -> String {
         // Refus d'entrée : le titre ne couvre pas le service (OrlyVal exige
         // un titre aéroport, un Imagine R n'y donne pas accès)
         return "Titre non valable"
+    case 0x17:
+        // Refus d'entrée que la borne affiche « Validation interdite » : relevé
+        // sur un Noctilien N21 de Keolis Seine Orly.
+        return "Validation interdite"
     case 0x30:
         return "Double validation (Entrée)"
     case 0x31:
