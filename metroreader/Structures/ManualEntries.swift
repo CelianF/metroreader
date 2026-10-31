@@ -371,6 +371,25 @@ final class ManualEntries: ObservableObject {
         persistStops()
     }
 
+    /// Tous les codes rangés sous un même nom suivent la correction.
+    ///
+    /// L'écran les présente groupés par nom : n'en renommer qu'un scinderait
+    /// l'arrêt en deux, et laisserait la moitié de ses codes sur le mauvais.
+    /// Les coordonnées ne bougent pas — elles disent où l'on était, ce qu'un
+    /// nom mal choisi ne dément pas.
+    func rename(stops ids: [UUID], to name: String) {
+        guard !ids.isEmpty, !name.isEmpty else { return }
+        let cibles = Set(ids)
+        var touche = false
+        for i in stops.indices where cibles.contains(stops[i].id) {
+            stops[i].stationName = name
+            touche = true
+        }
+        guard touche else { return }
+        rebuild()
+        persistStops()
+    }
+
     func rename(line id: UUID, to name: String) {
         guard let i = lines.firstIndex(where: { $0.id == id }) else { return }
         lines[i].name = name

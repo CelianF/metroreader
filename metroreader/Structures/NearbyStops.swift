@@ -15,9 +15,16 @@ import CoreLocation
 /// ceux, précisément, où l'on en a besoin.
 struct NearbyStop: Decodable {
     let name: String
+    /// Le nom complété de sa commune, quand celui du référentiel ne nomme rien.
+    /// Une suggestion de voisinage en a plus besoin qu'ailleurs : « Mairie » à
+    /// cent mètres ne dit pas laquelle.
+    let alias: String?
     let mode: String
     let lat: Double
     let lon: Double
+
+    /// Ce qu'on montre et ce qu'on enregistre.
+    var libelle: String { alias ?? name }
 }
 
 public class NearbyStops {
@@ -40,7 +47,7 @@ public class NearbyStops {
             .map { (stop: $0, distance: position.distance(toLatitude: $0.lat, longitude: $0.lon)) }
             .filter { $0.distance < radius }
             .sorted { $0.distance < $1.distance }
-            .filter { vus.insert($0.stop.name).inserted }
+            .filter { vus.insert($0.stop.libelle).inserted }
             .prefix(limit)
             .map { $0 }
     }

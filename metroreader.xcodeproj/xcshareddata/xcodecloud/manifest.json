@@ -1,0 +1,9 @@
+{
+  "id" : "9ce6ba8e-a11f-45eb-a1c1-8d45dc1e0bab",
+  "targets" : [
+    {
+      "id" : "B86435C5-FE03-4154-9114-73730BE71C01",
+      "name" : "PassReader"
+    }
+  ]
+}

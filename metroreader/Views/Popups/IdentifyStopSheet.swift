@@ -63,11 +63,18 @@ struct IdentifyStopSheet: View {
 
     private var surLaLigne: Bool { lineName != nil && !toutLeReseau }
 
+    /// « la ligne 5443 », ou « la ligne empruntée » quand la carte annonce une
+    /// course que le référentiel ne nomme pas.
+    private var laLigne: String {
+        lineName.map { "la ligne \($0)" } ?? "la ligne empruntée"
+    }
+
     /// Arrêts de la ligne empruntée, connus même quand le réseau n'a aucun
     /// arrêt indexé sur un code billettique.
     private var arretsDeLaLigne: [LineStop] {
-        LineStops.stops(forLine: linePublicId).filter {
-            recherche.isEmpty || $0.name.localizedCaseInsensitiveContains(recherche)
+        LineStops.stops(forLine: linePublicId).filter { arret in
+            recherche.isEmpty
+            || arret.noms.contains { $0.localizedCaseInsensitiveContains(recherche) }
         }
     }
 
@@ -90,18 +97,25 @@ struct IdentifyStopSheet: View {
     }
 
     /// Une proposition d'arrêt, avec la distance qui dit ce qu'elle vaut.
+    ///
+    /// Un poteau porte parfois deux noms — celui du référentiel régional et
+    /// celui que son exploitant lui donne. Aucun des deux n'a raison contre
+    /// l'autre, alors les deux se proposent : c'est le nom lu sur le poteau
+    /// qu'on veut au journal, pas celui qu'une table a gardé le plus longtemps.
     @ViewBuilder
-    private func suggestion(nom: String, lat: Double, lon: Double,
+    private func suggestion(noms: [String], lat: Double, lon: Double,
                             distance: CLLocationDistance) -> some View {
-        Button {
-            enregistrer(nom: nom, lat: lat, lon: lon)
-        } label: {
-            HStack {
-                Text(nom).foregroundStyle(.primary)
-                Spacer()
-                Text(distance.courte)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        ForEach(Array(noms.enumerated()), id: \.offset) { rang, nom in
+            Button {
+                enregistrer(nom: nom, lat: lat, lon: lon)
+            } label: {
+                HStack {
+                    Text(nom).foregroundStyle(.primary)
+                    Spacer()
+                    Text(rang == 0 ? distance.courte : "même poteau")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -127,49 +141,42 @@ struct IdentifyStopSheet: View {
                     // Le code lu vient d'un valideur de la ligne empruntée :
                     // son arrêt est dans la liste de cette ligne, forcément.
                     // Les arrêts du voisinage, eux, appartiennent à n'importe
-                    // quelle ligne passant là — les mêler aux premiers, c'est
-                    // inviter à nommer la validation d'après une ligne qu'on
-                    // n'a pas prise.
+                    // quelle ligne passant là. Tant que la ligne a des arrêts
+                    // connus, les proposer — même à part — c'est inviter à
+                    // nommer la validation d'après une ligne qu'on n'a pas
+                    // prise ; le voisinage ne sert donc qu'à défaut de ligne.
+                    let ligneConnue = LineStops.connait(linePublicId)
                     let prochesDeLaLigne = LineStops.around(releve.position, forLine: linePublicId)
-                    let deLaLigne = Set(prochesDeLaLigne.map(\.stop.name))
-                    let voisins = NearbyStops.around(releve.position, mode: mode)
-                        .filter { !deLaLigne.contains($0.stop.name) }
+                    let voisins = ligneConnue
+                        ? []
+                        : NearbyStops.around(releve.position, mode: mode)
 
                     Section {
                         if !prochesDeLaLigne.isEmpty {
-                            ForEach(prochesDeLaLigne, id: \.stop.name) { arret, distance in
-                                suggestion(nom: arret.name, lat: arret.lat,
+                            ForEach(prochesDeLaLigne, id: \.stop.libelle) { arret, distance in
+                                suggestion(noms: arret.noms, lat: arret.lat,
                                            lon: arret.lon, distance: distance)
                             }
-                        } else if voisins.isEmpty {
-                            Text("Aucun arrêt connu à moins de 400 m")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            // Ligne inconnue, ou aucun de ses arrêts à portée.
-                            ForEach(voisins, id: \.stop.name) { station, distance in
-                                suggestion(nom: station.name, lat: station.lat,
+                        } else if !voisins.isEmpty {
+                            // Aucune ligne connue : le voisinage est tout ce
+                            // qu'on a, et la note dit ce qu'il vaut.
+                            ForEach(voisins, id: \.stop.libelle) { station, distance in
+                                suggestion(noms: [station.libelle], lat: station.lat,
                                            lon: station.lon, distance: distance)
                             }
+                        } else if ligneConnue {
+                            Text("Aucun arrêt de \(laLigne) à moins de 400 m")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("Aucun arrêt connu à moins de 400 m")
+                                .foregroundStyle(.secondary)
                         }
                     } header: {
                         Text("Là où tu étais au scan")
                     } footer: {
-                        Text(prochesDeLaLigne.isEmpty
-                             ? "\(qualiteDuReleve(releve)) Les arrêts proposés viennent de tous les réseaux — c'est souvent le même arrêt physique."
-                             : "\(qualiteDuReleve(releve)) Seuls les arrêts desservis par la ligne \(lineName ?? "") sont proposés ici.")
-                    }
-
-                    if !prochesDeLaLigne.isEmpty && !voisins.isEmpty {
-                        Section {
-                            ForEach(voisins, id: \.stop.name) { station, distance in
-                                suggestion(nom: station.name, lat: station.lat,
-                                           lon: station.lon, distance: distance)
-                            }
-                        } header: {
-                            Text("Autres arrêts à proximité")
-                        } footer: {
-                            Text("Ces arrêts ne sont pas dans la liste de la ligne \(lineName ?? ""). Un même arrêt physique change parfois de nom d'un réseau à l'autre, mais la suggestion est alors moins sûre.")
-                        }
+                        Text(ligneConnue
+                             ? "\(qualiteDuReleve(releve)) Le code lu vient d'un valideur de \(laLigne) : seuls ses arrêts sont proposés ici."
+                             : "\(qualiteDuReleve(releve)) Les arrêts proposés viennent de tous les réseaux — c'est souvent le même arrêt physique.")
                     }
                 } else if let ecoule, ecoule < LocationProvider.freshnessWindow {
                     Section {
@@ -217,23 +224,32 @@ struct IdentifyStopSheet: View {
 
                 if !arretsDeLaLigne.isEmpty {
                     Section {
-                        ForEach(arretsDeLaLigne, id: \.name) { arret in
-                            Button {
-                                enregistrer(nom: arret.name, lat: arret.lat, lon: arret.lon)
-                            } label: {
-                                HStack {
-                                    Text(arret.name).foregroundStyle(.primary)
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                        ForEach(arretsDeLaLigne, id: \.libelle) { arret in
+                            ForEach(Array(arret.noms.enumerated()), id: \.offset) { rang, nom in
+                                Button {
+                                    enregistrer(nom: nom, lat: arret.lat, lon: arret.lon)
+                                } label: {
+                                    HStack {
+                                        Text(nom)
+                                            .foregroundStyle(rang == 0 ? .primary : .secondary)
+                                        Spacer()
+                                        if rang == 0 {
+                                            Image(systemName: "chevron.right")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        } else {
+                                            Text("même poteau")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
                                 }
                             }
                         }
                     } header: {
                         Text("Desservi par la ligne \(lineName ?? "")")
                     } footer: {
-                        Text("Liste établie depuis le référentiel régional des lignes, indépendante du code billettique — elle vaut donc aussi pour les réseaux dont les arrêts manquent.")
+                        Text("Liste établie depuis le référentiel régional des lignes, indépendante du code billettique — elle vaut donc aussi pour les réseaux dont les arrêts manquent. Quand un poteau y porte un nom et un autre chez son exploitant, les deux sont proposés.")
                     }
                 }
 

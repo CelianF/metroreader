@@ -343,6 +343,18 @@
       "operator": "Keolis Grand Paris Seine Orly"
     },
     {
+      "id": 248,
+      "dsp": 48,
+      "network": "Rive Gauche",
+      "operator": ""
+    },
+    {
+      "id": 249,
+      "dsp": 49,
+      "network": "Rive Droite",
+      "operator": ""
+    },
+    {
       "id": 299,
       "network": "GC Marne et Brie",
       "operator": "Keolis Grand Paris Vallée de la Marne"

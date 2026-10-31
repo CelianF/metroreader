@@ -85,13 +85,22 @@ public class ProviderCatalog {
 
     /// Les délégations que la RATP exploite sous la marque « RATP Cap ».
     ///
-    /// Elles ont repris des lignes RATP en gardant leurs numéros, mais le
-    /// référentiel ne les a pas redéclarées sous le nouvel exploitant : Massy –
-    /// Juvisy n'y annonce aucune ligne, Pompadour une seule. La carte, elle,
-    /// annonce la délégation — d'où des lignes à nommer à la main alors que le
-    /// référentiel les contient. Le renvoi vers la RATP s'arrête à cette
-    /// marque : un numéro de bus se recycle d'un réseau à l'autre, et les
-    /// autres délégations, elles, ont bien déclaré leurs lignes.
+    /// Elles ont repris des lignes RATP en gardant leurs numéros, que le
+    /// référentiel laisse rangées sous la RATP. La carte, elle, annonce la
+    /// délégation — d'où des lignes à nommer à la main alors que le
+    /// référentiel les contient.
+    ///
+    /// Ce filet ne dit plus le gros de l'affaire : la marque n'y était pour
+    /// rien. Treize délégations gardent des lignes rangées sous la RATP, dont
+    /// sept hors « RATP Cap » — Seine Orly, Ourcq, Croix du Sud, Vallée de la
+    /// Marne, Express Roissy, Seine et Oise, Argenteuil. Depuis que le référentiel
+    /// publie `id_bus_contrat`, c'est lui qui nomme le lot qui exploite
+    /// chaque ligne, et `NavigoLines.json` range désormais ces lignes sous
+    /// leur délégation autant que sous la RATP. Le filet ne sert plus qu'aux
+    /// lignes que le référentiel n'a pas encore rattachées à un lot ; il ne
+    /// s'ouvre qu'à cette marque parce qu'un numéro de bus se recycle d'un
+    /// réseau à l'autre, et qu'à défaut du lot publié, rien ne prouve que
+    /// celui de la carte désigne la même ligne.
     static func isRATPDelegation(_ id: Int) -> Bool {
         guard let exploitant = findProvider(id) else { return false }
         return (exploitant.operatorName ?? exploitant.name ?? "").hasPrefix("RATP Cap")

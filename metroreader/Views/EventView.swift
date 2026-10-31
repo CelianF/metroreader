@@ -17,9 +17,6 @@ struct EventView: View {
     /// pour une validation lue seule, qui la retrouve d'elle-même.
     var regle: RegleDeTransition?
     var contractsInfos: [[String: Any]] = []
-    /// Vrai depuis les voyages reconstitués : une validation de bus y propose de
-    /// dire que l'arrêt affiché n'est pas le bon.
-    var signaleArret = false
 
     // La résolution est refaite à chaque rendu et le journal est observé : ce
     // qu'on vient d'identifier s'affiche sans quitter l'écran.
@@ -45,12 +42,11 @@ struct EventView: View {
     }
 
     init(eventInfo: [String: Any] = [:], transition: String? = nil, regle: RegleDeTransition? = nil,
-         contractsInfos: [[String: Any]] = [], signaleArret: Bool = false) {
+         contractsInfos: [[String: Any]] = []) {
         self.eventInfo = eventInfo
         self.transition = transition
         self.regle = regle
         self.contractsInfos = contractsInfos
-        self.signaleArret = signaleArret
     }
 
     private var event: ResolvedEvent { ResolvedEvent(eventInfo, transition: transition) }
@@ -190,7 +186,7 @@ struct EventView: View {
 
                     // Un arrêt inconnu n'a rien à contester ; un arrêt écarté,
                     // lui, peut revenir.
-                    if signaleArret, event.isBus, event.location.found || event.isStopIgnored {
+                    if event.isBus, event.location.found || event.isStopIgnored {
                         MauvaisArret(eventInfo: eventInfo, event: event)
                     }
                 }
@@ -500,14 +496,18 @@ struct EventView: View {
     private func suggestion(pour event: ResolvedEvent)
     -> (nom: String, lat: Double, lon: Double, distance: CLLocationDistance)? {
         guard let releve = gps.fix(for: eventInstant) else { return nil }
-        if let arret = LineStops.around(releve.position, forLine: event.lineData?.public_id,
-                                        limit: 1).first {
-            return (arret.stop.name, arret.stop.lat, arret.stop.lon, arret.distance)
+        let ligne = event.lineData?.public_id
+        if let arret = LineStops.around(releve.position, forLine: ligne, limit: 1).first {
+            return (arret.stop.libelle, arret.stop.lat, arret.stop.lon, arret.distance)
         }
+        // Les arrêts de la ligne sont connus et aucun n'est à portée : c'est
+        // que le bon n'y est pas, pas qu'il faille en proposer un d'ailleurs.
+        // Sans suggestion, le bouton ouvre la fiche, qui liste toute la ligne.
+        guard !LineStops.connait(ligne) else { return nil }
         guard let voisin = NearbyStops.nearest(releve.position, mode: event.lookupMode) else {
             return nil
         }
-        return (voisin.stop.name, voisin.stop.lat, voisin.stop.lon, voisin.distance)
+        return (voisin.stop.libelle, voisin.stop.lat, voisin.stop.lon, voisin.distance)
     }
 
     private func ajouter(nom: String, lat: Double, lon: Double, pour event: ResolvedEvent) {

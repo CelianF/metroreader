@@ -145,7 +145,7 @@ struct ValidationHistoryView: View {
                                 let transition = validations.transition(de: i)
                                 NavigationLink {
                                     EventView(eventInfo: events[i], transition: transition, regle: validations.regle(de: i),
-                                              contractsInfos: contracts, signaleArret: true)
+                                              contractsInfos: contracts)
                                 } label: {
                                     EventPreview(eventInfo: events[i], transition: transition, afficheDate: false)
                                 }
