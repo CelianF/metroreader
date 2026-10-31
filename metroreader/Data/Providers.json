@@ -351,13 +351,13 @@
       "id": 248,
       "dsp": 48,
       "network": "Rive Gauche",
-      "operator": ""
+      "operator": "RATP Cap Rive Gauche"
     },
     {
       "id": 249,
       "dsp": 49,
       "network": "Rive Droite",
-      "operator": ""
+      "operator": "RATP Cap Rive Droite"
     },
     {
       "id": 299,
