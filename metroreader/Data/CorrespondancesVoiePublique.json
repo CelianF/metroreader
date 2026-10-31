@@ -1,0 +1,173 @@
+[
+  {
+    "nom": "Porte de Clichy (13, 14) – Porte de Clichy (C)",
+    "gares": [
+      "Porte de Clichy"
+    ]
+  },
+  {
+    "nom": "Saint-Michel (4) – Saint-Michel Notre-Dame (B, C)",
+    "gares": [
+      "Saint-Michel",
+      "Saint-Michel Notre-Dame"
+    ]
+  },
+  {
+    "nom": "Gare d'Austerlitz (5, 10) – Gare d'Austerlitz (C)",
+    "gares": [
+      "Gare d'Austerlitz"
+    ]
+  },
+  {
+    "nom": "Porte Dauphine (2) – Avenue Foch (C)",
+    "gares": [
+      "Porte Dauphine",
+      "Avenue Foch"
+    ]
+  },
+  {
+    "nom": "Alma - Marceau (9) – Pont de l'Alma (C)",
+    "gares": [
+      "Alma - Marceau",
+      "Pont de l'Alma"
+    ]
+  },
+  {
+    "nom": "Solférino (12) – Musée d'Orsay (C)",
+    "gares": [
+      "Solférino",
+      "Musée d'Orsay"
+    ]
+  },
+  {
+    "nom": "Javel (10) – Javel (C)",
+    "gares": [
+      "Javel - André Citroën",
+      "Javel"
+    ]
+  },
+  {
+    "nom": "Neuilly Porte Maillot (C, E) – Porte Maillot (1)",
+    "gares": [
+      "Neuilly Porte Maillot",
+      "Porte Maillot"
+    ]
+  },
+  {
+    "nom": "Gare du Nord (4, 5, B, D, H, K) – Magenta (E) – Poissonnière (7)",
+    "gares": [
+      "Gare du Nord",
+      "Magenta",
+      "Poissonnière"
+    ]
+  },
+  {
+    "nom": "Châtelet les Halles (A, B, D) – Les Halles (4)",
+    "gares": [
+      "Châtelet les Halles",
+      "Les Halles"
+    ]
+  },
+  {
+    "nom": "Saint-Lazare (E, J, L, 3, 12, 13, 14) – Saint-Augustin (9)",
+    "gares": [
+      "Haussmann Saint-Lazare",
+      "Gare Saint-Lazare",
+      "Saint-Lazare",
+      "Saint-Augustin"
+    ]
+  },
+  {
+    "nom": "Saint-Lazare (E, J, L, 3, 12, 13, 14) – Havre-Caumartin (3, 9)",
+    "gares": [
+      "Haussmann Saint-Lazare",
+      "Gare Saint-Lazare",
+      "Saint-Lazare",
+      "Havre-Caumartin"
+    ]
+  },
+  {
+    "nom": "Saint-Lazare (E, J, L, 3, 12, 13, 14) – Auber (A)",
+    "gares": [
+      "Haussmann Saint-Lazare",
+      "Gare Saint-Lazare",
+      "Saint-Lazare",
+      "Auber"
+    ]
+  },
+  {
+    "nom": "Pont Cardinet (14) – Pont Cardinet (L)",
+    "gares": [
+      "Pont Cardinet"
+    ]
+  },
+  {
+    "nom": "Gare Montparnasse (N) – Montparnasse Bienvenue (4, 6, 12, 13)",
+    "gares": [
+      "Gare Montparnasse",
+      "Montparnasse Bienvenue"
+    ]
+  },
+  {
+    "nom": "Gare de l'Est (P, 4, 5, 7) – Château Landon (7)",
+    "gares": [
+      "Gare de l'Est",
+      "Château Landon"
+    ]
+  },
+  {
+    "nom": "Gare de l'Est (P, 4, 5, 7) – Gare du Nord (4, 5, B, D, H, K) – Magenta (E)",
+    "gares": [
+      "Gare de l'Est",
+      "Gare du Nord",
+      "Magenta"
+    ]
+  },
+  {
+    "nom": "Massy - Palaiseau (B, C, 18)",
+    "gares": [
+      "Massy - Palaiseau"
+    ]
+  },
+  {
+    "nom": "La Défense (L, U) – La Défense (A, 1)",
+    "gares": [
+      "La Défense",
+      "La Défense (Grande Arche)"
+    ]
+  },
+  {
+    "nom": "Gare de Lyon (1, 14, A, D) – Gare de Lyon (R)",
+    "gares": [
+      "Gare de Lyon"
+    ]
+  },
+  {
+    "nom": "Pont de Rungis (14) – Pont de Rungis (C)",
+    "gares": [
+      "Thiais - Orly​ (Pont de Rungis​)",
+      "Pont de Rungis Aéroport d'Orly"
+    ]
+  },
+  {
+    "nom": "Saint-Denis - Pleyel (14) – Stade de France Saint-Denis (D)",
+    "gares": [
+      "Saint-Denis - Pleyel",
+      "Stade de France Saint-Denis"
+    ]
+  },
+  {
+    "nom": "Rosny-Bois-Perrier (11) – Rosny Bois Perrier (E)",
+    "gares": [
+      "Rosny-Bois-Perrier",
+      "Rosny Bois Perrier"
+    ]
+  },
+  {
+    "nom": "Nanterre Préfecture (A) – Nanterre-La-Folie (E)",
+    "gares": [
+      "Nanterre Préfecture",
+      "Nanterre-La-Folie"
+    ]
+  }
+]

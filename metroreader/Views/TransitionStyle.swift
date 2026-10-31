@@ -173,12 +173,18 @@ private let delaiSurface: TimeInterval = 90 * 60
 ///   être ressorti ;
 /// - après le bus, le tram ou le câble, toute entrée l'est.
 ///
-/// Un trajet ne compte qu'un changement : bus, bus puis bus, ou bus, tram puis
-/// métro, en commencent un autre, quand bus, métro puis train reste d'un seul
-/// tenant. Reprendre une ligne déjà empruntée en commence un autre aussi :
-/// l'aller-retour n'est pas une correspondance. Les tickets à l'unité — ceux
-/// qui portent un compteur — en sont exclus, puisqu'un changement de réseau y
-/// réclame un autre ticket.
+/// Entre bus et tram, les correspondances sont illimitées dans le délai, comme
+/// IDFM l'accorde aux forfaits et à Liberté+ : bus, bus puis tram reste d'un
+/// seul tenant. Passer de la surface au rail, ou l'inverse, ne compte qu'une
+/// fois : bus, tram puis métro en commencent un autre après le tram, quand
+/// bus, métro puis train reste d'un seul tenant. Reprendre une ligne déjà
+/// empruntée en commence un autre aussi : l'aller-retour n'est pas une
+/// correspondance. Les tickets à l'unité — ceux qui portent un compteur — en
+/// sont exclus : chaque validation y ouvre un trajet.
+///
+/// Dans le rail, on change sans sortir. Une sortie franche ferme le trajet
+/// pour le rail, sauf par une correspondance de la liste IDFM par la voie
+/// publique — voir `CorrespondancesVoiePublique`.
 func entreeDansLeDelai(_ lue: LectureValidation, precedents: some Collection<LectureValidation>) -> Bool {
     guard !lue.refus, entreeDeVoyage(lue), let instant = lue.instant else { return false }
 
@@ -197,9 +203,17 @@ func entreeDansLeDelai(_ lue: LectureValidation, precedents: some Collection<Lec
     // est celle qu'on juge.
     let chrono = Array(fenetre.reversed())
     var trajet: (debut: Date, depuisLeRail: Bool, forfait: Bool, lignes: Set<LigneEmpruntee>,
-                 changements: Int, dansLeRail: Bool)?
+                 changements: Int, dansLeRail: Bool, sortie: LectureValidation?)?
     var prolongee = false
     for (k, evenement) in chrono.enumerated() {
+        // Une sortie franche du rail ferme le trajet pour le rail : à Persan, le
+        // 25/10, sortir puis revalider à la même porte dans la minute est un
+        // nouveau voyage, pas un changement. Le bus ou le tram pris en sortant
+        // reste, lui, une correspondance.
+        if !evenement.refus, ferre(evenement.mode), TransitionKind(evenement.transition) == .sortie {
+            trajet?.sortie = evenement
+            continue
+        }
         guard !evenement.refus, let date = evenement.instant, entreeDeVoyage(evenement) else { continue }
         let rail = ferre(evenement.mode)
         let ligne = evenement.ligne
@@ -214,8 +228,25 @@ func entreeDansLeDelai(_ lue: LectureValidation, precedents: some Collection<Lec
         if let t = trajet, date.timeIntervalSince(t.debut) <= (t.depuisLeRail ? delaiRail : delaiSurface) {
             if dejaDite {
                 prolonge = true
+            } else if let sortie = t.sortie, rail {
+                // Sauf par une correspondance de la liste IDFM, où l'on sort d'un
+                // réseau pour entrer dans l'autre — Châtelet les Halles et Les
+                // Halles, Gare de Lyon, La Défense —, dans les 2 h du trajet.
+                // Une gare de même nom ne se relie qu'à l'autre réseau : sortir
+                // du RER à Gare de Lyon pour y reprendre le RER est un nouveau
+                // voyage, en sortir pour la ligne R une correspondance.
+                if let depuis = sortie.gare, let vers = evenement.gare,
+                   let quand = sortie.instant, date >= quand,
+                   depuis != vers || sortie.exploitant != evenement.exploitant {
+                    prolonge = CorrespondancesVoiePublique.relie(depuis, vers)
+                }
             } else if t.forfait, evenement.forfait, !(ligne.map { t.lignes.contains($0) } ?? false) {
                 if t.dansLeRail && ModeTransport(rawValue: evenement.mode) == .train {
+                    prolonge = true
+                } else if !t.dansLeRail && !rail {
+                    // Entre bus et tram, les correspondances sont illimitées
+                    // dans le délai : seul l'aller-retour sur une même ligne,
+                    // écarté plus haut, recommence un trajet.
                     prolonge = true
                 } else if !(t.dansLeRail && rail) {
                     change = true
@@ -227,9 +258,12 @@ func entreeDansLeDelai(_ lue: LectureValidation, precedents: some Collection<Lec
             if let ligne { trajet?.lignes.insert(ligne) }
             if change { trajet?.changements += 1 }
             trajet?.dansLeRail = rail
+            // Revenu dans le rail : la sortie est soldée.
+            if rail { trajet?.sortie = nil }
         } else {
             trajet = (debut: date, depuisLeRail: rail, forfait: evenement.forfait,
-                      lignes: Set([ligne].compactMap { $0 }), changements: 0, dansLeRail: rail)
+                      lignes: Set([ligne].compactMap { $0 }), changements: 0, dansLeRail: rail,
+                      sortie: nil)
         }
         prolongee = prolonge && !dejaDite
     }

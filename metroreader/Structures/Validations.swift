@@ -20,6 +20,11 @@ struct LectureValidation {
     /// L'exploitant, la course et le mode, pour reconnaître une ligne reprise.
     /// Rien quand la carte ne les écrit pas, comme aux portes SNCF.
     let ligne: LigneEmpruntee?
+    /// La gare, pour le rail seulement : c'est elle qui dit si sortir puis
+    /// revalider est un changement de ligne ou un nouveau voyage.
+    let gare: String?
+    /// L'exploitant que la borne annonce, SNCF ou RATP pour le rail.
+    let exploitant: Int?
     /// Le titre que la validation désigne.
     let contrat: [String: Any]?
     /// Payé par un titre sans compteur — un forfait, ou Liberté+. Faute de titre
@@ -33,6 +38,7 @@ struct LectureValidation {
                                                isRouteNumberPresent: course != nil,
                                                routeNumber: course,
                                                serviceProvider: exploitant)
+        self.exploitant = exploitant
         self.instant = ResolvedEvent.instant(evenement)
         self.mode = mode
         self.brute = brute
@@ -42,6 +48,15 @@ struct LectureValidation {
             self.ligne = LigneEmpruntee(exploitant: exploitant, course: course, mode: mode)
         } else {
             self.ligne = nil
+        }
+        if ModeTransport(rawValue: mode)?.estFerre ?? false {
+            let arret = interpretLocationId(getKey(evenement, "EventLocationId") ?? "",
+                                            getKey(evenement, "EventCode") ?? "",
+                                            getKey(evenement, "EventServiceProvider") ?? "",
+                                            getKey(evenement, "EventRouteNumber"))
+            self.gare = arret.found ? arret.name : nil
+        } else {
+            self.gare = nil
         }
         let contrat = contratDesigne(par: evenement, parmi: contrats)
         self.contrat = contrat
