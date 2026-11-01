@@ -22,9 +22,9 @@ func interpretNavigoCommercialId(_ bitstring: String) -> String {
     case 10:
         return "eSE Apple"
     case 16:
-        return "Navigo Easy Carte"
+        return "Navigo Easy Plastique"
     case 17:
-        return "Navigo Easy SOCS"
+        return "Navigo Easy Carton" // Support Occasionnel Carton Sans Contact
     case 32:
         return "Carte Interne"
     default:
@@ -72,9 +72,9 @@ func interpretNavigoImage(_ personalizationStatusBitstring: String, _ issuerIdBi
         default:
             return "Nominatif"
         }
-    case "Navigo Easy Carte":
+    case "Navigo Easy Plastique":
         return "Easy"
-    case "Navigo Easy SOCS": // Support Occasionnel Carton Sans Contact
+    case "Navigo Easy Carton":
         return "EasyCarton"
     default:
         switch perso {
