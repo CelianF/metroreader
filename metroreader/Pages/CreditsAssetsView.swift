@@ -19,6 +19,25 @@ struct CreditsAssetsView: View {
             }
 
             Section {
+                Link(destination: URL(string: "https://data.iledefrance-mobilites.fr")!) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Île-de-France Mobilités")
+                            .foregroundColor(.primary)
+                        Text("data.iledefrance-mobilites.fr")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Données")
+            } footer: {
+                // Mention exigée par les deux licences, et par les CGU de PRIM
+                // qui y renvoient. Les tables corrigées et enrichies restent
+                // sous ODbL : le README du dépôt le déclare.
+                Text("Arrêts, lignes et réseaux viennent de l'open data d'Île-de-France Mobilités : « Référentiel des lignes » et « Arrêts et lignes associées » sous licence ODbL, « Arrêts transporteur » sous Licence Ouverte v2.0. Les tables qu'en tire l'app, corrigées et enrichies, sont publiées sous ODbL avec son code source.")
+            }
+
+            Section {
                 Text("Île-de-France Mobilités")
                 Text("Transilien SNCF")
                 Text("RATP")
