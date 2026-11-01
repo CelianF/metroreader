@@ -482,7 +482,7 @@ struct ScanView: View {
             }
 
             if !tagEnvHolder.isEmpty {
-                Section(header: Text("Environnement")) {
+                Section(header: Text("Environnement").frame(maxWidth: .infinity, alignment: .leading)) {
                     EnvHolderView(envHolderInfo: tagEnvHolder, cardID: cardID)
                 }
             }
@@ -862,6 +862,13 @@ struct FicheEnDeuxColonnes: View {
         Group {
             if let detail = ouverte ?? forfaitActif {
                 evenementOuvert(detail)
+            } else {
+                // Ni contrat ni validation : la colonne garde sa moitié. Vide,
+                // elle ne prenait aucune place, et la fiche s'étalait sur tout
+                // l'écran, sous la barre.
+                ContentUnavailableView("Rien à détailler", systemImage: "creditcard",
+                                       description: Text("Ce pass ne porte ni contrat ni validation."))
+                    .padding(.trailing, retraitDeLaBarre)
             }
         }
         .contentMargins(.top, margeDetail, for: .scrollContent)
