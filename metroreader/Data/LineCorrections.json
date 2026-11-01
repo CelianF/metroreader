@@ -141,5 +141,15 @@
     "constate": "2026-06-08",
     "raison": "Le référentiel donne le privatecode 000535201 à 7820, 7823 et 7825 : rien n'y distingue la course. La table livrée l'attribuait à 7823, qui part de Bonnières-sur-Seine. IDFM décrit 7820 comme « Mantes-la-Jolie Hôpital → La Défense Terminal Jules Verne », et la validation du 8 juin 2026 à 08:46 suit d'une minute l'arrivée du train à Mantes-la-Jolie.",
     "fonde_sur": "validation observée"
+  },
+  {
+    "provider_id": 120,
+    "line_id": 114,
+    "mode": "Bus urbain",
+    "public_id": "C01336",
+    "remplace": null,
+    "constate": "2026-11-01",
+    "raison": "Prouvé : Montbus appartient au réseau Vallée Sud Bus, comme la ligne 14, exploité par Transdev Vallée Sud ; le référentiel la laisse pourtant sous la RATP, course 526. Déduit : la course 114. Les trois autres navettes reprises par Vallée Sud, ClamiBus, Le Petit Fontenaisien et L'Hirondelle (RATP 579, 594, 597), y portent 111, 112 et 113, dans l'ordre alphabétique, et Montbus vient après. À trancher par une validation à bord : si la carte écrit une autre course, déplacer cette entrée.",
+    "fonde_sur": "déduit"
   }
 ]
