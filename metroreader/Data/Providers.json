@@ -365,6 +365,16 @@
       "operator": "RATP Cap Rive Droite"
     },
     {
+      "id": 291,
+      "network": "Paris-Saclay Mobilités",
+      "operator": "Autocars Dominique"
+    },
+    {
+      "id": 292,
+      "network": "Grand Paris Seine Ouest",
+      "operator": "Origami / Mobicité"
+    },
+    {
       "id": 299,
       "network": "GC Marne et Brie",
       "operator": "Keolis Grand Paris Vallée de la Marne"
